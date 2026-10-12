@@ -24,100 +24,38 @@
 
 ## Overview
 
-Termix Mobile connects to your [Termix](https://github.com/Termix-SSH/Termix) server so you can manage your servers from your phone or tablet. You need a Termix server to use it. See the [install docs](https://docs.termix.site/install) to set one up.
+Termix Mobile connects to your [Termix](https://github.com/Termix-SSH/Termix) server from a phone or tablet. You need a Termix server to use it, see the [install docs](https://docs.termix.site/install).
 
-Termix is plugin-based, so features like the file manager, Docker, tunnels and metrics show up when the matching plugin is turned on in your server.
+Features like the file manager, Docker, tunnels and metrics show up when the matching plugin is on in your server.
 
-Want to try Termix first? Use the [demo](https://demo.termix.site/), any username and password works.
+Try Termix at [demo.termix.site](https://demo.termix.site/). Any username and password works.
 
 <br />
 
 ## Features
 
-<table>
-<tr>
-<td width="50%" valign="top">
-
-**SSH Terminal:**
-Open multiple terminal sessions at once with tab-based navigation. Switch between a standard keyboard and a custom terminal keyboard built for SSH use. Customize the keyboard layout and key repeat, save snippets for quick reuse, recall past commands from the history bar, and use hardware keyboards, dictation, and VoiceOver. Sessions stay alive in the background.
-
-</td>
-<td width="50%" valign="top">
-
-**File Manager:**
-Browse, view, edit, move, and manage files and folders over SSH. Pin files and add folder shortcuts to get back to what you use most. Compress files, download them through the share sheet, and restore deleted items from the trash.
-
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
-
-**Host Metrics:**
-Monitor CPU, memory, disk, network, uptime, running processes, open ports, firewall rules, and login history in real time. Server alerts show up on the hosts screen.
-
-</td>
-<td width="50%" valign="top">
-
-**SSH Tunnels:**
-Create, start, and stop SSH tunnels, and set them up per host right from the host editor.
-
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
-
-**Docker:**
-View and manage Docker containers directly from your phone.
-
-</td>
-<td width="50%" valign="top">
-
-**Remote Desktop:**
-Access a graphical desktop on your server (RDP, VNC, and Telnet supported).
-
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
-
-**Home Screen Widgets:**
-Add widgets on iOS and Android to jump straight into a host, run a snippet, or check host metrics without opening the app. Pick which hosts each widget shows and which tab it opens.
-
-</td>
-<td width="50%" valign="top">
-
-**Host Management:**
-Organize your servers into folders. Save credentials and SSH keys per host. Use Quick Connect to jump into a session fast, and wake a machine over the network with Wake-on-LAN.
-
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
-
-**Settings:**
-Customize your terminal appearance, keyboard layout, and keys. Manage API keys, active sessions, and two-factor authentication for your Termix account, plus change your password or delete your account.
-
-</td>
-<td width="50%" valign="top">
-
-**App Lock:**
-Lock the app behind Face ID, Touch ID, or fingerprint, with a PIN as backup.
-
-</td>
-</tr>
-</table>
+- SSH terminal: several sessions in tabs, a custom terminal keyboard with a layout you can change, snippets, a history bar, hardware keyboards, dictation and VoiceOver. Sessions stay alive in the background.
+- File manager: browse, edit, move, compress and download files over SSH. Pin files, add folder shortcuts and restore from trash.
+- Host metrics: CPU, memory, disk, network, uptime, processes, ports, firewall rules and login history, plus server alerts on the hosts screen.
+- SSH tunnels: create, start and stop tunnels, set up per host in the host editor.
+- Docker: view and manage containers.
+- Remote desktop: RDP, VNC and Telnet.
+- Home screen widgets on iOS and Android: open a host, run a snippet or check metrics without opening the app.
+- Hosts: folders, saved credentials and keys, Quick Connect and Wake-on-LAN.
+- Settings: terminal look, keyboard, API keys, active sessions, two-factor, password and account deletion.
+- App lock: Face ID, Touch ID or fingerprint, with a PIN as backup.
 
 <br />
 
 ## Installation
 
-Termix Mobile is available for both [Android](https://docs.termix.site/install/connector/android) and [iOS](https://docs.termix.site/install/connector/ios) platforms.
+Termix Mobile is available for [Android](https://docs.termix.site/install/apps/android) and [iOS](https://docs.termix.site/install/apps/ios).
 
 <br />
 
 ## Sponsors
 
-Interested in a paid placement to support development? Email [mail@termix.site](mailto:mail@termix.site).
+For a paid sponsor spot, email [mail@termix.site](mailto:mail@termix.site).
 
 <!-- SPONSORS:START -->
 
@@ -163,7 +101,7 @@ Interested in a paid placement to support development? Email [mail@termix.site](
 
 Bugs and ideas for the mobile app go in this repo: [report a bug](https://github.com/Termix-SSH/Mobile/issues/new?template=bug_report.yml) or [request a feature](https://github.com/Termix-SSH/Mobile/issues/new?template=feature_request.yml). Problems with the Termix server or a plugin go in the [Termix repo](https://github.com/Termix-SSH/Termix/issues/new/choose) or that plugin's repo. Not sure where it goes? Open it in Termix and it will be moved.
 
-Please be as detailed as possible, preferably in English.
+Add as much detail as you can, in English if possible.
 
 For discussions and questions, join the [Discord](https://discord.gg/jVQGdvHDrf) server.
 
@@ -171,4 +109,4 @@ For discussions and questions, join the [Discord](https://discord.gg/jVQGdvHDrf)
 
 ## License
 
-Distributed under the Apache License Version 2.0. See [LICENSE](LICENSE) for more information.
+Apache License 2.0. See [LICENSE](LICENSE).

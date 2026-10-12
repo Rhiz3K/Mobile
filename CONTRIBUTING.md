@@ -21,8 +21,6 @@ Termix Mobile is the iOS and Android app for [Termix](https://github.com/Termix-
 
 ## Running the development server
 
-Run the following command:
-
 ```sh
 npm run start
 ```
@@ -31,22 +29,22 @@ This starts the Expo development server. Open it in Expo Go or a development bui
 
 ## Making a change
 
-1. **Fork the repository**: Click "Fork" at the top right of the [repository page](https://github.com/Termix-SSH/Mobile).
-2. **Create a branch**:
+1. Fork the [repo](https://github.com/Termix-SSH/Mobile).
+2. Create a branch:
    ```sh
    git checkout -b feature/my-new-feature
    ```
-3. **Make your changes**.
-4. **Commit your changes**:
+3. Make your changes.
+4. Commit your changes:
    ```sh
    git commit -m "feat: add my new feature"
    ```
-5. **Push to your fork**:
+5. Push to your fork:
    ```sh
    git push origin feature/my-new-feature
    ```
-6. **Open a pull request** with a clear description.
+6. Open a pull request with a clear description.
 
 ## Support
 
-Bugs and ideas for the mobile app go in [this repo](https://github.com/Termix-SSH/Mobile/issues/new/choose). Please be as detailed as possible, preferably in English. You can also ask in the [Discord](https://discord.gg/jVQGdvHDrf) server.
+Bugs and ideas for the mobile app go in [this repo](https://github.com/Termix-SSH/Mobile/issues/new/choose). Add as much detail as you can, in English if possible. You can also ask in the [Discord](https://discord.gg/jVQGdvHDrf) server.
