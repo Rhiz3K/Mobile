@@ -21,6 +21,7 @@ import {
   AccordionSection,
 } from "@/app/components/ui";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
+import { useServerFeatures } from "@/app/contexts/ServerFeaturesContext";
 import { toast } from "@/app/utils/toast";
 
 type TabId = "general" | "auth";
@@ -72,6 +73,7 @@ export default function CredentialForm({
 }) {
   const insets = useSafeAreaInsets();
   const color = useThemeColor();
+  const features = useServerFeatures();
   const [form, setForm] = useState<CredentialFormState>(EMPTY);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("general");
@@ -411,61 +413,63 @@ export default function CredentialForm({
                     </Field>
                   </Section>
 
-                  <Section title="Key Generation">
-                    <View className="gap-2.5 border border-border bg-card px-3 py-3">
-                      <View className="gap-0.5">
-                        <Text
-                          weight="medium"
-                          className="text-sm text-foreground"
-                        >
-                          Generate new key pair
-                        </Text>
-                        <Text className="text-[10px] text-muted-foreground">
-                          Replaces current private and public key
-                        </Text>
+                  {features.has("credentialTools") ? (
+                    <Section title="Key Generation">
+                      <View className="gap-2.5 border border-border bg-card px-3 py-3">
+                        <View className="gap-0.5">
+                          <Text
+                            weight="medium"
+                            className="text-sm text-foreground"
+                          >
+                            Generate new key pair
+                          </Text>
+                          <Text className="text-[10px] text-muted-foreground">
+                            Replaces current private and public key
+                          </Text>
+                        </View>
+                        <View className="flex-row flex-wrap gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            loading={generatingKey === "ed25519"}
+                            onPress={() =>
+                              handleGenerateKeyPair(
+                                "ssh-ed25519",
+                                undefined,
+                                "ed25519",
+                              )
+                            }
+                          >
+                            Ed25519
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            loading={generatingKey === "ecdsa"}
+                            onPress={() =>
+                              handleGenerateKeyPair(
+                                "ecdsa-sha2-nistp256",
+                                undefined,
+                                "ecdsa",
+                              )
+                            }
+                          >
+                            ECDSA
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            loading={generatingKey === "rsa"}
+                            onPress={() =>
+                              handleGenerateKeyPair("ssh-rsa", 2048, "rsa")
+                            }
+                          >
+                            RSA 2048
+                          </Button>
+                        </View>
                       </View>
-                      <View className="flex-row flex-wrap gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          loading={generatingKey === "ed25519"}
-                          onPress={() =>
-                            handleGenerateKeyPair(
-                              "ssh-ed25519",
-                              undefined,
-                              "ed25519",
-                            )
-                          }
-                        >
-                          Ed25519
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          loading={generatingKey === "ecdsa"}
-                          onPress={() =>
-                            handleGenerateKeyPair(
-                              "ecdsa-sha2-nistp256",
-                              undefined,
-                              "ecdsa",
-                            )
-                          }
-                        >
-                          ECDSA
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          loading={generatingKey === "rsa"}
-                          onPress={() =>
-                            handleGenerateKeyPair("ssh-rsa", 2048, "rsa")
-                          }
-                        >
-                          RSA 2048
-                        </Button>
-                      </View>
-                    </View>
-                  </Section>
+                    </Section>
+                  ) : null}
 
                   <Section title="Private Key">
                     <View className="flex-row items-center justify-between">
@@ -499,14 +503,16 @@ export default function CredentialForm({
                     <View className="flex-row items-center justify-between">
                       <Label>Public Key (optional)</Label>
                       <View className="flex-row gap-1.5">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          loading={generatingPublicKey}
-                          onPress={handleGeneratePublicKey}
-                        >
-                          Generate
-                        </Button>
+                        {features.has("credentialTools") ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            loading={generatingPublicKey}
+                            onPress={handleGeneratePublicKey}
+                          >
+                            Generate
+                          </Button>
+                        ) : null}
                         <Button
                           variant="outline"
                           size="sm"

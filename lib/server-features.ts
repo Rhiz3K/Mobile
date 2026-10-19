@@ -11,7 +11,9 @@ export type ServerFeature =
   | "snippets"
   | "wakeOnLan"
   | "alerts"
-  | "totp";
+  | "totp"
+  | "importExport"
+  | "credentialTools";
 
 export interface ServerPlugin {
   id: string;
@@ -32,6 +34,8 @@ const FEATURE_PLUGINS: Record<ServerFeature, string> = {
   wakeOnLan: "wake-on-lan",
   alerts: "alerts",
   totp: "totp",
+  importExport: "import-export",
+  credentialTools: "credential-tools",
 };
 
 const PROTOCOL_FEATURES = new Set<ServerFeature>(["rdp", "vnc", "telnet"]);
