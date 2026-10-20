@@ -50,6 +50,10 @@ import {
   type ServerFeature,
   type ServerPlugin,
 } from "../lib/server-features";
+import {
+  parseTailscaleDevicesResponse,
+  type TailscaleDevicesResult,
+} from "../lib/tailscale";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
@@ -352,6 +356,34 @@ export function getApiGeneration(): ApiGeneration {
 
 export function isPluginApi(): boolean {
   return apiGeneration === "plugin";
+}
+
+export function isTailscaleAvailable(): boolean {
+  return isPluginApi() && hasFeature("tailscale");
+}
+
+export async function getTailscaleDevices(): Promise<TailscaleDevicesResult | null> {
+  try {
+    const response = await authApi.get("/plugin-api/tailscale/devices", {
+      baseURL: getRootBase(8081),
+    });
+    return parseTailscaleDevicesResponse(response.data);
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response) {
+      const result = parseTailscaleDevicesResponse(error.response.data);
+      if (error.response.status === 403) {
+        return {
+          devices: [],
+          hasApiKey: result?.hasApiKey ?? false,
+          error: "forbidden",
+        };
+      }
+      if (error.response.status === 404 || isHtmlPayload(error.response.data))
+        return null;
+      if (result) return result;
+    }
+    throw error;
+  }
 }
 
 /**

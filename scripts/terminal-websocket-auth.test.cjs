@@ -42,6 +42,7 @@ function fixture(
   serverUrl = "https://termix.example/base/",
   token = "header.payload.signature",
   generation = "legacy",
+  callbacks = {},
 ) {
   const sockets = [];
   const timers = new Map();
@@ -51,6 +52,7 @@ function fixture(
     static OPEN = 1;
     static CLOSED = 3;
     readyState = 0;
+    sent = [];
     constructor(url, protocols) {
       this.url = url;
       this.protocols = protocols;
@@ -58,6 +60,9 @@ function fixture(
     }
     close() {
       this.readyState = Socket.CLOSED;
+    }
+    send(data) {
+      this.sent.push(JSON.parse(data));
     }
   }
   const api = {
@@ -103,6 +108,7 @@ function fixture(
     hostConfig: { id: 1, name: "host" },
     onStateChange: () => {},
     onConnectionFailed: (message) => errors.push(message),
+    ...callbacks,
   });
   return {
     sockets,
@@ -188,6 +194,69 @@ test("a saved /ssh suffix does not double the socket path", async () => {
   const f = fixture("https://termix.example/ssh");
   const socket = await f.factory();
   assert.equal(new URL(socket.url).pathname, "/ssh/websocket/");
+});
+
+test("browser SSH checks open and complete without writing terminal data", async () => {
+  const required = [];
+  const data = [];
+  let completed = 0;
+  const f = fixture(undefined, undefined, undefined, {
+    onBrowserCheckRequired: (url, message) => required.push({ url, message }),
+    onBrowserCheckCompleted: () => completed++,
+    onData: (value) => data.push(value),
+  });
+  await f.manager.connect(80, 24);
+  const socket = f.sockets[0];
+  assert.equal(f.timers.size, 1);
+  socket.onmessage({
+    data: JSON.stringify({
+      type: "tailscale_check_required",
+      url: "https://login.tailscale.com/a/check",
+      message: "Complete your SSH check to continue.",
+    }),
+  });
+  assert.deepEqual(required, [
+    {
+      url: "https://login.tailscale.com/a/check",
+      message: "Complete your SSH check to continue.",
+    },
+  ]);
+  assert.equal(f.timers.size, 0, "browser checks clear the connection timeout");
+  socket.onmessage({
+    data: JSON.stringify({ type: "tailscale_check_completed" }),
+  });
+  assert.equal(completed, 1);
+  assert.deepEqual(data, []);
+  assert.deepEqual(f.errors, []);
+  f.manager.destroy();
+});
+
+test("Warpgate authentication still requires its explicit continuation", async () => {
+  const required = [];
+  const checks = [];
+  const f = fixture(undefined, undefined, undefined, {
+    onWarpgateAuthRequired: (url, securityKey) =>
+      required.push({ url, securityKey }),
+    onBrowserCheckRequired: (url) => checks.push(url),
+  });
+  await f.manager.connect(80, 24);
+  const socket = f.sockets[0];
+  socket.readyState = 1;
+  socket.onmessage({
+    data: JSON.stringify({
+      type: "warpgate_auth_required",
+      url: "https://warpgate.example/auth",
+      securityKey: "123456",
+    }),
+  });
+  assert.deepEqual(required, [
+    { url: "https://warpgate.example/auth", securityKey: "123456" },
+  ]);
+  assert.deepEqual(checks, []);
+  assert.deepEqual(socket.sent, []);
+  f.manager.sendWarpgateContinue();
+  assert.deepEqual(socket.sent, [{ type: "warpgate_auth_continue", data: {} }]);
+  f.manager.destroy();
 });
 
 for (const token of [undefined, "", "   "]) {

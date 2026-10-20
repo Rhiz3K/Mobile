@@ -9,12 +9,14 @@ import { Text } from "./Text";
 export function BottomSheet({
   visible,
   onClose,
+  onDismiss,
   title,
   children,
   scroll = false,
 }: {
   visible: boolean;
   onClose: () => void;
+  onDismiss?: () => void;
   title?: string;
   children: React.ReactNode;
   scroll?: boolean;
@@ -28,6 +30,7 @@ export function BottomSheet({
       transparent
       animationType="slide"
       onRequestClose={onClose}
+      onDismiss={onDismiss}
       statusBarTranslucent
     >
       <Pressable className="flex-1 bg-black/50" onPress={onClose} />

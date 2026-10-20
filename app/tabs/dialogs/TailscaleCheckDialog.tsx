@@ -1,0 +1,82 @@
+import { useCallback } from "react";
+import { View, Linking } from "react-native";
+import * as Clipboard from "expo-clipboard";
+import { Shield, Copy, ExternalLink } from "lucide-react-native";
+import { Dialog, Button, Text } from "@/app/components/ui";
+import { useThemeColor } from "@/app/contexts/ThemeContext";
+import { showToast } from "@/app/utils/toast";
+
+interface TailscaleCheckDialogProps {
+  visible: boolean;
+  url: string;
+  message: string;
+  onCancel: () => void;
+}
+
+export function TailscaleCheckDialog({
+  visible,
+  url,
+  message,
+  onCancel,
+}: TailscaleCheckDialogProps) {
+  const color = useThemeColor();
+
+  const handleCopy = useCallback(async () => {
+    try {
+      await Clipboard.setStringAsync(url);
+      showToast.success("URL copied");
+    } catch {
+      showToast.error("Failed to copy");
+    }
+  }, [url]);
+
+  const handleOpenBrowser = useCallback(() => {
+    if (url) {
+      Linking.openURL(url).catch(() =>
+        showToast.error("Could not open browser"),
+      );
+    }
+  }, [url]);
+
+  return (
+    <Dialog
+      visible={visible}
+      onClose={onCancel}
+      icon={<Shield size={18} color={color("accent-brand")} />}
+      title="Tailscale SSH check"
+      description={
+        message ||
+        "Complete the Tailscale SSH check in your browser to continue."
+      }
+      footer={
+        <View className="flex-1 flex-row flex-wrap gap-2">
+          <Button variant="outline" onPress={onCancel} className="flex-1">
+            Cancel
+          </Button>
+          <Button
+            variant="outline"
+            onPress={handleCopy}
+            disabled={!url}
+            icon={<Copy size={13} color={color("accent-brand")} />}
+            className="flex-1"
+          >
+            Copy URL
+          </Button>
+          <Button
+            variant="accent"
+            onPress={handleOpenBrowser}
+            disabled={!url}
+            icon={<ExternalLink size={13} color={color("accent-foreground")} />}
+            className="flex-1"
+          >
+            Open Browser
+          </Button>
+        </View>
+      }
+    >
+      <Text selectable className="text-xs text-muted-foreground">
+        {url}
+      </Text>
+    </Dialog>
+  );
+}

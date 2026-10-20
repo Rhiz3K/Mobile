@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Pressable,
+  Platform,
 } from "react-native";
 import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { useFocusEffect } from "@react-navigation/native";
@@ -21,6 +22,7 @@ import {
   Plus,
   KeyRound,
   FileText,
+  Radar,
 } from "lucide-react-native";
 import HostTree from "@/app/tabs/hosts/navigation/Folder";
 import type { HostMetrics } from "@/app/tabs/hosts/navigation/Host";
@@ -29,6 +31,7 @@ import { useServerFeatures } from "@/app/contexts/ServerFeaturesContext";
 import { filterOptionAvailable } from "@/lib/server-features";
 import HostForm from "@/app/tabs/hosts/HostForm";
 import { QuickConnect } from "@/app/tabs/hosts/QuickConnect";
+import { TailscaleDevices } from "@/app/tabs/hosts/TailscaleDevices";
 import CredentialListModal from "@/app/tabs/hosts/CredentialListModal";
 import {
   getSSHHosts,
@@ -42,6 +45,7 @@ import {
   getSnippets,
   getUserAlerts,
   dismissAlert,
+  isTailscaleAvailable,
 } from "@/app/main-axios";
 import { SSHHost, ServerStatus, Snippet } from "@/types";
 import { publishHostSnapshot } from "@/app/widgets";
@@ -125,6 +129,7 @@ const STORAGE_EXPANDED = "hostExpandedFolders";
 export default function Hosts() {
   const color = useThemeColor();
   const { has, refresh: refreshFeatures } = useServerFeatures();
+  const tailscaleAvailable = isTailscaleAvailable();
   const router = useRouter();
   const [hosts, setHosts] = useState<SSHHost[]>([]);
   const [folderColors, setFolderColors] = useState<
@@ -154,11 +159,14 @@ export default function Hosts() {
   // Action sheet + form state
   const [sheetHost, setSheetHost] = useState<SSHHost | null>(null);
   const [formHost, setFormHost] = useState<SSHHost | null>(null);
+  const [formDraft, setFormDraft] = useState<Partial<SSHHost>>();
   const [formOpen, setFormOpen] = useState(false);
   const [quickConnectOpen, setQuickConnectOpen] = useState(false);
+  const [tailscaleDevicesOpen, setTailscaleDevicesOpen] = useState(false);
   const [credentialListOpen, setCredentialListOpen] = useState(false);
 
   const isRefreshingRef = useRef(false);
+  const pendingTailscaleFormRef = useRef(false);
   // Tracks whether the user has manually toggled folders this session, so a data
   // refresh doesn't blow away their expansion choices.
   const expansionInitializedRef = useRef(false);
@@ -513,11 +521,27 @@ export default function Hosts() {
 
   const openEdit = (host: SSHHost) => {
     setFormHost(host);
+    setFormDraft(undefined);
     setFormOpen(true);
   };
 
   const openCreate = () => {
     setFormHost(null);
+    setFormDraft(undefined);
+    setFormOpen(true);
+  };
+
+  const addTailscaleHost = (draft: Partial<SSHHost>) => {
+    pendingTailscaleFormRef.current = Platform.OS === "ios";
+    setTailscaleDevicesOpen(false);
+    setFormHost(null);
+    setFormDraft(draft);
+    if (!pendingTailscaleFormRef.current) setFormOpen(true);
+  };
+
+  const handleTailscaleDismiss = () => {
+    if (!pendingTailscaleFormRef.current) return;
+    pendingTailscaleFormRef.current = false;
     setFormOpen(true);
   };
 
@@ -556,6 +580,18 @@ export default function Hosts() {
               accessibilityLabel="Quick connect"
               onPress={() => setQuickConnectOpen(true)}
               icon={<Zap size={18} color={color("muted-foreground")} />}
+            />
+          ) : null}
+          {tailscaleAvailable ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              accessibilityLabel="Tailscale devices"
+              onPress={() => {
+                pendingTailscaleFormRef.current = false;
+                setTailscaleDevicesOpen(true);
+              }}
+              icon={<Radar size={18} color={color("muted-foreground")} />}
             />
           ) : null}
           <Button
@@ -829,6 +865,7 @@ export default function Hosts() {
       <HostForm
         visible={formOpen}
         host={formHost}
+        draft={formDraft}
         onClose={() => setFormOpen(false)}
         onSaved={() => {
           setFormOpen(false);
@@ -840,6 +877,13 @@ export default function Hosts() {
       <QuickConnect
         visible={quickConnectOpen}
         onClose={() => setQuickConnectOpen(false)}
+      />
+
+      <TailscaleDevices
+        visible={tailscaleDevicesOpen}
+        onClose={() => setTailscaleDevicesOpen(false)}
+        onDismiss={handleTailscaleDismiss}
+        onAddHost={addTailscaleHost}
       />
 
       {/* Credential manager */}

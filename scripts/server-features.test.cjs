@@ -33,6 +33,9 @@ const ALL = [
   "wakeOnLan",
   "alerts",
   "totp",
+  "tailscale",
+  "importExport",
+  "credentialTools",
 ];
 
 test("older servers and an unknown plugin list keep everything on", () => {
@@ -62,6 +65,34 @@ test("only enabled and running plugins count", () => {
   assert.equal(has("tunnels"), false);
   assert.equal(has("fileManager"), false);
   assert.equal(has("rdp"), false);
+});
+
+test("Tailscale discovery follows the Tailscale plugin", () => {
+  assert.equal(features.pluginForFeature("tailscale"), "tailscale");
+  for (const entry of [
+    { id: "tailscale", enabled: false, state: "disabled" },
+    { id: "tailscale", enabled: true, state: "failed" },
+  ]) {
+    assert.equal(
+      features.hasServerFeature(
+        "tailscale",
+        true,
+        features.activePlugins([entry]),
+      ),
+      false,
+    );
+  }
+  assert.equal(features.hasServerFeature("tailscale", true, []), false);
+  assert.equal(
+    features.hasServerFeature(
+      "tailscale",
+      true,
+      features.activePlugins([
+        { id: "tailscale", enabled: true, state: "active" },
+      ]),
+    ),
+    true,
+  );
 });
 
 test("remote desktop protocols follow the plugin's declared protocols", () => {
