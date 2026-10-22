@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.7.0
+
+### Added
+
+- Add hosts from your Tailscale device list when the Tailscale plugin is on
+- Answer the Tailscale SSH check from the terminal
+
 ## 1.6.0
 
 The app now follows which Termix plugins are turned on, and RDP asks for credentials when a host has none saved.
