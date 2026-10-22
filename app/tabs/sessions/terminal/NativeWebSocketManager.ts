@@ -10,7 +10,7 @@ export interface TerminalHostConfig {
   ip: string;
   port: number;
   username: string;
-  authType: "password" | "key" | "credential" | "none";
+  authType: "password" | "key" | "credential" | "none" | "tailscale";
   password?: string;
   key?: string;
   keyPassword?: string;
@@ -57,6 +57,8 @@ export interface NativeWSConfig {
   ) => void;
   onPassphraseRequired?: () => void;
   onWarpgateAuthRequired?: (url: string, securityKey: string) => void;
+  onBrowserCheckRequired?: (url: string, message: string) => void;
+  onBrowserCheckCompleted?: () => void;
   onPostConnectionSetup: () => void;
   onDisconnected: (hostName: string) => void;
   onConnectionFailed: (message: string) => void;
@@ -432,7 +434,24 @@ export class NativeWebSocketManager {
       try {
         const msg = JSON.parse(event.data as string);
 
-        if (msg.type === "data") {
+        if (
+          typeof msg.type === "string" &&
+          msg.type.endsWith("_check_required")
+        ) {
+          if (this.connectionTimeout) {
+            clearTimeout(this.connectionTimeout);
+            this.connectionTimeout = null;
+          }
+          this.config.onBrowserCheckRequired?.(
+            (msg.url as string) || "",
+            (msg.message as string) || "",
+          );
+        } else if (
+          typeof msg.type === "string" &&
+          msg.type.endsWith("_check_completed")
+        ) {
+          this.config.onBrowserCheckCompleted?.();
+        } else if (msg.type === "data") {
           this.config.onData(msg.data as string);
           this.config.onStateChange("dataReceived", {
             hostName: this.config.hostConfig.name,

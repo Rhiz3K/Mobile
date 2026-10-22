@@ -16,6 +16,7 @@
     "verify:terminal-websocket-auth": "node scripts/terminal-websocket-auth.test.cjs",
     "verify:api-compat": "node scripts/api-compat.test.cjs",
     "verify:server-features": "node scripts/server-features.test.cjs",
+    "verify:tailscale": "node scripts/tailscale.test.cjs",
     "verify:rdp-login": "node scripts/rdp-login.test.cjs",
     "verify:oidc-callback-intent-filter": "node scripts/verify-oidc-callback-intent-filter.cjs",
     "build-all": "eas build --platform all --profile development",

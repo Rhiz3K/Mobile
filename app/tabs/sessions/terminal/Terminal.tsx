@@ -38,6 +38,7 @@ import {
   PassphraseDialog,
   WarpgateDialog,
 } from "@/app/tabs/dialogs";
+import { TailscaleCheckDialog } from "@/app/tabs/dialogs/TailscaleCheckDialog";
 import { TERMINAL_THEMES, TERMINAL_FONTS } from "@/constants/terminal-themes";
 import { MOBILE_DEFAULT_TERMINAL_CONFIG } from "@/constants/terminal-config";
 import type { TerminalConfig } from "@/types";
@@ -56,7 +57,7 @@ interface TerminalProps {
     ip: string;
     port: number;
     username: string;
-    authType: "password" | "key" | "credential" | "none";
+    authType: "password" | "key" | "credential" | "none" | "tailscale";
     password?: string;
     key?: string;
     keyPassword?: string;
@@ -175,6 +176,10 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
     const [warpgateAuth, setWarpgateAuth] = useState<{
       url: string;
       securityKey: string;
+    } | null>(null);
+    const [browserCheck, setBrowserCheck] = useState<{
+      url: string;
+      message: string;
     } | null>(null);
     const [isSelecting, setIsSelecting] = useState(false);
     const [selectedText, setSelectedText] = useState("");
@@ -1398,13 +1403,21 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
         onWarpgateAuthRequired: (url, securityKey) => {
           setWarpgateAuth({ url, securityKey });
         },
+        onBrowserCheckRequired: (url, message) => {
+          setBrowserCheck({ url, message });
+        },
+        onBrowserCheckCompleted: () => {
+          setBrowserCheck(null);
+        },
         onPostConnectionSetup: () => handlePostConnectionSetup(),
         onDisconnected: (hostName) => {
+          setBrowserCheck(null);
           setConnectionState("disconnected");
           showToast.warning(`Disconnected from ${hostName}`);
           if (onClose) onClose();
         },
         onConnectionFailed: (message) => {
+          setBrowserCheck(null);
           log.append({ level: "error", message });
           handleConnectionFailure(message);
         },
@@ -1423,6 +1436,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
       setShowAuthDialog(false);
       setPassphraseRequired(false);
       setWarpgateAuth(null);
+      setBrowserCheck(null);
 
       if (xtermAssetsRef.current) {
         setHtmlContent(generateHTML(xtermAssetsRef.current));
@@ -1469,7 +1483,8 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
             showAuthDialog ||
             hostKeyVerification !== null ||
             passphraseRequired ||
-            warpgateAuth !== null
+            warpgateAuth !== null ||
+            browserCheck !== null
           );
         },
         notifyBackgrounded: () => {
@@ -1490,7 +1505,15 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
           return isSelecting;
         },
       }),
-      [totpRequired, showAuthDialog, hostKeyVerification, isSelecting],
+      [
+        totpRequired,
+        showAuthDialog,
+        hostKeyVerification,
+        passphraseRequired,
+        warpgateAuth,
+        browserCheck,
+        isSelecting,
+      ],
     );
 
     return (
@@ -1800,6 +1823,16 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
           }}
           onCancel={() => {
             setWarpgateAuth(null);
+            if (onClose) onClose();
+          }}
+        />
+
+        <TailscaleCheckDialog
+          visible={browserCheck !== null}
+          url={browserCheck?.url ?? ""}
+          message={browserCheck?.message ?? ""}
+          onCancel={() => {
+            setBrowserCheck(null);
             if (onClose) onClose();
           }}
         />

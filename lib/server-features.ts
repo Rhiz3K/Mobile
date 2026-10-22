@@ -12,6 +12,7 @@ export type ServerFeature =
   | "wakeOnLan"
   | "alerts"
   | "totp"
+  | "tailscale"
   | "importExport"
   | "credentialTools";
 
@@ -34,6 +35,7 @@ const FEATURE_PLUGINS: Record<ServerFeature, string> = {
   wakeOnLan: "wake-on-lan",
   alerts: "alerts",
   totp: "totp",
+  tailscale: "tailscale",
   importExport: "import-export",
   credentialTools: "credential-tools",
 };

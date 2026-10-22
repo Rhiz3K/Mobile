@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Modal, View, ScrollView, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { X, Upload, Trash2 } from "lucide-react-native";
@@ -10,6 +10,7 @@ import {
   getSSHHostWithCredentials,
   getCredentials,
   getSSHHosts,
+  isTailscaleAvailable,
 } from "@/app/main-axios";
 import {
   Text,
@@ -23,8 +24,10 @@ import {
 import { useThemeColor } from "@/app/contexts/ThemeContext";
 import { useServerFeatures } from "@/app/contexts/ServerFeaturesContext";
 import { toast } from "@/app/utils/toast";
+import { TailscaleDevicePicker } from "@/app/tabs/hosts/TailscaleDevices";
+import { tailnetAddress } from "@/lib/tailscale";
 
-type AuthType = "password" | "key" | "credential" | "none";
+type AuthType = "password" | "key" | "credential" | "none" | "tailscale";
 type TabId = "general" | "ssh" | "tunnels" | "rdp" | "vnc" | "telnet";
 
 interface FormState {
@@ -108,11 +111,13 @@ const EMPTY: FormState = {
 export default function HostForm({
   visible,
   host,
+  draft,
   onClose,
   onSaved,
 }: {
   visible: boolean;
   host: SSHHost | null;
+  draft?: Partial<SSHHost>;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -126,6 +131,10 @@ export default function HostForm({
   const [activeTab, setActiveTab] = useState<TabId>("general");
   const isEdit = !!host;
   const { has } = useServerFeatures();
+  const tailscaleAvailable = isTailscaleAvailable();
+  // The name a Tailscale draft or device pick filled in, so picking another
+  // device can replace it without overwriting a name the user typed.
+  const autoNameRef = useRef("");
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -148,46 +157,52 @@ export default function HostForm({
   useEffect(() => {
     if (!visible) return;
     setActiveTab("general");
-    if (!host) {
+    const source = host ?? draft;
+    autoNameRef.current = host ? "" : (draft?.name ?? "");
+    if (!source) {
       setForm(EMPTY);
       setTunnels([]);
       return;
     }
-    setTunnels(host.tunnelConnections ?? []);
+    setTunnels(source.tunnelConnections ?? []);
     // Start from the known fields, then enrich with resolved secrets.
     setForm({
       ...EMPTY,
-      name: host.name ?? "",
-      ip: host.ip ?? "",
-      port: String(host.port ?? host.sshPort ?? 22),
-      enableSsh: host.enableSsh !== false,
-      enableRdp: !!host.enableRdp,
-      enableVnc: !!host.enableVnc,
-      enableTelnet: !!host.enableTelnet,
-      username: host.username ?? "",
-      authType: host.authType ?? "password",
-      credentialId: host.credentialId,
-      enableTerminal: host.enableTerminal !== false,
-      enableTunnel: !!host.enableTunnel,
-      enableFileManager: !!host.enableFileManager,
-      enableDocker: !!host.enableDocker,
-      defaultPath: host.defaultPath || "/",
-      rdpUser: host.rdpUser ?? "Administrator",
-      rdpDomain: host.rdpDomain ?? "",
-      rdpPort: String(host.rdpPort ?? 3389),
-      vncUser: host.vncUser ?? "",
-      vncPort: String(host.vncPort ?? 5900),
-      telnetUser: host.telnetUser ?? "",
-      telnetPort: String(host.telnetPort ?? 23),
-      macAddress: host.macAddress ?? "",
-      folder: host.folder ?? "",
-      tags: (host.tags ?? []).join(", "),
-      pin: !!host.pin,
-      notes: host.notes ?? "",
+      name: source.name ?? "",
+      ip: source.ip ?? "",
+      port: String(source.port ?? source.sshPort ?? 22),
+      enableSsh: source.enableSsh !== false,
+      enableRdp: !!source.enableRdp,
+      enableVnc: !!source.enableVnc,
+      enableTelnet: !!source.enableTelnet,
+      username: source.username ?? "",
+      authType: source.authType ?? "password",
+      credentialId: source.credentialId,
+      enableTerminal: source.enableTerminal !== false,
+      enableTunnel: !!source.enableTunnel,
+      enableFileManager: host
+        ? !!host.enableFileManager
+        : (draft?.enableFileManager ?? EMPTY.enableFileManager),
+      enableDocker: !!source.enableDocker,
+      defaultPath: source.defaultPath || "/",
+      rdpUser: source.rdpUser ?? "Administrator",
+      rdpDomain: source.rdpDomain ?? "",
+      rdpPort: String(source.rdpPort ?? 3389),
+      vncUser: source.vncUser ?? "",
+      vncPort: String(source.vncPort ?? 5900),
+      telnetUser: source.telnetUser ?? "",
+      telnetPort: String(source.telnetPort ?? 23),
+      macAddress: source.macAddress ?? "",
+      folder: source.folder ?? "",
+      tags: (source.tags ?? []).join(", "),
+      pin: !!source.pin,
+      notes: source.notes ?? "",
     });
+    if (!host) return;
+    let cancelled = false;
     getSSHHostWithCredentials(host.id)
       .then((full) => {
-        if (!full) return;
+        if (!full || cancelled) return;
         setForm((f) => ({
           ...f,
           password: full.password ?? "",
@@ -199,7 +214,10 @@ export default function HostForm({
         }));
       })
       .catch(() => {});
-  }, [visible, host]);
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, host, draft]);
 
   // The tab strip: General is always present; protocol tabs follow their toggle.
   const tabs = useMemo<{ id: TabId; label: string }[]>(() => {
@@ -600,8 +618,41 @@ export default function HostForm({
                     { id: "key", label: "Key" },
                     { id: "credential", label: "Cred" },
                     { id: "none", label: "None" },
+                    ...(tailscaleAvailable || form.authType === "tailscale"
+                      ? [{ id: "tailscale" as const, label: "Tailscale" }]
+                      : []),
                   ]}
                 />
+
+                {form.authType === "tailscale" ? (
+                  <>
+                    <Text className="text-xs text-muted-foreground">
+                      Connects with Tailscale SSH; no password or key is stored.
+                    </Text>
+                    {tailscaleAvailable ? (
+                      <TailscaleDevicePicker
+                        address={form.ip}
+                        onSelect={(device) =>
+                          setForm((current) => {
+                            const ip = tailnetAddress(device);
+                            const typed = current.name.trim();
+                            if (typed && typed !== autoNameRef.current) {
+                              return { ...current, ip };
+                            }
+                            const name = device.hostname || device.name || ip;
+                            autoNameRef.current = name;
+                            return { ...current, ip, name };
+                          })
+                        }
+                      />
+                    ) : (
+                      <Text className="text-xs text-muted-foreground">
+                        Tailscale is unavailable on this server. This host keeps
+                        its Tailscale authentication setting.
+                      </Text>
+                    )}
+                  </>
+                ) : null}
 
                 {form.authType === "password" ? (
                   <Field label="Password">
