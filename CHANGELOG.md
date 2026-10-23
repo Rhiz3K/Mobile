@@ -12,6 +12,9 @@
 - Hosts, logins and snippets on This device are saved on the phone in an encrypted database
 - Export your local data to a backup file locked with a passphrase, and restore it later
 - Delete local data from Settings
+- Open a terminal to hosts on This device with no Termix server: password, key, keyboard-interactive and TOTP, certificates, jump hosts, proxies and port knocking
+- Host keys of hosts on This device are checked and saved on the phone, with a warning when a key changes
+- PuTTY keys loaded in the host or login editor are changed to OpenSSH format
 
 ### Changed
 
