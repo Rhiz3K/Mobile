@@ -7,6 +7,7 @@ import type { Account } from "./types";
 
 export * from "./types";
 export { AccountStore, sameServerUrl } from "./store";
+export { hasUsableData } from "./usable";
 
 /** The app's account list. Clients come from here, never from a global. */
 export const accounts = new AccountStore();

@@ -46,7 +46,7 @@ const STATE_TEXT = {
   offline: "Offline",
   error: "Stopped",
   signed_out: "Signed out",
-  off: "Not syncing",
+  off: "Waiting to sync",
 } as const;
 
 function Section({ title, hint }: { title: string; hint?: string }) {
@@ -129,9 +129,11 @@ export default function SyncSettings() {
               <SettingRow
                 label={STATE_TEXT[status.state]}
                 description={
-                  status.state === "idle" || status.state === "syncing"
-                    ? `Last synced ${since(status.lastSyncAt).toLowerCase()}`
-                    : reason.message
+                  (status.reason ?? server.lastError)
+                    ? reason.message
+                    : `Last synced ${since(
+                        status.lastSyncAt ?? server.lastSyncAt,
+                      ).toLowerCase()}`
                 }
               >
                 {status.live ? <Badge variant="success">Live</Badge> : null}
