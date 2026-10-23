@@ -1,8 +1,19 @@
 import {
   AxiosError,
+  type AxiosAdapter,
   type AxiosInstance,
   type CreateAxiosDefaults,
 } from "axios";
+import {
+  clearCookie,
+  importClientCert,
+  nativeRequest,
+  NativeSocket,
+  needsNativeRequests,
+  removeClientCert,
+  setCookies,
+  type NetCookie,
+} from "@/modules/termix-net";
 import {
   type ApiGeneration,
   buildTerminalWebSocketUrl,
@@ -23,6 +34,8 @@ import {
   type HttpOwner,
 } from "@/core/api/http";
 import { createModules, type ApiModules } from "@/core/api/modules";
+import { nativeAdapter, toFetchResponse } from "@/core/api/native-adapter";
+import { toBase64, utf8Encode } from "@/core/db/bytes";
 import { systemLogger } from "@/core/log/logger";
 import type { AccountStorage } from "@/core/storage/kv";
 
@@ -36,12 +49,27 @@ export interface BasicAuth {
   password: string;
 }
 
-/** A PFX or P12 file and its passphrase, sent when the server asks for one. */
+/**
+ * What the app shows about the client certificate. The certificate and its
+ * key live in the iOS Keychain or Android Keystore, not here.
+ */
 export interface ClientCert {
-  pfx: string;
-  passphrase: string;
   name: string | null;
+  subject: string | null;
+  notAfter: number | null;
 }
+
+/** Anything with the WebSocket calls the app's sockets use. */
+export type SocketLike = Pick<
+  WebSocket,
+  | "send"
+  | "close"
+  | "readyState"
+  | "onopen"
+  | "onmessage"
+  | "onclose"
+  | "onerror"
+>;
 
 export interface AccountClientOptions {
   accountId: string;
@@ -55,6 +83,7 @@ export const SECRET_KEYS = [
   "customHeaders",
   "basicAuth",
   "clientCert",
+  "proxyCookies",
 ];
 const DATA_KEYS = ["apiGeneration", "enabledPlugins", "hostOrigins"];
 
@@ -86,6 +115,7 @@ export class AccountClient implements HttpOwner {
   private customHeaders: ProxyHeader[] = [];
   private basic: BasicAuth | null = null;
   private cert: ClientCert | null = null;
+  private cookies: NetCookie[] = [];
   private loaded: Promise<void> | null = null;
   private listeners = new Set<() => void>();
   private authLostListeners = new Set<() => void>();
@@ -102,19 +132,24 @@ export class AccountClient implements HttpOwner {
   load(): Promise<void> {
     this.loaded ??= (async () => {
       const { data, secrets } = this.storage;
-      const [token, headers, basic, cert, generation, plugins] =
+      const [token, headers, basic, cert, cookies, generation, plugins] =
         await Promise.all([
           secrets.get("session"),
           secrets.getJson<ProxyHeader[]>("customHeaders"),
           secrets.getJson<BasicAuth>("basicAuth"),
           secrets.getJson<ClientCert>("clientCert"),
+          secrets.getJson<NetCookie[]>("proxyCookies"),
           data.get("apiGeneration"),
           data.getJson<unknown>("enabledPlugins"),
         ]);
       this.sessionToken = token;
       this.customHeaders = Array.isArray(headers) ? headers : [];
       this.basic = basic;
-      this.cert = cert;
+      // Older builds saved the certificate file itself here; it never worked.
+      this.cert = cert && !("pfx" in cert) ? cert : null;
+      this.cookies = Array.isArray(cookies) ? cookies : [];
+      // Session cookies are gone after a restart, so put them back.
+      await setCookies(this.rootBase(), this.cookies).catch(() => {});
       if (generation === "plugin" || generation === "legacy") {
         this.apiGeneration = generation;
       }
@@ -136,7 +171,12 @@ export class AccountClient implements HttpOwner {
   }
 
   async setToken(token: string | null): Promise<void> {
+    const changed = (token || null) !== this.sessionToken;
     this.sessionToken = token || null;
+    // A login response leaves its token as a jwt cookie in the shared jar. The
+    // server reads that cookie before the Bearer header, so once the login
+    // session ends it would turn every request into a 401.
+    if (changed) await clearCookie(this.rootBase(), "jwt");
     if (this.sessionToken) {
       await this.storage.secrets.set("session", this.sessionToken);
     } else {
@@ -169,6 +209,34 @@ export class AccountClient implements HttpOwner {
     for (const h of this.customHeaders) {
       if (h?.name) out[h.name] = h.value ?? "";
     }
+    if (this.basic) {
+      const pair = `${this.basic.username}:${this.basic.password}`;
+      out.Authorization = `Basic ${toBase64(utf8Encode(pair))}`;
+    }
+    return out;
+  }
+
+  /**
+   * The session for a request. Basic auth needs the Authorization header, so
+   * then the session goes as the jwt cookie instead, like the desktop app.
+   */
+  sessionHeaders(): Record<string, string> {
+    const token = this.sessionToken;
+    if (!token) return {};
+    return this.basic
+      ? { Cookie: `jwt=${token}` }
+      : { Authorization: `Bearer ${token}` };
+  }
+
+  /** Proxy headers plus the session, for sockets and streams. */
+  requestHeaders(): Record<string, string> {
+    const out: Record<string, string> = {
+      ...this.proxyHeaders(),
+      "User-Agent": USER_AGENT,
+    };
+    for (const [name, value] of Object.entries(this.sessionHeaders())) {
+      out[name] = value;
+    }
     return out;
   }
 
@@ -195,21 +263,84 @@ export class AccountClient implements HttpOwner {
     this.emit();
   }
 
-  /** Saved for when native networking can present it. Not sent yet. */
   clientCert(): ClientCert | null {
     return this.cert;
   }
 
-  async setClientCert(cert: ClientCert | null): Promise<void> {
-    this.cert = cert;
-    if (cert) await this.storage.secrets.setJson("clientCert", cert);
-    else await this.storage.secrets.remove("clientCert").catch(() => {});
+  /** Imports a PFX or P12 file. The key goes into the Keychain or Keystore. */
+  async setClientCert(file: {
+    base64: string;
+    passphrase: string;
+    name: string | null;
+  }): Promise<ClientCert> {
+    const info = await importClientCert(
+      this.accountId,
+      new URL(this.rootBase()).hostname,
+      file.base64,
+      file.passphrase,
+    );
+    this.cert = {
+      name: file.name,
+      subject: info.subject,
+      notAfter: info.notAfter,
+    };
+    await this.storage.secrets.setJson("clientCert", this.cert);
     this.emit();
+    return this.cert;
+  }
+
+  async removeClientCert(): Promise<void> {
+    this.cert = null;
+    await removeClientCert(this.accountId);
+    await this.storage.secrets.remove("clientCert").catch(() => {});
+    this.emit();
+  }
+
+  /** Cookies from a proxy sign in (Cloudflare Access, Authelia, ...). */
+  proxyCookies(): NetCookie[] {
+    return [...this.cookies];
+  }
+
+  async setProxyCookies(cookies: NetCookie[]): Promise<void> {
+    // Never keep a jwt cookie: it would beat the session token.
+    this.cookies = cookies.filter((c) => c.name && c.name !== "jwt");
+    if (this.cookies.length) {
+      await this.storage.secrets.setJson("proxyCookies", this.cookies);
+      await setCookies(this.rootBase(), this.cookies);
+    } else {
+      await this.storage.secrets.remove("proxyCookies").catch(() => {});
+    }
+    this.emit();
+  }
+
+  /** True when requests must go through the module to send the certificate. */
+  usesNativeNetwork(): boolean {
+    return !!this.cert && needsNativeRequests();
+  }
+
+  adapter(): AxiosAdapter | undefined {
+    return this.usesNativeNetwork() ? nativeAdapter : undefined;
+  }
+
+  /** A WebSocket to this server, with the certificate and proxy headers. */
+  openSocket(url: string, protocols: string[] = []): SocketLike {
+    const headers = { ...this.proxyHeaders(), "User-Agent": USER_AGENT };
+    if (this.usesNativeNetwork()) {
+      return new NativeSocket(url, protocols, headers) as unknown as SocketLike;
+    }
+    const Socket = WebSocket as unknown as new (
+      url: string,
+      protocols: string[],
+      options: { headers: Record<string, string> },
+    ) => WebSocket;
+    return new Socket(url, protocols, { headers });
   }
 
   /** Removes every key this account wrote. */
   async wipe(): Promise<void> {
     this.sessionToken = null;
+    await removeClientCert(this.accountId);
+    await clearCookie(this.rootBase(), "jwt");
     await this.storage.wipe({ data: DATA_KEYS, secrets: SECRET_KEYS });
   }
 
@@ -225,14 +356,22 @@ export class AccountClient implements HttpOwner {
   }
 
   /** fetch with the proxy headers added. */
-  fetch(input: string, init: RequestInit = {}): Promise<Response> {
-    return fetch(input, {
-      ...init,
-      headers: {
-        ...this.proxyHeaders(),
-        ...(init.headers as Record<string, string> | undefined),
-      },
-    });
+  async fetch(input: string, init: RequestInit = {}): Promise<Response> {
+    const headers = {
+      ...this.proxyHeaders(),
+      ...(init.headers as Record<string, string> | undefined),
+    };
+    if (this.usesNativeNetwork()) {
+      return toFetchResponse(
+        await nativeRequest({
+          url: input,
+          method: init.method ?? "GET",
+          headers,
+          body: typeof init.body === "string" ? init.body : null,
+        }),
+      );
+    }
+    return fetch(input, { ...init, headers });
   }
 
   /** Turns a failed request into an ApiError and reacts to auth loss. */

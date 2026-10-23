@@ -2,8 +2,10 @@ import { AccountClient } from "@/core/api/AccountClient";
 import { ApiError } from "@/core/api/errors";
 import { accountStorage } from "@/core/storage/kv";
 import { fakeServer, resetStorage } from "../../helpers/http";
+import { clearFakeNet, fakeNet } from "../../helpers/net";
 
 beforeEach(resetStorage);
+afterEach(clearFakeNet);
 
 function client(id = "a1", serverUrl = "https://termix.example/") {
   return new AccountClient({
@@ -126,25 +128,98 @@ test("socket URLs follow the server generation", async () => {
   );
 });
 
-test("the client certificate is kept but not used yet", async () => {
+test("a client certificate goes to the native store, not to secure storage", async () => {
+  const net = fakeNet();
   const c = client();
-  await c.setClientCert({ pfx: "AAAA", passphrase: "pw", name: "me.p12" });
-  const again = client();
-  await again.load();
-  expect(again.clientCert()).toEqual({
-    pfx: "AAAA",
+  const info = await c.setClientCert({
+    base64: "AAAA",
     passphrase: "pw",
     name: "me.p12",
   });
+  expect(info).toEqual({ name: "me.p12", subject: "CN=phone", notAfter: null });
+  expect(net.certs.get("a1")).toBe("termix.example");
+  const again = client();
+  await again.load();
+  expect(again.clientCert()).toEqual(info);
+  expect(
+    JSON.stringify(await again.storage.secrets.getJson("clientCert")),
+  ).not.toContain("AAAA");
 });
 
-test("wipe removes every saved secret", async () => {
+test("a certificate saved by an older build is ignored", async () => {
+  await accountStorage("a1").secrets.setJson("clientCert", {
+    pfx: "A",
+    passphrase: "",
+    name: null,
+  });
+  const c = client();
+  await c.load();
+  expect(c.clientCert()).toBeNull();
+});
+
+test("basic auth is sent, and the session moves to the jwt cookie", async () => {
+  const seen = fakeServer(() => ({ data: {} }));
+  const c = client();
+  await c.setToken("tok");
+  await c.setProxy({ basicAuth: { username: "u", password: "p" } });
+  await c.api.auth.getUserInfo();
+  expect(seen[0].headers.Authorization).toBe("Basic dTpw");
+  expect(seen[0].headers.Cookie).toBe("jwt=tok");
+});
+
+test("proxy cookies never keep a jwt cookie and go back in the jar on load", async () => {
+  const net = fakeNet();
+  const c = client();
+  await c.setProxyCookies([
+    { name: "CF_Authorization", value: "cf" },
+    { name: "jwt", value: "old" },
+  ]);
+  expect(c.proxyCookies()).toEqual([{ name: "CF_Authorization", value: "cf" }]);
+  net.cookies.clear();
+  const again = client();
+  await again.load();
+  expect(net.cookies.get("https://termix.example")).toEqual([
+    { name: "CF_Authorization", value: "cf" },
+  ]);
+});
+
+test("a new token clears the login cookie the server would read first", async () => {
+  const net = fakeNet();
+  const c = client();
+  await c.setToken("device");
+  expect(net.cleared).toEqual([["https://termix.example", "jwt"]]);
+  await c.setToken("device");
+  expect(net.cleared).toHaveLength(1);
+});
+
+test("on iOS with a certificate, requests go through the native module", async () => {
+  const net = fakeNet({ nativeRequests: true });
+  net.reply = () => ({
+    status: 200,
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ username: "luke" }),
+    url: "",
+  });
+  fakeServer(() => ({ data: { username: "wrong path" } }));
+  const c = client();
+  await c.setToken("tok");
+  await c.setClientCert({ base64: "AAAA", passphrase: "pw", name: null });
+  expect(c.usesNativeNetwork()).toBe(true);
+  const me = await c.api.auth.getUserInfo();
+  expect(me.username).toBe("luke");
+  expect(net.requests[0].url).toBe("https://termix.example/users/me");
+  expect(net.requests[0].headers.Authorization).toBe("Bearer tok");
+});
+
+test("wipe removes every saved secret and the certificate", async () => {
+  const net = fakeNet();
   const c = client();
   await c.setToken("t");
-  await c.setClientCert({ pfx: "A", passphrase: "", name: null });
+  await c.setClientCert({ base64: "A", passphrase: "", name: null });
   await c.wipe();
   const again = client();
   await again.load();
   expect(again.token()).toBeNull();
   expect(again.clientCert()).toBeNull();
+  expect(net.certs.size).toBe(0);
 });

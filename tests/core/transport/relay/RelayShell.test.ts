@@ -45,6 +45,8 @@ function fakeClient(
     token: () => token,
     terminalWebSocketUrl: (jwt: string) =>
       buildTerminalWebSocketUrl(serverUrl, jwt, generation),
+    openSocket: (url: string, protocols: string[]) =>
+      new (global as any).WebSocket(url, protocols),
   };
 }
 

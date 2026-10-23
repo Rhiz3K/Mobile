@@ -62,7 +62,7 @@ export function createTerminalApi(c: AccountClient) {
       }
 
       const wsUrl = c.terminalWebSocketUrl(jwtToken);
-      return new WebSocket(wsUrl, [`termix.jwt.${jwtToken}`]);
+      return c.openSocket(wsUrl, [`termix.jwt.${jwtToken}`]) as WebSocket;
     } catch (error) {
       return null;
     }

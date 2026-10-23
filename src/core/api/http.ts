@@ -1,5 +1,6 @@
 import axios, {
   AxiosError,
+  type AxiosAdapter,
   type AxiosInstance,
   type CreateAxiosDefaults,
 } from "axios";
@@ -19,6 +20,10 @@ export interface HttpOwner {
   token(): string | null;
   /** Headers a reverse proxy in front of the server expects. */
   proxyHeaders(): Record<string, string>;
+  /** The session as a Bearer header, or as the jwt cookie behind basic auth. */
+  sessionHeaders(): Record<string, string>;
+  /** A transport other than the default one, for client certificates. */
+  adapter?(): AxiosAdapter | undefined;
   /** Maps pre 2.9 paths onto plugin routes when the server needs it. */
   rewrite(config: { baseURL?: string; url?: string; method?: string }): void;
 }
@@ -44,13 +49,34 @@ function loggerFor(serviceName: string) {
   return apiLogger;
 }
 
+/** Adds headers without dropping cookies that are already there. */
+export function mergeHeaders(
+  target: { [name: string]: unknown },
+  extra: Record<string, string>,
+  overwrite: boolean,
+): void {
+  for (const [name, value] of Object.entries(extra)) {
+    const current = target[name];
+    if (
+      name.toLowerCase() === "cookie" &&
+      typeof current === "string" &&
+      current
+    ) {
+      target[name] = `${current}; ${value}`;
+    } else if (overwrite || current === undefined) {
+      target[name] = value;
+    }
+  }
+}
+
 /** A bare instance with only the proxy headers, for probes and fallbacks. */
 export function createRawHttp(
-  owner: Pick<HttpOwner, "proxyHeaders">,
+  owner: Pick<HttpOwner, "proxyHeaders" | "adapter">,
   config: CreateAxiosDefaults = {},
 ): AxiosInstance {
   return axios.create({
     ...config,
+    adapter: config.adapter ?? owner.adapter?.(),
     headers: { ...owner.proxyHeaders(), ...(config.headers as object) },
   });
 }
@@ -85,12 +111,10 @@ export function createHttp(
 
     logger.requestStart(method, fullUrl, context);
 
-    for (const [name, value] of Object.entries(owner.proxyHeaders())) {
-      if (config.headers[name] === undefined) config.headers[name] = value;
-    }
-    const token = owner.token();
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    mergeHeaders(config.headers, owner.proxyHeaders(), false);
+    const session = owner.sessionHeaders();
+    if (Object.keys(session).length) {
+      mergeHeaders(config.headers, session, true);
     } else {
       authLogger.warn(
         "No JWT token found, request will be unauthenticated",
@@ -100,6 +124,8 @@ export function createHttp(
     config.headers["User-Agent"] = USER_AGENT;
 
     owner.rewrite(config);
+    const adapter = owner.adapter?.();
+    if (adapter) config.adapter = adapter;
 
     return config;
   });

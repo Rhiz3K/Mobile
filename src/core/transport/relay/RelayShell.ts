@@ -10,7 +10,10 @@ import type {
 /** Shell over the linked server's terminal socket. */
 export interface RelayShellConfig extends ShellOptions {
   /** Account the terminal session belongs to. */
-  client: Pick<AccountClient, "serverUrl" | "token" | "terminalWebSocketUrl">;
+  client: Pick<
+    AccountClient,
+    "serverUrl" | "token" | "terminalWebSocketUrl" | "openSocket"
+  >;
 }
 
 export class RelayShell implements ShellChannel {
@@ -306,7 +309,10 @@ export class RelayShell implements ShellChannel {
       retryCount: this.reconnectAttempts,
     });
 
-    const ws = new WebSocket(this.wsUrl, this.wsProtocols);
+    const ws = this.config.client.openSocket(
+      this.wsUrl,
+      this.wsProtocols,
+    ) as WebSocket;
     this.ws = ws;
 
     this.connectionTimeout = setTimeout(() => {
