@@ -31,7 +31,7 @@ import {
 import { TailscaleCheckDialog } from "@/screens/dialogs/TailscaleCheckDialog";
 import { TERMINAL_THEMES, TERMINAL_FONTS } from "@/constants/terminal-themes";
 import { MOBILE_DEFAULT_TERMINAL_CONFIG } from "@/constants/terminal-config";
-import type { TerminalConfig } from "@/types";
+import type { SSHHost, TerminalConfig } from "@/types";
 import type { TerminalInputHandle } from "@/core/features/types";
 import {
   useSessionTransport,
@@ -45,7 +45,8 @@ import {
   ConnectionLog,
 } from "@/screens/sessions/shared/useConnectionLog";
 import { useUiColors } from "@/contexts/ThemeContext";
-import { useSessionClient } from "@/core/accounts/session";
+import { useClient } from "@/core/accounts";
+import { useSessionAccountId } from "@/core/accounts/session";
 import { useSessionRepositories } from "@/core/data/hooks";
 
 interface TerminalProps {
@@ -94,7 +95,8 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
     },
     ref,
   ) => {
-    const client = useSessionClient();
+    // Null on This device, where the phone connects on its own.
+    const client = useClient(useSessionAccountId());
     const repos = useSessionRepositories();
     const transport = useSessionTransport();
     const ui = useUiColors();
@@ -126,7 +128,9 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
             const command = commandBufferRef.current.trim();
             commandBufferRef.current = "";
             if (command.length > 1 && hostConfig.id > 0) {
-              client.api.terminal.saveCommandToHistory(hostConfig.id, command);
+              repos.commandHistory
+                .add({ id: hostConfig.id } as SSHHost, command)
+                .catch(() => {});
             }
           } else if (ch === "\x7f" || ch === "\b") {
             commandBufferRef.current = commandBufferRef.current.slice(0, -1);
@@ -137,7 +141,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
           }
         }
       },
-      [hostConfig.id],
+      [hostConfig.id, repos],
     );
     const dataFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
       null,
@@ -1353,9 +1357,15 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
               webViewRef.current?.injectJavaScript(
                 `window.notifyConnected(${fromBackground}, ${isReattach}); true;`,
               );
-              client.api.homepage
-                .logActivity("terminal", hostConfig.id, hostConfig.name)
-                .catch(() => {});
+              if (client) {
+                client.api.homepage
+                  .logActivity("terminal", hostConfig.id, hostConfig.name)
+                  .catch(() => {});
+              } else {
+                repos.recentActivity
+                  .add({ kind: "terminal", title: hostConfig.name })
+                  .catch(() => {});
+              }
               break;
             }
             case "dataReceived":

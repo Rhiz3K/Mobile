@@ -72,6 +72,46 @@ export interface RecentActivityRepository extends Watchable {
   add(entry: Omit<ActivityEntry, "at">): Promise<void>;
 }
 
+/** A host key Termix saved, in the server's format. */
+export interface SavedHostKey {
+  /** Hex of the raw key blob, like the server's host_key_fingerprint. */
+  fingerprint: string;
+  keyType: string;
+  changedCount: number;
+}
+
+/** Everything the phone's own SSH engine reads for one host. */
+export interface HostConnectProfile {
+  host: SSHHost;
+  /** The login the host points to, with its secrets and certificate. */
+  credential: (Credential & { certPublicKey?: string }) | null;
+  /** Core's ssh_options JSON (keepalive, legacy algorithms, env vars). */
+  sshOptions: Record<string, unknown>;
+  socks5: {
+    use: boolean;
+    host?: string;
+    port?: number;
+    username?: string;
+    password?: string;
+    chain: unknown[];
+  };
+  portKnock: { port: number; protocol?: string; delay?: number }[];
+  hostKey: SavedHostKey | null;
+}
+
+/** Reads and host key writes for connecting from this phone. */
+export interface HostConnectRepository {
+  profile(id: number): Promise<HostConnectProfile | null>;
+  /** Saves a trusted key. `changed` bumps the change count like the server. */
+  saveHostKey(
+    id: number,
+    key: { fingerprint: string; keyType: string },
+    changed: boolean,
+  ): Promise<void>;
+  /** Marks the saved key as just seen. */
+  touchHostKey(id: number): Promise<void>;
+}
+
 /** Where an account keeps its data. */
 export interface DataRepositories {
   /** "local" for the encrypted store on this phone, "server" for the server. */
@@ -83,4 +123,6 @@ export interface DataRepositories {
   snippetFolders: SnippetFolderRepository;
   commandHistory: CommandHistoryRepository;
   recentActivity: RecentActivityRepository;
+  /** Only on This device, where the phone opens SSH itself. */
+  connect?: HostConnectRepository;
 }

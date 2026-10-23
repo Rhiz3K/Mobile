@@ -15,11 +15,12 @@ const shellOptions = {
   onConnectionFailed: () => {},
 };
 
-test("This device uses the local transport, which is not ready yet", () => {
+test("This device uses the local transport, off when the build has no engine", () => {
   const t = pickTransport(null);
   expect(t.kind).toBe("local");
+  // Jest has no native module, like Expo Go and web.
   expect(t.available).toBe(false);
-  expect(t.unavailableReason).toMatch(/Link a Termix server/);
+  expect(t.unavailableReason).toMatch(/no SSH engine/);
   expect(() => t.openShell(shellOptions)).toThrow(AppError);
 });
 

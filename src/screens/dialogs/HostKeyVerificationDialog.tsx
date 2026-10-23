@@ -15,7 +15,9 @@ interface HostKeyVerificationDialogProps {
   onReject: () => void;
 }
 
-const formatFingerprint = (fp: string) => fp.match(/.{1,2}/g)?.join(":") ?? fp;
+// The server sends the key as hex; the phone sends SHA256:... like OpenSSH prints.
+export const formatFingerprint = (fp: string) =>
+  fp.startsWith("SHA256:") ? fp : (fp.match(/.{1,2}/g)?.join(":") ?? fp);
 
 function FingerprintRow({
   label,

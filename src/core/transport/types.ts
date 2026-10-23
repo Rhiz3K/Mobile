@@ -1,3 +1,5 @@
+import type { ExecOptions, SshExecResult, SshSftp } from "@/modules/termix-ssh";
+
 /**
  * How the app reaches a host. "relay" goes through a linked Termix server,
  * "local" is the phone opening SSH itself. Features ask for a transport and
@@ -96,10 +98,25 @@ export interface ShellChannel {
   destroy(): void;
 }
 
+/** A logged in connection for commands and files, with no shell and nobody to ask. */
+export interface HostSession {
+  exec(command: string, options?: ExecOptions): Promise<SshExecResult>;
+  sftp: SshSftp;
+  close(): Promise<void>;
+}
+
 export interface Transport {
   kind: TransportKind;
   /** False when this transport can't connect yet, with the reason in `unavailableReason`. */
   available: boolean;
   unavailableReason?: string;
   openShell(options: ShellOptions): ShellChannel;
+  /**
+   * Exec and SFTP on a host. Only the local transport has it; relay features
+   * use the server's own routes. Needs a trusted host key and a saved login.
+   */
+  openSession?(
+    host: TerminalHostConfig,
+    options?: { signal?: AbortSignal },
+  ): Promise<HostSession>;
 }

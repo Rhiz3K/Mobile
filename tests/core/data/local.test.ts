@@ -330,3 +330,87 @@ test("lists hear about an unlock, so a read made while locked can retry", async 
   stores.unlock();
   expect(listener).toHaveBeenCalledTimes(1);
 });
+
+test("history found by host id alone lands on the host's syncId", async () => {
+  const { repos } = setup();
+  const host = await repos.hosts.create(fullHost);
+  // The terminal only knows the id.
+  await repos.commandHistory.add({ id: host.id } as SSHHost, "uptime");
+  expect(await repos.commandHistory.list(host)).toEqual(["uptime"]);
+  expect(await repos.commandHistory.list({ id: host.id } as SSHHost)).toEqual([
+    "uptime",
+  ]);
+});
+
+test("connect profiles carry the login, options and saved key", async () => {
+  const { repos, stores } = setup();
+  const cred = await repos.credentials.create({
+    name: "deploy key",
+    authType: "key",
+    username: "deploy",
+    key: "KEY",
+    keyPassword: "kp",
+    certPublicKey: "CERT",
+  } as never);
+  const host = await repos.hosts.create({
+    ...fullHost,
+    authType: "credential",
+    credentialId: cred.id,
+  });
+  const { db } = await stores.get("local");
+  db.update(hostsTable)
+    .set({
+      sshOptions: JSON.stringify({ keepaliveInterval: 10 }),
+      useSocks5: true,
+      socks5Host: "proxy",
+      socks5Port: 1081,
+      socks5ProxyChain: JSON.stringify([{ host: "a", port: 1, type: 5 }]),
+      portKnockSequence: JSON.stringify([{ port: 7000 }]),
+    })
+    .run();
+
+  const p = (await repos.connect!.profile(host.id))!;
+  expect(p.host.id).toBe(host.id);
+  expect(p.credential).toMatchObject({
+    username: "deploy",
+    key: "KEY",
+    keyPassword: "kp",
+    certPublicKey: "CERT",
+  });
+  expect(p.sshOptions).toEqual({ keepaliveInterval: 10 });
+  expect(p.socks5).toMatchObject({ use: true, host: "proxy", port: 1081 });
+  expect(p.socks5.chain).toHaveLength(1);
+  expect(p.portKnock).toEqual([{ port: 7000 }]);
+  expect(p.hostKey).toBeNull();
+  expect(await repos.connect!.profile(9999)).toBeNull();
+});
+
+test("host keys save like the server and count changes", async () => {
+  const { repos, stores } = setup();
+  const host = await repos.hosts.create(fullHost);
+  const key = { fingerprint: "abcd", keyType: "ssh-ed25519" };
+  await repos.connect!.saveHostKey(host.id, key, false);
+  expect((await repos.connect!.profile(host.id))!.hostKey).toEqual({
+    ...key,
+    changedCount: 0,
+  });
+
+  const { db } = await stores.get("local");
+  const first = db.select().from(hostsTable).get()!;
+  await repos.connect!.saveHostKey(
+    host.id,
+    { fingerprint: "ef01", keyType: "ssh-rsa" },
+    true,
+  );
+  const row = db.select().from(hostsTable).get()!;
+  expect(row.hostKeyFingerprint).toBe("ef01");
+  expect(row.hostKeyChangedCount).toBe(1);
+  expect(row.hostKeyFirstSeen).toBe(first.hostKeyFirstSeen);
+  expect(row.hostKeyAlgorithm).toBe("sha256");
+
+  await repos.connect!.touchHostKey(host.id);
+  expect(db.select().from(hostsTable).get()!.hostKeyLastVerified).toBeTruthy();
+  await expect(
+    repos.connect!.saveHostKey(9999, key, false),
+  ).rejects.toMatchObject({ code: "NOT_FOUND" });
+});

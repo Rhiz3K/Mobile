@@ -125,6 +125,8 @@ export class FeatureRegistry {
       if (!isFeatureAvailable({ ...def, requires: undefined }, ctx)) {
         return false;
       }
+      // Requirements name server plugins; This device has none to check.
+      if (ctx.account.kind === "local") return true;
       return meets(tab.requires?.(opts) ?? def.requires, ctx);
     }
     return false;

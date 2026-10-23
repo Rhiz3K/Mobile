@@ -36,6 +36,8 @@ export const terminalFeature: FeatureDef = {
   title: "Terminal",
   source: "native",
   requires: { plugin: "ssh-terminal" },
+  // This device opens SSH itself through modules/termix-ssh.
+  availableOn: ["local", "server"],
   sessionTabs: [
     {
       type: "terminal",

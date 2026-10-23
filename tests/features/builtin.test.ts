@@ -100,10 +100,13 @@ test("Tailscale discovery is off on older servers", () => {
   expect(registry().hasCapability("hosts.discovery", legacyServer)).toBe(false);
 });
 
-test("This device gets no server features yet", () => {
+test("This device gets the terminal and no server features", () => {
   const ctx = {
     account: { id: "local", kind: "local" } as const,
     client: null,
   };
-  expect(registry().available(ctx)).toEqual([]);
+  const r = registry();
+  expect(r.available(ctx).map((f) => f.id)).toEqual(["terminal"]);
+  expect(r.canOpen("terminal", {}, ctx)).toBe(true);
+  expect(r.canOpen("docker", {}, ctx)).toBe(false);
 });

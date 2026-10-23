@@ -11,7 +11,11 @@ import { TerminalHandle } from "@/features/terminal/Terminal";
 import { showToast } from "@/utils/toast";
 import { MONO_FONT } from "@/constants/fonts";
 import { useUiColors } from "@/contexts/ThemeContext";
-import { useSessionClient } from "@/core/accounts/session";
+import { useSessionRepositories } from "@/core/data/hooks";
+import type { SSHHost } from "@/types";
+
+// History only needs the id; the store finds the host from it.
+const hostRef = (id: number) => ({ id }) as SSHHost;
 
 interface HistoryBarProps {
   terminalRef: React.RefObject<TerminalHandle | null>;
@@ -28,7 +32,7 @@ export default function HistoryBar({
   hostId,
   isVisible,
 }: HistoryBarProps) {
-  const client = useSessionClient();
+  const history = useSessionRepositories().commandHistory;
   const ui = useUiColors();
   const [commands, setCommands] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,9 +44,9 @@ export default function HistoryBar({
       return;
     }
     setLoading(true);
-    setCommands(await client.api.terminal.getCommandHistory(hostId));
+    setCommands(await history.list(hostRef(hostId)).catch(() => []));
     setLoading(false);
-  }, [hostId]);
+  }, [hostId, history]);
 
   useEffect(() => {
     if (isVisible) load();
@@ -55,13 +59,13 @@ export default function HistoryBar({
   const remove = async (command: string) => {
     if (!hostId) return;
     setCommands((prev) => prev.filter((c) => c !== command));
-    await client.api.terminal.deleteCommandFromHistory(hostId, command);
+    await history.remove(hostRef(hostId), command);
   };
 
   const clearAll = async () => {
     if (!hostId) return;
     setCommands([]);
-    await client.api.terminal.clearCommandHistory(hostId);
+    await history.clear(hostRef(hostId));
     showToast.success("History cleared");
   };
 

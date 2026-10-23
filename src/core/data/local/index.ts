@@ -20,6 +20,7 @@ import {
   credentialToRow,
   hostFromRow,
   hostToRow,
+  parseJson,
   snippetFolderFromRow,
   snippetFromRow,
 } from "./mappers";
@@ -62,7 +63,15 @@ export function localRepositories(
     tables.forEach((t) => changes.emit(accountId, getTableName(t as never)));
 
   // History is keyed by syncId, so it follows the host across devices.
-  const hostKey = (host: SSHHost) => host.syncId || `id:${host.id}`;
+  // Callers that only know the id (the terminal) still land on the syncId.
+  const hostKey = (d: LocalDb, host: SSHHost) =>
+    host.syncId ||
+    d
+      .select({ syncId: hosts.syncId })
+      .from(hosts)
+      .where(eq(hosts.id, host.id))
+      .get()?.syncId ||
+    `id:${host.id}`;
 
   return {
     source: "local",
@@ -336,10 +345,11 @@ export function localRepositories(
 
     commandHistory: {
       async list(host) {
-        return (await db())
+        const d = await db();
+        return d
           .select({ command: commandHistory.command })
           .from(commandHistory)
-          .where(eq(commandHistory.hostSyncId, hostKey(host)))
+          .where(eq(commandHistory.hostSyncId, hostKey(d, host)))
           .orderBy(desc(commandHistory.usedAt), desc(commandHistory.id))
           .limit(HISTORY_LIMIT)
           .all()
@@ -349,7 +359,7 @@ export function localRepositories(
         const text = command.trim();
         if (!text) return;
         const d = await db();
-        const key = hostKey(host);
+        const key = hostKey(d, host);
         d.transaction((tx) => {
           tx.insert(commandHistory)
             .values({ hostSyncId: key, command: text, usedAt: now() })
@@ -377,20 +387,20 @@ export function localRepositories(
         });
       },
       async remove(host, command) {
-        (await db())
-          .delete(commandHistory)
+        const d = await db();
+        d.delete(commandHistory)
           .where(
             and(
-              eq(commandHistory.hostSyncId, hostKey(host)),
+              eq(commandHistory.hostSyncId, hostKey(d, host)),
               eq(commandHistory.command, command),
             ),
           )
           .run();
       },
       async clear(host) {
-        (await db())
-          .delete(commandHistory)
-          .where(eq(commandHistory.hostSyncId, hostKey(host)))
+        const d = await db();
+        d.delete(commandHistory)
+          .where(eq(commandHistory.hostSyncId, hostKey(d, host)))
           .run();
       },
     },
@@ -434,6 +444,70 @@ export function localRepositories(
             .run();
         });
         touched(recentActivity);
+      },
+    },
+
+    connect: {
+      async profile(id) {
+        const d = await db();
+        const row = d.select().from(hosts).where(eq(hosts.id, id)).get();
+        if (!row) return null;
+        const cred = row.credentialId
+          ? d
+              .select()
+              .from(credentials)
+              .where(eq(credentials.id, row.credentialId))
+              .get()
+          : undefined;
+        return {
+          host: hostFromRow(row),
+          credential: cred ? credentialFromRow(cred) : null,
+          sshOptions: parseJson<Record<string, unknown>>(row.sshOptions, {}),
+          socks5: {
+            use: row.useSocks5 ?? false,
+            host: row.socks5Host ?? undefined,
+            port: row.socks5Port ?? undefined,
+            username: row.socks5Username ?? undefined,
+            password: row.socks5Password ?? undefined,
+            chain: parseJson<unknown[]>(row.socks5ProxyChain, []),
+          },
+          portKnock: parseJson(row.portKnockSequence, []),
+          hostKey: row.hostKeyFingerprint
+            ? {
+                fingerprint: row.hostKeyFingerprint,
+                keyType: row.hostKeyType ?? "unknown",
+                changedCount: row.hostKeyChangedCount ?? 0,
+              }
+            : null,
+        };
+      },
+      async saveHostKey(id, key, changed) {
+        const d = await db();
+        const row = d.select().from(hosts).where(eq(hosts.id, id)).get();
+        if (!row) throw notFound("host");
+        const at = now();
+        d.update(hosts)
+          .set({
+            hostKeyFingerprint: key.fingerprint,
+            hostKeyType: key.keyType,
+            hostKeyAlgorithm: "sha256",
+            hostKeyFirstSeen: changed ? row.hostKeyFirstSeen : at,
+            hostKeyLastVerified: at,
+            hostKeyChangedCount:
+              (row.hostKeyChangedCount ?? 0) + (changed ? 1 : 0),
+            updatedAt: at,
+          })
+          .where(eq(hosts.id, id))
+          .run();
+        touched(hosts);
+      },
+      async touchHostKey(id) {
+        // No change event: a last seen time is not worth redrawing lists for.
+        (await db())
+          .update(hosts)
+          .set({ hostKeyLastVerified: now() })
+          .where(eq(hosts.id, id))
+          .run();
       },
     },
   };
