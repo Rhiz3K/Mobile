@@ -1,0 +1,9 @@
+{
+  "version": "0.1.0",
+  "tag": "termix-ssh-v0.1.0",
+  "sourceHash": "8d56dd6ccb7e88ffc0a9c6309aafc13c7ab0177cd852b04997e6edc5ee432bd7",
+  "assets": {
+    "termix-ssh-android.tar.gz": "d92336a80ef11123df0cca534c8c0fd75e96d847b91d71d6ea0ece0acfdc447e",
+    "termix-ssh-ios.tar.gz": "7b0525f1fc0c9854e7fe670af87ce32e8828f0d366244c9c986f40746fc3a087"
+  }
+}
