@@ -99,7 +99,9 @@ function marker(dest) {
 function unpack(archive, dest) {
   fs.rmSync(dest, { recursive: true, force: true });
   fs.mkdirSync(dest, { recursive: true });
-  execFileSync("tar", ["-xzf", archive, "-C", dest], { stdio: "inherit" });
+  // Relative paths, since GNU tar on Windows reads "C:" as a remote host.
+  const rel = path.relative(dest, archive).split(path.sep).join("/");
+  execFileSync("tar", ["-xzf", rel], { stdio: "inherit", cwd: dest });
 }
 
 async function fetchTarget(name, lock) {
