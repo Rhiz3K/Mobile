@@ -77,6 +77,46 @@
       "./plugins/withTermixWidgets.js",
       "./plugins/withPodDeploymentTarget.js",
       "./plugins/withNotificationIcon.js",
+      [
+        "expo-font",
+        {
+          "ios": {
+            "fonts": [
+              "./assets/fonts/CaskaydiaCoveNerdFontMono-Regular.ttf",
+              "./assets/fonts/CaskaydiaCoveNerdFontMono-Bold.ttf",
+              "./assets/fonts/CaskaydiaCoveNerdFontMono-Italic.ttf",
+              "./assets/fonts/CaskaydiaCoveNerdFontMono-BoldItalic.ttf"
+            ]
+          },
+          "android": {
+            "fonts": [
+              {
+                "fontFamily": "CaskaydiaCove NFM",
+                "fontDefinitions": [
+                  {
+                    "path": "./assets/fonts/CaskaydiaCoveNerdFontMono-Regular.ttf",
+                    "weight": 400
+                  },
+                  {
+                    "path": "./assets/fonts/CaskaydiaCoveNerdFontMono-Bold.ttf",
+                    "weight": 700
+                  },
+                  {
+                    "path": "./assets/fonts/CaskaydiaCoveNerdFontMono-Italic.ttf",
+                    "weight": 400,
+                    "style": "italic"
+                  },
+                  {
+                    "path": "./assets/fonts/CaskaydiaCoveNerdFontMono-BoldItalic.ttf",
+                    "weight": 700,
+                    "style": "italic"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
       "expo-dev-client",
       "expo-secure-store",
       "expo-web-browser"

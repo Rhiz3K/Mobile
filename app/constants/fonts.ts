@@ -19,3 +19,10 @@ export const FONT_MAP = {
 export const MONO_FONT = "JetBrainsMono";
 export const MONO_FONT_MEDIUM = "JetBrainsMono-Medium";
 export const MONO_FONT_BOLD = "JetBrainsMono-Bold";
+
+/**
+ * Terminal font, embedded at build time by the expo-font plugin (app.json).
+ * Regular, bold and italic are separate files, so fontWeight and fontStyle
+ * work without RN faking them.
+ */
+export const TERMINAL_FONT = "CaskaydiaCove NFM";

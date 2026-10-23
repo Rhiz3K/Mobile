@@ -55,6 +55,9 @@ jobs:
       - name: Verify app icons
         run: npm run verify:app-icons
 
+      - name: Verify bundled fonts
+        run: npm run verify:fonts
+
       - name: Verify remote desktop resolution
         run: node scripts/verify-remote-resolution.cjs
 
