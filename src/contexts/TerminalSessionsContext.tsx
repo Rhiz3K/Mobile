@@ -15,6 +15,7 @@ import { toast } from "@/utils/toast";
 import { accounts, clientFor, useActiveAccount } from "@/core/accounts";
 import type { AccountClient } from "@/core/api/AccountClient";
 import type { OpenTabRecord } from "@/core/api/types";
+import { transportFor } from "@/core/transport";
 
 export type SessionType =
   "terminal" | "stats" | "filemanager" | "tunnel" | "docker" | "remoteDesktop";
@@ -361,12 +362,13 @@ export const TerminalSessionsProvider: React.FC<
           type,
           opts?.remoteProtocol ?? host.connectionType,
         );
-        const client = accounts.activeClient();
-        if (!client) {
-          toast.error("Link a Termix server to connect to hosts.");
+        const transport = transportFor(accounts.active().id);
+        if (!transport.available) {
+          toast.error(transport.unavailableReason ?? "Can't connect yet.");
           return;
         }
-        if (feature && !client.hasFeature(feature)) {
+        const client = accounts.activeClient();
+        if (feature && client && !client.hasFeature(feature)) {
           toast.error("This feature is turned off on the server.");
           return;
         }

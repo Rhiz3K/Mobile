@@ -33,10 +33,11 @@ import { TERMINAL_THEMES, TERMINAL_FONTS } from "@/constants/terminal-themes";
 import { MOBILE_DEFAULT_TERMINAL_CONFIG } from "@/constants/terminal-config";
 import type { TerminalConfig } from "@/types";
 import {
-  NativeWebSocketManager,
-  type TerminalHostConfig,
+  useSessionTransport,
   type HostKeyData,
-} from "./NativeWebSocketManager";
+  type ShellChannel,
+  type TerminalHostConfig,
+} from "@/core/transport";
 import { loadXtermAssets } from "./loadXtermAssets";
 import {
   useConnectionLog,
@@ -100,9 +101,10 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
     ref,
   ) => {
     const client = useSessionClient();
+    const transport = useSessionTransport();
     const ui = useUiColors();
     const webViewRef = useRef<WebView>(null);
-    const wsManagerRef = useRef<NativeWebSocketManager | null>(null);
+    const wsManagerRef = useRef<ShellChannel | null>(null);
     const terminalColsRef = useRef(80);
     const terminalRowsRef = useRef(24);
     // Pixel height of the visible terminal area as measured by RN layout.
@@ -1322,8 +1324,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
     useEffect(() => {
       wsManagerRef.current?.destroy();
 
-      wsManagerRef.current = new NativeWebSocketManager({
-        client,
+      wsManagerRef.current = transport.openShell({
         hostConfig: hostConfig as TerminalHostConfig,
         tabInstanceId,
         initialSessionId,

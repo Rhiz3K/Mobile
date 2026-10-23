@@ -1,77 +1,19 @@
 import type { AccountClient } from "@/core/api/AccountClient";
+import type {
+  HostKeyData,
+  ShellChannel,
+  ShellOptions,
+  TerminalHostConfig,
+} from "../types";
 
-export interface TerminalHostConfig {
-  id: number;
-  name: string;
-  ip: string;
-  port: number;
-  username: string;
-  authType: "password" | "key" | "credential" | "none" | "tailscale";
-  password?: string;
-  key?: string;
-  keyPassword?: string;
-  keyType?: string;
-  credentialId?: number;
-  jumpHosts?: { hostId: number }[];
-  forceKeyboardInteractive?: boolean;
-  overrideCredentialUsername?: boolean;
-}
-
-export type WsState =
-  | "connecting"
-  | "connected"
-  | "disconnected"
-  | "dataReceived"
-  | "connectionFailed";
-
-export interface HostKeyData {
-  ip: string;
-  port: number;
-  hostname?: string;
-  fingerprint: string;
-  oldFingerprint?: string;
-  keyType: string;
-  oldKeyType?: string;
-  algorithm: string;
-}
-
-export interface NativeWSConfig {
+/** Shell over the linked server's terminal socket. */
+export interface RelayShellConfig extends ShellOptions {
   /** Account the terminal session belongs to. */
   client: Pick<AccountClient, "serverUrl" | "token" | "terminalWebSocketUrl">;
-  hostConfig: TerminalHostConfig;
-  /** Stable tab instance id for cross-device session tracking (open-tabs). */
-  tabInstanceId?: string;
-  /** Backend session id to attach to on first connect (reviving a tab). */
-  initialSessionId?: string | null;
-  onStateChange: (state: WsState, data?: Record<string, unknown>) => void;
-  onData: (data: string) => void;
-  onTotpRequired: (prompt: string, isPassword: boolean) => void;
-  onAuthDialogNeeded: (
-    reason: "no_keyboard" | "auth_failed" | "timeout",
-  ) => void;
-  onHostKeyVerificationRequired?: (
-    scenario: "new" | "changed",
-    data: HostKeyData,
-  ) => void;
-  onPassphraseRequired?: () => void;
-  onWarpgateAuthRequired?: (url: string, securityKey: string) => void;
-  onBrowserCheckRequired?: (url: string, message: string) => void;
-  onBrowserCheckCompleted?: () => void;
-  onPostConnectionSetup: () => void;
-  onDisconnected: (hostName: string) => void;
-  onConnectionFailed: (message: string) => void;
-  /** Fired when the backend session id is created/attached/cleared. */
-  onSessionIdChange?: (sessionId: string | null) => void;
-  /** Fired for each `connection_log` WS message from the server. */
-  onConnectionLog?: (entry: {
-    level?: string;
-    stage?: string;
-    message: string;
-  }) => void;
 }
 
-export class NativeWebSocketManager {
-  private config: NativeWSConfig;
+export class RelayShell implements ShellChannel {
+  private config: RelayShellConfig;
   private ws: WebSocket | null = null;
   private reconnectAttempts = 0;
   private readonly maxReconnectAttempts = 5;
@@ -93,7 +35,7 @@ export class NativeWebSocketManager {
   private pendingReattach = false;
   private awaitingAuthCredentials = false;
 
-  constructor(config: NativeWSConfig) {
+  constructor(config: RelayShellConfig) {
     this.config = config;
     // Seed the backend session id when reviving a backgrounded/cross-device tab.
     if (config.initialSessionId) {

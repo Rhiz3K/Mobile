@@ -1,5 +1,5 @@
 import { buildTerminalWebSocketUrl } from "@/core/api/compat/api-compat";
-import { NativeWebSocketManager } from "@/features/terminal/NativeWebSocketManager";
+import { RelayShell } from "@/core/transport/relay/RelayShell";
 
 class FakeSocket {
   static CONNECTING = 0;
@@ -50,7 +50,7 @@ function fakeClient(
 
 function manager(client = fakeClient(), callbacks: Record<string, any> = {}) {
   const errors: string[] = [];
-  const m = new NativeWebSocketManager({
+  const m = new RelayShell({
     client,
     hostConfig: { id: 1, name: "host" } as any,
     onStateChange: () => {},

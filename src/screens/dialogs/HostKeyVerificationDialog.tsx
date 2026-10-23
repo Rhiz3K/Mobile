@@ -5,7 +5,7 @@ import { Shield, AlertTriangle, Copy, Check } from "lucide-react-native";
 import { Button, Label, Sheet, SheetBody, Text } from "@/ui";
 import { MONO_FONT } from "@/constants/fonts";
 import { useThemeColor } from "@/contexts/ThemeContext";
-import type { HostKeyData } from "@/features/terminal/NativeWebSocketManager";
+import type { HostKeyData } from "@/core/transport/types";
 
 interface HostKeyVerificationDialogProps {
   visible: boolean;
