@@ -15,6 +15,9 @@
 - Open a terminal to hosts on This device with no Termix server: password, key, keyboard-interactive and TOTP, certificates, jump hosts, proxies and port knocking
 - Host keys of hosts on This device are checked and saved on the phone, with a warning when a key changes
 - PuTTY keys loaded in the host or login editor are changed to OpenSSH format
+- Pick per host whether a linked server's host connects from the phone, through the server, or automatically
+- A failed connection says what went wrong and what to try, with buttons to try again or connect the other way
+- Features that need a Termix server say so, with a button to connect the host through the server
 
 ### Changed
 
@@ -29,6 +32,7 @@
 - The host, credential, file and key editors open in place with a back button instead of as popups
 - The iOS app icon, including the dark and tinted versions, now uses the same logo as Termix on the web and desktop
 - Needs iOS 16.4 or newer
+- A terminal that fails to connect stays open with the error instead of closing
 
 ### Fixed
 
