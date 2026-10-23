@@ -1,10 +1,11 @@
+import { useEffect, useState } from "react";
 import { View, ScrollView } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { Pencil, Copy, CopyPlus, Trash2 } from "lucide-react-native";
 import { SSHHost } from "@/types";
 import type { HostMetrics } from "@/screens/hosts/navigation/Host";
 import { useTerminalSessions } from "@/contexts/TerminalSessionsContext";
-import { Sheet, SheetRow, Text } from "@/ui";
+import { Button, Sheet, SheetRow, Tabs, Text } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { toast } from "@/utils/toast";
 import {
@@ -12,6 +13,22 @@ import {
   type HostActionContext,
   type HostActionDef,
 } from "@/core/features";
+import {
+  ORIGINS,
+  ORIGIN_LABELS,
+  originInputs,
+  originOf,
+  planConnection,
+  saveOrigin,
+  type Blocked,
+  type ConnectionOrigin,
+} from "@/core/transport";
+import { isSshHost } from "@/utils/hosts";
+
+const FIX_LABEL: Record<Exclude<ConnectionOrigin, "auto">, string> = {
+  server: "Connect through the server",
+  device: "Connect from this phone",
+};
 
 export function HostActionSheet({
   host,
@@ -36,18 +53,64 @@ export function HostActionSheet({
   const { ctx, actions } = useHostActions();
   const color = useThemeColor();
   const iconColor = color("foreground") ?? "#fafafa";
+  const accountId = ctx.account.id;
+  const [origin, setOrigin] = useState<ConnectionOrigin | null>(null);
+  const [blocked, setBlocked] = useState<
+    (Blocked & { retry: () => void }) | null
+  >(null);
+
+  // Only a linked server's SSH hosts can pick where they connect from.
+  const picksOrigin =
+    !!host && ctx.account.kind === "server" && isSshHost(host);
+
+  useEffect(() => {
+    setBlocked(null);
+    if (!visible || !host || !picksOrigin) return;
+    let live = true;
+    originOf(accountId, host).then((o) => live && setOrigin(o));
+    return () => {
+      live = false;
+    };
+  }, [visible, host, picksOrigin, accountId]);
 
   if (!host) return null;
 
-  const actionCtx: HostActionContext = {
-    ...ctx,
-    openSession: (type, opts) => navigateToSessions(host, type, opts),
-    close: onClose,
+  const changeOrigin = async (next: ConnectionOrigin) => {
+    setOrigin(next);
+    setBlocked(null);
+    try {
+      await saveOrigin(accountId, host.id, next);
+    } catch (err) {
+      toast.error(
+        "Could not save how this host connects",
+        err instanceof Error ? err.message : undefined,
+      );
+    }
   };
 
-  const runAction = (action: HostActionDef) => {
-    void action.run(host, actionCtx);
-    onClose();
+  const originNote =
+    picksOrigin && origin
+      ? planConnection(origin, originInputs(accountId, true)).blocked?.reason
+      : undefined;
+
+  const runAction = async (action: HostActionDef) => {
+    let wasBlocked = false;
+    const actionCtx: HostActionContext = {
+      ...ctx,
+      openSession: async (type, opts) => {
+        const result = await navigateToSessions(host, type, {
+          ...opts,
+          quiet: true,
+        });
+        if (result) {
+          wasBlocked = true;
+          setBlocked({ ...result, retry: () => void runAction(action) });
+        }
+      },
+      close: onClose,
+    };
+    await action.run(host, actionCtx);
+    if (!wasBlocked) onClose();
   };
 
   const available = actions.filter((a) => a.isAvailable(host, ctx));
@@ -109,6 +172,49 @@ export function HostActionSheet({
         ) : null}
       </View>
 
+      {picksOrigin && origin ? (
+        <View className="gap-2 border-b border-border px-4 py-3">
+          <Text className="text-xs uppercase tracking-[1px] text-muted-foreground">
+            Connect from
+          </Text>
+          <Tabs<ConnectionOrigin>
+            options={ORIGINS.map((id) => ({ id, label: ORIGIN_LABELS[id] }))}
+            value={origin}
+            onChange={changeOrigin}
+          />
+          {originNote ? (
+            <Text className="text-meta text-muted-foreground">
+              {originNote}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+
+      {blocked ? (
+        <View className="gap-2 border-b border-border bg-card px-4 py-3">
+          <Text className="text-xs leading-5 text-foreground">
+            {blocked.reason}
+          </Text>
+          <View className="flex-row flex-wrap gap-2">
+            {blocked.fix && blocked.fix !== "auto" ? (
+              <Button
+                size="sm"
+                onPress={async () => {
+                  const retry = blocked.retry;
+                  await changeOrigin(blocked.fix!);
+                  retry();
+                }}
+              >
+                {FIX_LABEL[blocked.fix]}
+              </Button>
+            ) : null}
+            <Button size="sm" variant="muted" onPress={() => setBlocked(null)}>
+              Dismiss
+            </Button>
+          </View>
+        </View>
+      ) : null}
+
       <ScrollView style={{ maxHeight: 440 }}>
         {/* Connection actions (SSH features + protocols) */}
         {[...connectActions, ...manageActions].map((action) => {
@@ -118,7 +224,7 @@ export function HostActionSheet({
               key={action.id}
               icon={<Icon size={18} color={iconColor} />}
               label={action.label}
-              onPress={() => runAction(action)}
+              onPress={() => void runAction(action)}
             />
           );
         })}

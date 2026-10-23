@@ -19,6 +19,17 @@ import { toast } from "@/utils/toast";
 import { TailscaleDevicePicker } from "@/features/tailscale/TailscaleDevices";
 import { tailnetAddress } from "@/features/tailscale/tailscale";
 import { useRepositories } from "@/core/data/hooks";
+import { useActiveAccount } from "@/core/accounts";
+import {
+  ORIGINS,
+  ORIGIN_HELP,
+  ORIGIN_LABELS,
+  originInputs,
+  originOf,
+  planConnection,
+  saveOrigin,
+  type ConnectionOrigin,
+} from "@/core/transport";
 import { readLocalText } from "@/utils/localFile";
 import { importMessage, importPrivateKey } from "@/utils/keyImport";
 
@@ -134,6 +145,11 @@ export default function HostForm({
   const autoNameRef = useRef("");
 
   const repos = useRepositories();
+  const account = useActiveAccount();
+  // Only a linked server's hosts can pick where they connect from.
+  const picksOrigin = account.kind === "server";
+  const [connectFrom, setConnectFrom] = useState<ConnectionOrigin>("auto");
+  const savedOrigin = useRef<ConnectionOrigin>("auto");
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
 
@@ -154,6 +170,16 @@ export default function HostForm({
   useEffect(() => {
     if (!visible) return;
     setActiveTab("general");
+    setConnectFrom("auto");
+    savedOrigin.current = "auto";
+    if (host && picksOrigin) {
+      originOf(account.id, host)
+        .then((o) => {
+          savedOrigin.current = o;
+          setConnectFrom(o);
+        })
+        .catch(() => {});
+    }
     const source = host ?? draft;
     autoNameRef.current = host ? "" : (draft?.name ?? "");
     if (!source) {
@@ -381,13 +407,20 @@ export default function HostForm({
 
     setSaving(true);
     try {
-      if (isEdit && host) {
-        await repos.hosts.update(host.id, payload);
-        toast.success("Host updated");
-      } else {
-        await repos.hosts.create(payload);
-        toast.success("Host created");
+      const saved =
+        isEdit && host
+          ? await repos.hosts.update(host.id, payload)
+          : await repos.hosts.create(payload);
+      if (
+        picksOrigin &&
+        form.enableSsh &&
+        connectFrom !== savedOrigin.current
+      ) {
+        await saveOrigin(account.id, saved.id, connectFrom).catch((e) =>
+          toast.error("Could not save how this host connects", e?.message),
+        );
       }
+      toast.success(isEdit ? "Host updated" : "Host created");
       onSaved();
     } catch (e: any) {
       toast.error(e?.message || "Failed to save host");
@@ -682,6 +715,23 @@ export default function HostForm({
                 </Field>
               ) : null}
             </Section>
+
+            {picksOrigin ? (
+              <Section title="Connect from">
+                <Tabs<ConnectionOrigin>
+                  value={connectFrom}
+                  onChange={setConnectFrom}
+                  options={ORIGINS.map((id) => ({
+                    id,
+                    label: ORIGIN_LABELS[id],
+                  }))}
+                />
+                <Text className="mt-2 text-meta text-muted-foreground">
+                  {planConnection(connectFrom, originInputs(account.id, true))
+                    .blocked?.reason ?? ORIGIN_HELP[connectFrom]}
+                </Text>
+              </Section>
+            ) : null}
 
             {featureToggles.length > 0 ? (
               <Section title="Features">
