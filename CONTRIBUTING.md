@@ -25,7 +25,7 @@ Termix Mobile is the iOS and Android app for [Termix](https://github.com/Termix-
 npm run start
 ```
 
-This starts the Expo development server. Open it in Expo Go or a development build, and sign in to a Termix server. If you do not have one, see the [install docs](https://docs.termix.site/install).
+This starts the Expo development server. Open it in a development build, and sign in to a Termix server. If you do not have one, see the [install docs](https://docs.termix.site/install). Expo Go does not work, because the local database needs SQLCipher, which only a development build has.
 
 ## Theme and icons
 
@@ -38,10 +38,21 @@ npm run icons
 npm test
 ```
 
+## Local database
+
+Each account has its own SQLite file, encrypted with SQLCipher. The tables are in `src/core/db/schema.ts` and mirror the server's sync rows. After changing the schema, run:
+
+```sh
+npm run db:generate
+npm test
+```
+
+This writes a new migration to `drizzle/` and `src/core/db/migrations.ts`. Never edit a migration that has shipped. `npm test` fails when the two disagree.
+
 ## Project layout
 
 - `app/` holds routes only. Each route file imports a screen from `src/`.
-- `src/core/` is the shared base: accounts, the API client per server, transports, the feature registry, storage and logging.
+- `src/core/` is the shared base: accounts, the API client per server, transports, the feature registry, the local database and repositories, storage and logging.
 - `src/features/` holds one folder per feature. Each has a `register.tsx` that adds its tabs, host actions and settings to the registry. Screens read the registry and never check a feature by name.
 - `src/screens/`, `src/ui/`, `src/contexts/` hold the app screens, UI parts and providers.
 - `tests/` mirrors `src/` and runs with Jest.

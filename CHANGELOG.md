@@ -9,10 +9,15 @@
 - Themed app icon on Android 13 and newer
 - Link more than one Termix server and switch between them from Settings or the Hosts screen
 - Open tabs keep running when you switch to another server
+- Hosts, logins and snippets on This device are saved on the phone in an encrypted database
+- Export your local data to a backup file locked with a passphrase, and restore it later
+- Delete local data from Settings
 
 ### Changed
 
 - Your server sign in is now kept in the phone's secure storage
+- Secrets in the phone's secure storage stay on this device and are left out of iCloud and phone backups
+- Android system backups no longer include app data
 - Theme colors now match Termix on the web and desktop exactly
 - The terminal, keyboard bar and tab bar follow the chosen theme instead of always being dark
 - The theme picker shows the same swatches as Termix
