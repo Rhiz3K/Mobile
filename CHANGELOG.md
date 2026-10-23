@@ -25,6 +25,7 @@
 - Popups are now sheets that slide up from the bottom, and confirmations use them instead of system alerts
 - The host, credential, file and key editors open in place with a back button instead of as popups
 - The iOS app icon, including the dark and tinted versions, now uses the same logo as Termix on the web and desktop
+- Needs iOS 16.4 or newer
 
 ### Fixed
 
