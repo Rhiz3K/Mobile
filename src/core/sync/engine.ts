@@ -449,7 +449,7 @@ export class SyncEngine {
         }
         if (!result.row && !result.deleted) {
           // The server lost its record (revision 0), so start it over there.
-          // The desktop resends forever here; see Termix-SSH/Plugin-Sync issues.
+          // The desktop resends forever here; see Termix-SSH/Plugin-Sync#3.
           if (result.revision === 0) {
             book.put(op.entityType, op.syncId, { revision: 0 });
           }

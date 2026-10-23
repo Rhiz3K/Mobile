@@ -326,3 +326,15 @@ test("refused changes can be tried again", async () => {
   await retryRejected(account.id, localStores);
   expect(new SyncBook(await db()).errors()).toHaveLength(0);
 });
+
+test("a live server is still checked every few minutes for other devices' pushes", async () => {
+  jest.useFakeTimers();
+  manager.start();
+  await jest.advanceTimersByTimeAsync(10);
+  expect(streams.length).toBeGreaterThan(0);
+  const pulls = () =>
+    server.seen.filter((r) => r.url.endsWith("/sync/v2/changes")).length;
+  const before = pulls();
+  await jest.advanceTimersByTimeAsync(5 * 60_000 + 100);
+  expect(pulls()).toBeGreaterThan(before);
+});

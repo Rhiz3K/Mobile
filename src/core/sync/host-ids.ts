@@ -9,7 +9,7 @@ import { SyncRemote } from "./remote";
  * A linked server's own id for a host. The phone's copy has its own ids, but
  * server actions (the relay terminal, files, docker, ...) need the server's.
  * Shared hosts carry it; owned ones are asked for once and kept on the row.
- * See the Plugin-Sync issue about a batch lookup.
+ * There is no batch lookup yet, see Termix-SSH/Plugin-Sync#4.
  */
 export async function serverHostId(
   accountId: string,

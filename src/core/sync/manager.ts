@@ -20,6 +20,8 @@ const log = createLogger("sync");
 const MAX_PARALLEL = 2;
 /** Servers that keep a live event stream open while the app is open. */
 const MAX_STREAMS = 3;
+// Also catches pushes from other devices, which send no event yet
+// (Termix-SSH/Plugin-Sync#1).
 const POLL_MS = 5 * 60_000;
 const LOCAL_EDIT_DELAY_MS = 2_000;
 const EVENT_DELAY_MS = 500;
@@ -335,7 +337,8 @@ export class SyncManager {
         last: summary,
       });
       this.restream();
-      if (this.foreground && !slot.closeStream) {
+      // Even with a live stream: pushes from other devices send no event yet.
+      if (this.foreground) {
         this.schedule(accountId, POLL_MS);
       }
       void fillServerIds(accountId, 50, this.stores).catch(() => {});
@@ -403,7 +406,8 @@ export class SyncManager {
     const client = accounts.client(account.id);
     if (!client) return;
     const token = await new SyncRemote(client).refresh();
-    // The server ends the old session at once, so save the new one first.
+    // The server ends the old session at once, so save the new one first
+    // (Termix-SSH/Plugin-Sync#2).
     if (token) await client.setToken(token);
     await accounts.update(account.id, {
       options: {
