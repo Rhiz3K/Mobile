@@ -1,29 +1,12 @@
-const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
-const test = require("node:test");
-const vm = require("node:vm");
-const ts = require("typescript");
-
-const compat = {};
-vm.runInNewContext(
-  ts.transpileModule(
-    fs.readFileSync(
-      path.join(__dirname, "../src/core/api/compat/api-compat.ts"),
-      "utf8",
-    ),
-    {
-      compilerOptions: {
-        module: ts.ModuleKind.CommonJS,
-        target: ts.ScriptTarget.ES2022,
-      },
-    },
-  ).outputText,
-  { exports: compat },
-);
+import {
+  flattenPluginSettings,
+  isVersionAtLeast,
+  pluginTunnelName,
+  toPluginRequest,
+} from "@/core/api/compat/api-compat";
 
 test("old routes map onto 2.9 plugin routes", () => {
-  const cases = [
+  const cases: [string, string, string][] = [
     [
       "GET",
       "/ssh/file_manager/ssh/listFiles?sessionId=a",
@@ -89,7 +72,11 @@ test("old routes map onto 2.9 plugin routes", () => {
     ["GET", "/users/oidc-config", "/plugin-api/sso/config"],
   ];
   for (const [method, from, to] of cases) {
-    assert.equal(compat.toPluginRequest(method, from), to, `${method} ${from}`);
+    expect([method, from, toPluginRequest(method, from)]).toEqual([
+      method,
+      from,
+      to,
+    ]);
   }
 });
 
@@ -106,12 +93,12 @@ test("routes 2.9 kept in core are left alone", () => {
     "/version",
     "/host/status",
   ]) {
-    assert.equal(compat.toPluginRequest("GET", p), p);
+    expect(toPluginRequest("GET", p)).toBe(p);
   }
 });
 
 test("pluginSettings fill the flat host fields", () => {
-  const host = compat.flattenPluginSettings({
+  const host: any = flattenPluginSettings({
     id: 1,
     statsConfig: { metricsEnabled: true },
     pluginSettings: {
@@ -126,49 +113,44 @@ test("pluginSettings fill the flat host fields", () => {
       "wake-on-lan": { macAddress: "aa:bb" },
     },
   });
-  assert.equal(host.enableTerminal, true);
-  assert.equal(host.enableFileManager, false);
-  assert.equal(host.defaultPath, "/srv");
-  assert.equal(host.enableDocker, true);
-  assert.equal(host.enableTunnel, true);
-  assert.equal(host.tunnelConnections.length, 1);
-  assert.equal(host.enableRdp, true);
-  assert.equal(host.rdpPort, 3390);
-  assert.equal(host.enableVnc, false);
-  assert.equal(host.macAddress, "aa:bb");
-  assert.equal(typeof host.statsConfig, "string");
+  expect(host.enableTerminal).toBe(true);
+  expect(host.enableFileManager).toBe(false);
+  expect(host.defaultPath).toBe("/srv");
+  expect(host.enableDocker).toBe(true);
+  expect(host.enableTunnel).toBe(true);
+  expect(host.tunnelConnections).toHaveLength(1);
+  expect(host.enableRdp).toBe(true);
+  expect(host.rdpPort).toBe(3390);
+  expect(host.enableVnc).toBe(false);
+  expect(host.macAddress).toBe("aa:bb");
+  expect(typeof host.statsConfig).toBe("string");
 });
 
 test("a plugin missing from pluginSettings reads as off", () => {
-  const host = compat.flattenPluginSettings({ id: 1, pluginSettings: {} });
-  assert.equal(host.enableDocker, false);
-  assert.equal(host.enableTerminal, false);
-  assert.equal(JSON.parse(host.statsConfig).metricsEnabled, false);
+  const host: any = flattenPluginSettings({ id: 1, pluginSettings: {} });
+  expect(host.enableDocker).toBe(false);
+  expect(host.enableTerminal).toBe(false);
+  expect(JSON.parse(host.statsConfig).metricsEnabled).toBe(false);
 });
 
 test("pre 2.9 hosts pass through untouched", () => {
   const legacy = { id: 1, enableDocker: true, statsConfig: "{}" };
-  assert.deepEqual(compat.flattenPluginSettings(legacy), legacy);
+  expect(flattenPluginSettings(legacy)).toEqual(legacy);
 });
 
 test("2.9 tunnel names match the server format", () => {
-  assert.equal(
-    compat.pluginTunnelName(
-      { id: 4, name: "", username: "root", ip: "10.0.0.1" },
-      0,
-      {
-        sourcePort: 8080,
-        endpointHost: " db ",
-        endpointPort: 5432,
-      },
-    ),
-    "4::0::root@10.0.0.1::8080::db::5432",
-  );
+  expect(
+    pluginTunnelName({ id: 4, name: "", username: "root", ip: "10.0.0.1" }, 0, {
+      sourcePort: 8080,
+      endpointHost: " db ",
+      endpointPort: 5432,
+    }),
+  ).toBe("4::0::root@10.0.0.1::8080::db::5432");
 });
 
 test("version compare", () => {
-  assert.equal(compat.isVersionAtLeast("2.9.0", "2.9.0"), true);
-  assert.equal(compat.isVersionAtLeast("v2.10.1", "2.9.0"), true);
-  assert.equal(compat.isVersionAtLeast("2.8.4", "2.9.0"), false);
-  assert.equal(compat.isVersionAtLeast(undefined, "2.9.0"), false);
+  expect(isVersionAtLeast("2.9.0", "2.9.0")).toBe(true);
+  expect(isVersionAtLeast("v2.10.1", "2.9.0")).toBe(true);
+  expect(isVersionAtLeast("2.8.4", "2.9.0")).toBe(false);
+  expect(isVersionAtLeast(undefined, "2.9.0")).toBe(false);
 });

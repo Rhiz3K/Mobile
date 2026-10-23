@@ -24,4 +24,10 @@ module.exports = defineConfig([
       ],
     },
   },
+  {
+    files: ["tests/**/*.{ts,tsx}"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+    },
+  },
 ]);

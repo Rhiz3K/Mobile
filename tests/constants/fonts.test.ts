@@ -1,24 +1,23 @@
-const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
-const test = require("node:test");
+import fs from "node:fs";
+import path from "node:path";
 
-const root = path.join(__dirname, "..");
+const root = path.join(__dirname, "../..");
 const config = JSON.parse(
   fs.readFileSync(path.join(root, "app.json"), "utf8"),
 ).expo;
 const fontPlugin = config.plugins.find(
-  (p) => Array.isArray(p) && p[0] === "expo-font",
+  (p: unknown) => Array.isArray(p) && p[0] === "expo-font",
 )[1];
 const fontsTs = fs.readFileSync(
   path.join(root, "src/constants/fonts.ts"),
   "utf8",
 );
 const STYLES = ["Regular", "Bold", "Italic", "BoldItalic"];
-const file = (s) => `./assets/fonts/CaskaydiaCoveNerdFontMono-${s}.ttf`;
+const file = (s: string) => `./assets/fonts/CaskaydiaCoveNerdFontMono-${s}.ttf`;
+const terminalFont = () => fontsTs.match(/TERMINAL_FONT = "([^"]+)"/)![1];
 
 // Family name stored in the font files (name table id 1).
-function familyName(rel) {
+function familyName(rel: string) {
   const d = fs.readFileSync(path.join(root, rel));
   const tables = d.readUInt16BE(4);
   for (let i = 0; i < tables; i++) {
@@ -32,8 +31,7 @@ function familyName(rel) {
       if (d.readUInt16BE(r) !== 3 || d.readUInt16BE(r + 6) !== 1) continue;
       const len = d.readUInt16BE(r + 8);
       const start = strings + d.readUInt16BE(r + 10);
-      return d
-        .subarray(start, start + len)
+      return Buffer.from(d.subarray(start, start + len))
         .swap16()
         .toString("utf16le");
     }
@@ -42,28 +40,26 @@ function familyName(rel) {
 }
 
 test("every nerd font style is bundled with its license", () => {
-  for (const s of STYLES) {
-    assert.ok(fs.existsSync(path.join(root, file(s))), s);
-  }
-  assert.ok(
+  for (const s of STYLES)
+    expect(fs.existsSync(path.join(root, file(s)))).toBe(true);
+  expect(
     fs.existsSync(path.join(root, "assets/fonts/LICENSE-CaskaydiaCove.txt")),
-  );
+  ).toBe(true);
 });
 
 test("iOS embeds all four styles", () => {
-  assert.deepEqual(fontPlugin.ios.fonts, STYLES.map(file));
+  expect(fontPlugin.ios.fonts).toEqual(STYLES.map(file));
 });
 
 test("Android groups the styles under one family", () => {
   const [family] = fontPlugin.android.fonts;
-  const name = fontsTs.match(/TERMINAL_FONT = "([^"]+)"/)[1];
-  assert.equal(family.fontFamily, name);
-  const defs = family.fontDefinitions.map((d) => [
+  expect(family.fontFamily).toBe(terminalFont());
+  const defs = family.fontDefinitions.map((d: any) => [
     d.path,
     d.weight,
     d.style ?? "normal",
   ]);
-  assert.deepEqual(defs, [
+  expect(defs).toEqual([
     [file("Regular"), 400, "normal"],
     [file("Bold"), 700, "normal"],
     [file("Italic"), 400, "italic"],
@@ -72,6 +68,5 @@ test("Android groups the styles under one family", () => {
 });
 
 test("the family name matches the font files, so iOS finds it too", () => {
-  const name = fontsTs.match(/TERMINAL_FONT = "([^"]+)"/)[1];
-  for (const s of STYLES) assert.equal(familyName(file(s)), name, s);
+  for (const s of STYLES) expect(familyName(file(s))).toBe(terminalFont());
 });
