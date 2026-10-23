@@ -1,4 +1,5 @@
 import { AccountClient } from "@/core/api/AccountClient";
+import { localStores } from "@/core/db/stores";
 import { AppError } from "@/core/errors";
 import {
   accountStorage,
@@ -27,6 +28,8 @@ export interface AccountStoreDeps {
   storageFor?: (accountId: string) => AccountStorage;
   newId?: () => string;
   now?: () => string;
+  /** Deletes the account's encrypted local data. */
+  wipeLocalData?: (accountId: string) => Promise<void>;
 }
 
 function randomId(): string {
@@ -52,6 +55,7 @@ export class AccountStore {
   private storageFor: (accountId: string) => AccountStorage;
   private newId: () => string;
   private now: () => string;
+  private wipeLocalData: (accountId: string) => Promise<void>;
 
   private servers: ServerAccount[] = [];
   private activeId: string = LOCAL_ACCOUNT_ID;
@@ -68,6 +72,8 @@ export class AccountStore {
     this.storageFor = deps.storageFor ?? accountStorage;
     this.newId = deps.newId ?? randomId;
     this.now = deps.now ?? (() => new Date().toISOString());
+    this.wipeLocalData =
+      deps.wipeLocalData ?? ((accountId) => localStores.wipe(accountId));
   }
 
   /** Loads saved accounts, moving a pre 2.0 server login over once. */
@@ -209,6 +215,7 @@ export class AccountStore {
     if (!this.find(id)) throw new AppError("No such account", "NOT_FOUND");
     const client = this.client(id);
     await client?.wipe();
+    await this.wipeLocalData(id);
     this.clients.delete(id);
     this.servers = this.servers.filter((a) => a.id !== id);
     await this.commit();

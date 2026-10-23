@@ -76,6 +76,15 @@ test("removing an account wipes its secrets", async () => {
   expect(await accountStorage(a.id).secrets.get("session")).toBeNull();
 });
 
+test("removing an account deletes its local database", async () => {
+  const wipeLocalData = jest.fn(async () => {});
+  const s = new AccountStore({ newId: () => "srv", wipeLocalData });
+  await s.init();
+  const a = await s.add("https://a.example");
+  await s.remove(a.id);
+  expect(wipeLocalData).toHaveBeenCalledWith("srv");
+});
+
 test("updates notify subscribers and keep the snapshot stable between them", async () => {
   const s = store();
   await s.init();
