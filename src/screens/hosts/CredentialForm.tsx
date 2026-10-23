@@ -19,6 +19,11 @@ import { toast } from "@/utils/toast";
 import { api } from "@/core/accounts";
 import { useRepositories } from "@/core/data/hooks";
 import { readLocalText } from "@/utils/localFile";
+import {
+  importMessage,
+  importPrivateKey,
+  publicKeyOf,
+} from "@/utils/keyImport";
 
 type TabId = "general" | "auth";
 type GeneratingKey = "ed25519" | "ecdsa" | "rsa" | null;
@@ -126,9 +131,14 @@ export default function CredentialForm({
       });
       if (result.canceled || !result.assets?.[0]) return;
       const text = await readLocalText(result.assets[0].uri);
-      set("key", text.trim());
+      const imported = importPrivateKey(text, form.keyPassword || undefined);
+      setForm((f) => ({
+        ...f,
+        key: imported.key,
+        publicKey: imported.publicKey ?? f.publicKey,
+      }));
       setKeyExistsOnServer(false);
-      toast.success(`Loaded ${result.assets[0].name}`);
+      toast.success(importMessage(result.assets[0].name, imported));
     } catch {
       toast.error("Could not read key file");
     }
@@ -184,6 +194,13 @@ export default function CredentialForm({
     }
     setGeneratingPublicKey(true);
     try {
+      // The phone can read the key itself; the server route is the fallback.
+      const local = publicKeyOf(form.key, form.keyPassword || undefined);
+      if (local) {
+        set("publicKey", local);
+        toast.success("Public key generated");
+        return;
+      }
       const result = await api().keys.generatePublicKeyFromPrivate(
         form.key,
         form.keyPassword || undefined,
