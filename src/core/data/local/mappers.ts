@@ -12,6 +12,7 @@ import type {
 } from "@/core/db/schema";
 import type {
   Credential,
+  SharedInfo,
   SnippetFolder,
   SSHHost,
   SSHHostData,
@@ -27,6 +28,19 @@ export function parseJson<T>(value: unknown, fallback: T): T {
   } catch {
     return fallback;
   }
+}
+
+/** The server's shared marker on a synced copy: who shared it and how. */
+export function sharedOf(source: string | null): SharedInfo | null {
+  if (!source) return null;
+  const shared = parseJson<Json>(source, {});
+  return {
+    owner: typeof shared.owner === "string" ? shared.owner : "",
+    permissionLevel:
+      typeof shared.permissionLevel === "string"
+        ? shared.permissionLevel
+        : "view",
+  };
 }
 
 const json = (value: unknown) =>
@@ -55,6 +69,8 @@ export function hostFromRow(row: HostRow): SSHHost {
   const host: Json = {
     id: row.id,
     syncId: row.syncId,
+    serverId: row.serverId ?? null,
+    shared: sharedOf(row.sharedSource),
     connectionType: row.connectionType,
     name: row.name ?? "",
     ip: row.ip,
@@ -206,6 +222,7 @@ export function hostToRow(
 export function credentialFromRow(row: CredentialRow): Credential {
   return {
     id: row.id,
+    shared: sharedOf(row.sharedSource),
     name: row.name,
     description: row.description ?? undefined,
     folder: row.folder ?? undefined,
@@ -268,6 +285,7 @@ export function credentialToRow(
 export function snippetFromRow(row: SnippetRow): Snippet {
   return {
     id: row.id,
+    syncId: row.syncId,
     userId: "",
     name: row.name,
     content: row.content,

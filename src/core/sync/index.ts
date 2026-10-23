@@ -14,6 +14,13 @@ export {
   unlinkAccount,
 } from "./link";
 export type { LinkOutcome } from "./link";
-export { asServerHost, serverHostId } from "./host-ids";
+export {
+  asServerHost,
+  hostStatusesByLocalId,
+  isSynced,
+  serverHostConfig,
+  serverHostId,
+  serverSnippetId,
+} from "./host-ids";
 export { SYNC_KINDS, kindsOf, typesOf } from "./kinds";
 export type { SyncKind } from "./kinds";

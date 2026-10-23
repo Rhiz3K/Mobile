@@ -1,6 +1,7 @@
 import { Zap } from "lucide-react-native";
 import type { FeatureDef } from "@/core/features/types";
 import { toast } from "@/utils/toast";
+import { serverHostId } from "@/core/sync";
 
 export const wakeOnLanFeature: FeatureDef = {
   id: "wake-on-lan",
@@ -18,7 +19,11 @@ export const wakeOnLanFeature: FeatureDef = {
       run: async (host, ctx) => {
         ctx.close();
         try {
-          await ctx.client?.api.wakeOnLan.wakeHost(host.id);
+          const client = ctx.client;
+          if (!client) return;
+          await client.api.wakeOnLan.wakeHost(
+            await serverHostId(client.accountId, host),
+          );
           toast.success(`Wake-on-LAN sent to ${host.name}`);
         } catch {
           toast.error("Failed to send Wake-on-LAN packet");

@@ -21,6 +21,8 @@ export type TransportCapability =
 
 export interface TerminalHostConfig {
   id: number;
+  /** The server finds the host by this first; the same on every device. */
+  syncId?: string | null;
   name: string;
   ip: string;
   port: number;

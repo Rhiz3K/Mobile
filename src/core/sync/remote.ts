@@ -176,6 +176,16 @@ export class SyncRemote {
     }
   }
 
+  /** Host status entries keyed by host syncId. */
+  async hostStatus<T>(): Promise<Record<string, T>> {
+    const res = await this.call<Record<string, T>>({
+      method: "GET",
+      url: "/sync/v2/host-status",
+      timeout: 15_000,
+    });
+    return res && typeof res === "object" ? res : {};
+  }
+
   /** Where and how to open the change event stream. */
   eventsRequest(): { url: string; headers: Record<string, string> } {
     return {

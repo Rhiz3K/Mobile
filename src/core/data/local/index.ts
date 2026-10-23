@@ -33,6 +33,16 @@ const now = () => new Date().toISOString();
 const notFound = (what: string) =>
   new AppError(`That ${what} no longer exists.`, "NOT_FOUND");
 
+/** Shared copies come from the server and only their owner can change them. */
+function refuseShared(row: { sharedSource: string | null }, what: string) {
+  if (row.sharedSource) {
+    throw new AppError(
+      `This ${what} is shared with you. Only its owner can change it.`,
+      "ACCESS_DENIED",
+    );
+  }
+}
+
 /** The encrypted store of one account. Every call waits for App Lock. */
 export function localRepositories(
   accountId: string,
@@ -103,6 +113,7 @@ export function localRepositories(
         const d = await db();
         const current = d.select().from(hosts).where(eq(hosts.id, id)).get();
         if (!current) throw notFound("host");
+        refuseShared(current, "host");
         const row = d
           .update(hosts)
           .set({ ...hostToRow(draft, current), updatedAt: now() })
@@ -113,7 +124,10 @@ export function localRepositories(
         return hostFromRow(row);
       },
       async remove(id) {
-        (await db()).delete(hosts).where(eq(hosts.id, id)).run();
+        const d = await db();
+        const current = d.select().from(hosts).where(eq(hosts.id, id)).get();
+        if (current) refuseShared(current, "host");
+        d.delete(hosts).where(eq(hosts.id, id)).run();
         touched(hosts);
       },
     },
@@ -172,6 +186,7 @@ export function localRepositories(
           .where(eq(credentials.id, id))
           .get();
         if (!current) throw notFound("login");
+        refuseShared(current, "login");
         const row = d
           .update(credentials)
           .set({ ...credentialToRow(draft, current), updatedAt: now() })
@@ -182,7 +197,14 @@ export function localRepositories(
         return credentialFromRow(row);
       },
       async remove(id) {
-        (await db()).delete(credentials).where(eq(credentials.id, id)).run();
+        const d = await db();
+        const current = d
+          .select()
+          .from(credentials)
+          .where(eq(credentials.id, id))
+          .get();
+        if (current) refuseShared(current, "login");
+        d.delete(credentials).where(eq(credentials.id, id)).run();
         // Hosts that used it lose the link (on delete set null).
         touched(credentials, hosts);
       },

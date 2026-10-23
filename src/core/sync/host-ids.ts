@@ -81,3 +81,84 @@ export async function fillServerIds(
   }
   return filled;
 }
+
+/** Whether the phone keeps its own copy of this account (its ids are local). */
+export function isSynced(accountId: string): boolean {
+  const account = accounts.find(accountId);
+  return isServerAccount(account) && account.options.sync === true;
+}
+
+/**
+ * The host config the relay terminal sends. The server finds the host by
+ * syncId first; the id is swapped for the server's when it can be found.
+ */
+export async function serverHostConfig<
+  T extends { id: number; syncId?: string | null },
+>(accountId: string, config: T): Promise<T> {
+  if (!isSynced(accountId)) return config;
+  try {
+    return { ...config, id: await serverHostId(accountId, config) };
+  } catch {
+    return config;
+  }
+}
+
+const snippetIds = new Map<string, { at: number; ids: Map<string, number> }>();
+const SNIPPET_IDS_TTL_MS = 60_000;
+
+/** A linked server's own id for a snippet, by its syncId. */
+export async function serverSnippetId(
+  accountId: string,
+  snippet: { id: number; syncId?: string | null },
+): Promise<number> {
+  if (!isSynced(accountId) || !snippet.syncId) return snippet.id;
+  let cached = snippetIds.get(accountId);
+  if (!cached || Date.now() - cached.at > SNIPPET_IDS_TTL_MS) {
+    const client = accounts.client(accountId);
+    const raw = client ? await client.api.snippets.getSnippets() : [];
+    const list: { id?: unknown; syncId?: unknown }[] = Array.isArray(raw)
+      ? raw
+      : Array.isArray(raw?.snippets)
+        ? raw.snippets
+        : [];
+    const ids = new Map<string, number>();
+    for (const item of list) {
+      if (typeof item.syncId === "string" && typeof item.id === "number") {
+        ids.set(item.syncId, item.id);
+      }
+    }
+    cached = { at: Date.now(), ids };
+    snippetIds.set(accountId, cached);
+  }
+  return cached.ids.get(snippet.syncId) ?? snippet.id;
+}
+
+/**
+ * Live host status keyed by the phone's own host ids. A synced account asks
+ * /sync/v2/host-status, which is keyed by syncId; others use /status.
+ */
+export async function hostStatusesByLocalId<T>(
+  accountId: string,
+  hostList: { id: number; syncId?: string | null }[],
+): Promise<Record<number, T>> {
+  const client = accounts.client(accountId);
+  if (!client) return {};
+  if (!isSynced(accountId)) {
+    return (await client.api.metrics.getAllServerStatuses()) as Record<
+      number,
+      T
+    >;
+  }
+  const bySyncId = await new SyncRemote(client).hostStatus<T>();
+  const out: Record<number, T> = {};
+  for (const host of hostList) {
+    const entry = host.syncId ? bySyncId[host.syncId] : undefined;
+    if (entry) out[host.id] = entry;
+  }
+  return out;
+}
+
+/** Test seam. */
+export function clearSnippetIds(): void {
+  snippetIds.clear();
+}

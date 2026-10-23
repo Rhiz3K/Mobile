@@ -11,8 +11,18 @@ export interface QuickAction {
   snippetId: number;
 }
 
+/** Who shared a host or login with this account (synced from the server). */
+export interface SharedInfo {
+  owner: string;
+  permissionLevel: string;
+}
+
 export interface SSHHost {
   id: number;
+  /** A linked server's own id for this host, when the phone keeps a copy. */
+  serverId?: number | null;
+  /** Set on hosts shared with you. They are read only here. */
+  shared?: SharedInfo | null;
   // Names the host on both sides of a sync pair. Numeric ids can drift between
   // a device and its sync server, so connect calls pass this when present.
   syncId?: string | null;
@@ -174,6 +184,8 @@ export type HostTreeNode =
 
 export interface Credential {
   id: number;
+  /** Set on logins shared with you. They are read only here. */
+  shared?: SharedInfo | null;
   name: string;
   description?: string;
   folder?: string;
@@ -648,6 +660,7 @@ export interface FolderStats {
 
 export interface Snippet {
   id: number;
+  syncId?: string | null;
   userId: string;
   name: string;
   content: string;

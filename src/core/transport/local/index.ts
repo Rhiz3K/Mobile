@@ -12,7 +12,7 @@ export const NO_ENGINE =
   "This build has no SSH engine. Use the app from the store, or link a Termix server to connect.";
 export const NO_DEVICE_STORE = "The hosts on this phone are not open yet.";
 export const NO_SERVER_COPY =
-  "This server's hosts are not on this phone yet. Sync the server to connect from the phone.";
+  "This server's hosts are not on this phone. Turn on the Sync plugin on the server to connect from the phone.";
 
 const deviceRepo = (): HostConnectRepository | undefined =>
   repositoriesFor({ id: LOCAL_ACCOUNT_ID, kind: "local" }, null).connect;

@@ -232,3 +232,17 @@ test("failures say which step failed, using the server's last error", async () =
   await out.m.connect(80, 24);
   expect(signedOut[0]).toMatchObject({ stage: "server", origin: "relay" });
 });
+
+test("the host config can be swapped for the server's before connecting", async () => {
+  const { m } = manager(fakeClient(), {
+    prepareHostConfig: async (config: any) => ({ ...config, id: 77 }),
+  });
+  await m.connect(80, 24);
+  const socket = FakeSocket.all[0];
+  socket.readyState = FakeSocket.OPEN;
+  (socket as any).onopen?.();
+  expect(socket.sent[0]).toMatchObject({
+    type: "connectToHost",
+    data: { hostConfig: { id: 77, name: "host" } },
+  });
+});

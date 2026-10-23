@@ -63,14 +63,17 @@ const cache = new Map<string, DataRepositories>();
 const serverCache = new WeakMap<AccountClient, DataRepositories>();
 
 /**
- * This device uses its encrypted store. A linked server is read live until
- * sync (B3) fills its own local copy.
+ * This device and every linked server that syncs use their own encrypted
+ * copy. A server that can't sync (no Sync plugin, older Termix) is read live.
  */
 export function repositoriesFor(
   account: Account,
   client: AccountClient | null,
 ): DataRepositories {
-  if (account.kind === "server" && client) {
+  const store = localStores.getState().available;
+  const synced =
+    account.kind === "server" && account.options?.sync === true && store;
+  if (account.kind === "server" && client && !synced) {
     let repos = serverCache.get(client);
     if (!repos) {
       repos = serverRepositories(client, accountStorage(account.id).data);
@@ -78,8 +81,8 @@ export function repositoriesFor(
     }
     return repos;
   }
-  if (account.kind === "server") return emptyRepositories;
-  if (!localStores.getState().available) return emptyRepositories;
+  if (account.kind === "server" && !synced) return emptyRepositories;
+  if (!store) return emptyRepositories;
   let repos = cache.get(account.id);
   if (!repos) {
     repos = localRepositories(account.id);

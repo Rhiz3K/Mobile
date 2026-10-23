@@ -40,10 +40,14 @@ function localFor(account: Account): Transport {
   if (account.kind === "local") return localTransport;
   let local = serverLocals.get(account.id);
   if (!local) {
-    // A linked server's hosts reach the phone through sync (B3).
+    // A linked server's hosts reach the phone through sync. Read the account
+    // each time: sync can turn on after this was made.
     local = createLocalTransport(
       isSshEngineAvailable,
-      () => repositoriesFor(account, accounts.client(account.id)).connect,
+      () => {
+        const current = accounts.find(account.id) ?? account;
+        return repositoriesFor(current, accounts.client(account.id)).connect;
+      },
       NO_SERVER_COPY,
     );
     serverLocals.set(account.id, local);

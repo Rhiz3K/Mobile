@@ -23,6 +23,7 @@ export function isSshActive(host: SSHHost): boolean {
 export function toTerminalHostConfig(host: SSHHost) {
   return {
     id: parseInt(host.id.toString()),
+    syncId: host.syncId ?? undefined,
     name: host.name,
     ip: host.ip,
     port: parseInt(host.port.toString()),

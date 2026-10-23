@@ -7,7 +7,8 @@ import { Sheet, SheetRow, Text } from "@/ui";
 import { toast } from "@/utils/toast";
 import { systemLogger } from "@/core/log/logger";
 import type { SSHHost, Snippet } from "@/types";
-import { api } from "@/core/accounts";
+import { accounts, api } from "@/core/accounts";
+import { serverHostId, serverSnippetId } from "@/core/sync";
 import { useRepositories } from "@/core/data/hooks";
 
 /** Remembers the host a widget-run snippet last targeted. */
@@ -80,7 +81,12 @@ export function RunSnippetSheet({ snippet, onClose }: RunSnippetSheetProps) {
 
       setRunningHostId(host.id);
       try {
-        const result = await api().snippets.executeSnippet(snippet.id, host.id);
+        // The phone's copy has its own ids; the server runs by its own.
+        const accountId = accounts.active().id;
+        const result = await api().snippets.executeSnippet(
+          await serverSnippetId(accountId, snippet),
+          await serverHostId(accountId, host),
+        );
         AsyncStorage.setItem(LAST_HOST_KEY, String(host.id)).catch(() => {});
 
         if (result?.success === false) {

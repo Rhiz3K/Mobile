@@ -49,7 +49,7 @@ export default function LocalData() {
         repos.credentials.list(),
         repos.snippets.list(),
       ]);
-      // A linked server still reads live, so count what is on this phone.
+      // A server that can't sync reads live, so count what is on this phone.
       setCounts(
         repos.source === "local"
           ? {

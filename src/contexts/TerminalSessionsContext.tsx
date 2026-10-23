@@ -20,6 +20,7 @@ import type {
   TransportKind,
 } from "@/core/transport";
 import { checkOpen, features } from "@/core/features";
+import { asServerHost, isSynced, serverHostId } from "@/core/sync";
 import { isSshHost } from "@/utils/hosts";
 
 /** Session tab type. The registry knows which feature owns each one. */
@@ -361,14 +362,19 @@ export const TerminalSessionsProvider: React.FC<
         const listed = kind === "relay" && !!client;
         if (listed === !!target.listed) return prev;
         if (client && listed) {
-          client.api.openTabs.addOpenTab({
+          const record = {
             id: target.instanceId,
             tabType: toTabType(target.type, target.remoteProtocol, client),
-            hostId: target.host.id,
             label: target.title,
             tabOrder: prev.indexOf(target),
             backendSessionId: target.backendSessionId ?? null,
-          });
+          };
+          // Other devices know the host by the server's id.
+          void serverHostId(target.accountId, target.host)
+            .catch(() => target.host.id)
+            .then((hostId) =>
+              client.api.openTabs.addOpenTab({ ...record, hostId }),
+            );
         } else {
           client?.api.openTabs.deleteOpenTab(target.instanceId);
         }
@@ -407,7 +413,14 @@ export const TerminalSessionsProvider: React.FC<
           if (!opts?.quiet) toast.error(check.blocked.reason);
           return check.blocked;
         }
-        addSession(host, type, { remoteProtocol: opts?.remoteProtocol });
+        // Server features act on the server's host, by the server's id.
+        const sessionHost =
+          features.serverOnly(type) && isSynced(accountId)
+            ? await asServerHost(accountId, host).catch(() => host)
+            : host;
+        addSession(sessionHost, type, {
+          remoteProtocol: opts?.remoteProtocol,
+        });
       }
       router.push("/(tabs)/sessions");
       return null;

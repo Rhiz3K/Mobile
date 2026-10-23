@@ -5,7 +5,13 @@ import { changes } from "@/core/db/changes";
 import { hosts, snippets } from "@/core/db/schema";
 import { localStores } from "@/core/db/stores";
 import { SyncManager } from "@/core/sync/manager";
-import { serverHostId } from "@/core/sync/host-ids";
+import {
+  clearSnippetIds,
+  hostStatusesByLocalId,
+  serverHostConfig,
+  serverHostId,
+  serverSnippetId,
+} from "@/core/sync/host-ids";
 import { resetStorage } from "../../helpers/http";
 import { testDriver } from "../../helpers/db";
 import { FakeSyncServer } from "../../helpers/syncServer";
@@ -214,4 +220,45 @@ test("a quiet server is checked on a timer, never in a loop", async () => {
   const second = pulls();
   await jest.advanceTimersByTimeAsync(5_000);
   expect(pulls()).toBe(second);
+});
+
+test("snippets, statuses and relay configs use the server's ids", async () => {
+  manager.start();
+  await manager.syncNow(account.id);
+  const d = await db();
+  const web = d
+    .select()
+    .from(hosts)
+    .where(eq(hosts.syncId, "44444444-4444-4444-8444-444444444444"))
+    .get()!;
+  server.hostIds.set(web.syncId, 2);
+  expect(
+    await serverHostConfig(account.id, { id: web.id, syncId: web.syncId }),
+  ).toEqual({ id: 2, syncId: web.syncId });
+
+  const handle = (server as any).handle.bind(server);
+  (server as any).handle = (req: any) => {
+    if (req.url.endsWith("/snippets")) {
+      return {
+        data: [{ id: 41, syncId: "66666666-6666-4666-8666-666666666666" }],
+      };
+    }
+    if (req.url.endsWith("/sync/v2/host-status")) {
+      return { data: { [web.syncId]: { status: "online" } } };
+    }
+    return handle(req);
+  };
+  clearSnippetIds();
+  expect(
+    await serverSnippetId(account.id, {
+      id: 1,
+      syncId: "66666666-6666-4666-8666-666666666666",
+    }),
+  ).toBe(41);
+  expect(
+    await hostStatusesByLocalId(account.id, [
+      { id: web.id, syncId: web.syncId },
+      { id: 999, syncId: "gone" },
+    ]),
+  ).toEqual({ [web.id]: { status: "online" } });
 });

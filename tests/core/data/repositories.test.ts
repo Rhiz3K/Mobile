@@ -4,6 +4,7 @@ import {
   repositoriesFor,
   serverRepositories,
 } from "@/core/data/repositories";
+import { hosts } from "@/core/db/schema";
 import { localStores } from "@/core/db/stores";
 import { accountStorage } from "@/core/storage/kv";
 import { fakeServer, resetStorage } from "../../helpers/http";
@@ -115,4 +116,44 @@ test("with no store an origin can't be saved", async () => {
   await expect(repos.origins.set(1, "auto")).rejects.toMatchObject({
     code: "NO_LOCAL_STORE",
   });
+});
+
+test("a linked server that syncs reads its own copy, and shared rows are read only", async () => {
+  const client = new AccountClient({
+    accountId: "s1",
+    serverUrl: "https://t.example",
+    storage: accountStorage("s1"),
+  });
+  const account = { id: "s1", kind: "server", options: { sync: true } } as any;
+  const repos = repositoriesFor(account, client);
+  expect(repos.source).toBe("local");
+  expect(repos.connect).toBeDefined();
+
+  const { db } = await localStores.get("s1");
+  db.insert(hosts)
+    .values({
+      syncId: "sh",
+      name: "theirs",
+      ip: "1.2.3.4",
+      port: 22,
+      username: "r",
+      authType: "password",
+      sharedSource: JSON.stringify({
+        owner: "alice",
+        permissionLevel: "connect",
+      }),
+      serverId: 7,
+    })
+    .run();
+  const [host] = await repos.hosts.list();
+  expect(host).toMatchObject({
+    serverId: 7,
+    shared: { owner: "alice", permissionLevel: "connect" },
+  });
+  await expect(repos.hosts.remove(host.id)).rejects.toMatchObject({
+    code: "ACCESS_DENIED",
+  });
+  // Without a store (web) the same account reads live.
+  localStores.setDriver(null);
+  expect(repositoriesFor(account, client).source).toBe("server");
 });

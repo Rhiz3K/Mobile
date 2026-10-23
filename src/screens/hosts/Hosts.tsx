@@ -36,6 +36,8 @@ import { TailscaleDevices } from "@/features/tailscale/TailscaleDevices";
 import CredentialListModal from "@/screens/hosts/CredentialListModal";
 import { SSHHost, ServerStatus, Snippet } from "@/types";
 import { publishHostSnapshot } from "@/widgets";
+import { accounts, api, activeClient } from "@/core/accounts";
+import { hostStatusesByLocalId, isSynced } from "@/core/sync";
 import { Screen } from "@/components/Screen";
 import {
   Text,
@@ -62,7 +64,6 @@ import {
   collectAllTags,
   filtersActive,
 } from "@/screens/hosts/navigation/hostTree";
-import { api, activeClient } from "@/core/accounts";
 import { useRepositories } from "@/core/data/hooks";
 
 const SORT_OPTIONS: { id: SortKey; label: string }[] = [
@@ -191,9 +192,14 @@ export default function Hosts() {
   const fetchMetrics = useCallback(
     async (hostList: SSHHost[], statuses: Record<number, ServerStatus>) => {
       if (!activeClient()) return;
-      const onlineIds = hostList
-        .filter((h) => statuses[h.id]?.status === "online")
-        .map((h) => h.id);
+      // A synced copy has its own ids; metrics are asked by the server's.
+      const synced = isSynced(accounts.active().id);
+      const online = hostList.filter(
+        (h) =>
+          statuses[h.id]?.status === "online" &&
+          (!synced || typeof h.serverId === "number"),
+      );
+      const onlineIds = online.map((h) => h.id);
       if (onlineIds.length === 0) {
         setMetrics((previous) =>
           Object.keys(previous).length === 0 ? previous : {},
@@ -201,8 +207,10 @@ export default function Hosts() {
         return;
       }
       const results = await Promise.allSettled(
-        onlineIds.map((id) =>
-          activeClient()!.api.metrics.getServerMetricsById(id),
+        online.map((h) =>
+          activeClient()!.api.metrics.getServerMetricsById(
+            synced ? h.serverId! : h.id,
+          ),
         ),
       );
       setMetrics((previous) => {
@@ -237,14 +245,10 @@ export default function Hosts() {
 
         // Live status and metrics come from a linked server only.
         const client = activeClient();
-        const [hostsResult, statusesResult, snippetsResult] =
-          await Promise.allSettled([
-            repos.hosts.list(),
-            client
-              ? client.api.metrics.getAllServerStatuses()
-              : Promise.resolve({}),
-            repos.snippets.list(),
-          ]);
+        const [hostsResult, snippetsResult] = await Promise.allSettled([
+          repos.hosts.list(),
+          repos.snippets.list(),
+        ]);
 
         if (hostsResult.status !== "fulfilled") throw hostsResult.reason;
 
@@ -254,8 +258,12 @@ export default function Hosts() {
           : Array.isArray(raw?.hosts)
             ? raw.hosts
             : [];
-        const statuses =
-          statusesResult.status === "fulfilled" ? statusesResult.value : {};
+        const statuses: Record<number, ServerStatus> = client
+          ? await hostStatusesByLocalId<ServerStatus>(
+              accounts.active().id,
+              hostList,
+            ).catch(() => ({}))
+          : {};
 
         const colors: Record<string, string | undefined> = {};
         try {

@@ -14,6 +14,10 @@ export interface RelayShellConfig extends ShellOptions {
     AccountClient,
     "serverUrl" | "token" | "terminalWebSocketUrl" | "openSocket"
   >;
+  /** Swaps the phone's host id for the server's before connecting. */
+  prepareHostConfig?: (
+    config: TerminalHostConfig,
+  ) => Promise<TerminalHostConfig>;
 }
 
 export class RelayShell implements ShellChannel {
@@ -76,6 +80,12 @@ export class RelayShell implements ShellChannel {
 
     this.wsUrl = client.terminalWebSocketUrl(jwtToken);
     this.wsProtocols = [`termix.jwt.${jwtToken}`];
+    if (this.config.prepareHostConfig) {
+      this.config.hostConfig = await this.config
+        .prepareHostConfig(this.config.hostConfig)
+        .catch(() => this.config.hostConfig);
+      if (this.destroyed) return;
+    }
 
     this.connectWebSocket();
   }
