@@ -32,6 +32,7 @@ import { TailscaleCheckDialog } from "@/screens/dialogs/TailscaleCheckDialog";
 import { TERMINAL_THEMES, TERMINAL_FONTS } from "@/constants/terminal-themes";
 import { MOBILE_DEFAULT_TERMINAL_CONFIG } from "@/constants/terminal-config";
 import type { TerminalConfig } from "@/types";
+import type { TerminalInputHandle } from "@/core/features/types";
 import {
   useSessionTransport,
   type HostKeyData,
@@ -76,15 +77,7 @@ interface TerminalProps {
   onSessionIdChange?: (sessionId: string | null) => void;
 }
 
-export type TerminalHandle = {
-  sendInput: (data: string) => void;
-  fit: () => void;
-  isDialogOpen: () => boolean;
-  notifyBackgrounded: () => void;
-  notifyForegrounded: () => void;
-  scrollToBottom: () => void;
-  isSelecting: () => boolean;
-};
+export type TerminalHandle = TerminalInputHandle;
 
 const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
   (

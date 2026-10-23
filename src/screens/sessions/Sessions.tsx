@@ -20,21 +20,8 @@ import {
 import { X } from "lucide-react-native";
 import { SessionAccountProvider } from "@/core/accounts/session";
 import { useKeyboard } from "@/contexts/KeyboardContext";
-import { Terminal, TerminalHandle } from "@/features/terminal/Terminal";
-import {
-  ServerStats,
-  ServerStatsHandle,
-} from "@/features/host-metrics/ServerStats";
-import {
-  FileManager,
-  FileManagerHandle,
-} from "@/features/file-manager/FileManager";
-import {
-  TunnelManager,
-  TunnelManagerHandle,
-} from "@/features/tunnels/TunnelManager";
-import { RemoteDesktop } from "@/features/remote-desktop/RemoteDesktop";
-import { Docker } from "@/features/docker/Docker";
+import type { TerminalHandle } from "@/features/terminal/Terminal";
+import { features } from "@/core/features";
 import { ConnectionsPanel } from "@/screens/sessions/ConnectionsPanel";
 import { Screen } from "@/components/Screen";
 import { Text } from "@/ui";
@@ -88,18 +75,8 @@ export default function Sessions() {
   const [showConnectionsPanel, setShowConnectionsPanel] = useState(false);
   const { keyboardHeight, isKeyboardVisible } = useKeyboard();
   const hiddenInputRef = useRef<TerminalImeInputHandle | null>(null);
-  const terminalRefs = useRef<Record<string, React.RefObject<TerminalHandle>>>(
-    {},
-  );
-  const statsRefs = useRef<Record<string, React.RefObject<ServerStatsHandle>>>(
-    {},
-  );
-  const fileManagerRefs = useRef<
-    Record<string, React.RefObject<FileManagerHandle>>
-  >({});
-  const tunnelManagerRefs = useRef<
-    Record<string, React.RefObject<TunnelManagerHandle>>
-  >({});
+  // Tab handles by session id. Tabs with "terminal-input" hand out a TerminalHandle.
+  const tabRefs = useRef<Record<string, React.RefObject<any>>>({});
   const [activeModifiers, setActiveModifiers] = useState({
     ctrl: false,
     alt: false,
@@ -147,9 +124,13 @@ export default function Sessions() {
   const activeSession = sessions.find(
     (session) => session.id === activeSessionId,
   );
+  const activeIsTerminal = features.sessionHas(
+    activeSession?.type,
+    "terminal-input",
+  );
 
   const getActiveTerminalRef = useCallback(() => {
-    return activeSessionId ? terminalRefs.current[activeSessionId] : null;
+    return activeSessionId ? tabRefs.current[activeSessionId] : null;
   }, [activeSessionId]);
 
   const dispatchCommittedText = useCallback(
@@ -201,7 +182,7 @@ export default function Sessions() {
   useEffect(() => {
     // Only the terminal session renders the hidden input, so skip the native
     // call when switching to any other session type.
-    if (activeSession?.type === "terminal" && !isCustomKeyboardVisible) {
+    if (activeIsTerminal && !isCustomKeyboardVisible) {
       callImeInput(hiddenInputRef, "clear");
     }
     compositionActiveRef.current = false;
@@ -210,7 +191,8 @@ export default function Sessions() {
 
   useEffect(() => {
     const show = Keyboard.addListener("keyboardDidShow", () => {
-      if (activeSession?.type === "remoteDesktop") setIsRdpKeyboardOpen(true);
+      if (features.sessionHas(activeSession?.type, "own-keyboard"))
+        setIsRdpKeyboardOpen(true);
     });
     const hide = Keyboard.addListener("keyboardDidHide", () =>
       setIsRdpKeyboardOpen(false),
@@ -222,7 +204,7 @@ export default function Sessions() {
   }, [activeSession?.type]);
 
   const getTabBarBottomPosition = () => {
-    if (activeSession?.type !== "terminal") {
+    if (!activeIsTerminal) {
       return insets.bottom;
     }
 
@@ -241,8 +223,9 @@ export default function Sessions() {
     return KEYBOARD_BAR_HEIGHT;
   };
 
-  const getBottomMargin = (sessionType: SessionType = "terminal") => {
-    if (sessionType !== "terminal") {
+  // No active tab lays out like a terminal, as before.
+  const getBottomMargin = (sessionType?: SessionType) => {
+    if (sessionType && !features.sessionHas(sessionType, "terminal-input")) {
       return SESSION_TAB_BAR_HEIGHT + insets.bottom;
     }
 
@@ -268,57 +251,18 @@ export default function Sessions() {
   };
 
   useEffect(() => {
-    const terminalMap: Record<string, React.RefObject<TerminalHandle>> = {
-      ...terminalRefs.current,
-    };
-    const statsMap: Record<string, React.RefObject<ServerStatsHandle>> = {
-      ...statsRefs.current,
-    };
-    const fileManagerMap: Record<string, React.RefObject<FileManagerHandle>> = {
-      ...fileManagerRefs.current,
-    };
-
-    sessions.forEach((s) => {
-      if (s.type === "terminal" && !terminalMap[s.id]) {
-        terminalMap[s.id] =
-          React.createRef<TerminalHandle>() as React.RefObject<TerminalHandle>;
-      } else if (s.type === "stats" && !statsMap[s.id]) {
-        statsMap[s.id] =
-          React.createRef<ServerStatsHandle>() as React.RefObject<ServerStatsHandle>;
-      } else if (s.type === "filemanager" && !fileManagerMap[s.id]) {
-        fileManagerMap[s.id] =
-          React.createRef<FileManagerHandle>() as React.RefObject<FileManagerHandle>;
-      }
-    });
-
-    Object.keys(terminalMap).forEach((id) => {
-      if (!sessions.find((s) => s.id === id && s.type === "terminal")) {
-        delete terminalMap[id];
-      }
-    });
-
-    Object.keys(statsMap).forEach((id) => {
-      if (!sessions.find((s) => s.id === id && s.type === "stats")) {
-        delete statsMap[id];
-      }
-    });
-
-    Object.keys(fileManagerMap).forEach((id) => {
-      if (!sessions.find((s) => s.id === id && s.type === "filemanager")) {
-        delete fileManagerMap[id];
-      }
-    });
-
-    terminalRefs.current = terminalMap;
-    statsRefs.current = statsMap;
-    fileManagerRefs.current = fileManagerMap;
+    const next: Record<string, React.RefObject<any>> = {};
+    for (const s of sessions) {
+      next[s.id] = tabRefs.current[s.id] ?? React.createRef();
+    }
+    tabRefs.current = next;
   }, [sessions]);
 
   useFocusEffect(
     React.useCallback(() => {
       if (
         sessions.length > 0 &&
-        activeSession?.type === "terminal" &&
+        activeIsTerminal &&
         !isCustomKeyboardVisible &&
         !keyboardIntentionallyHiddenRef.current
       ) {
@@ -341,8 +285,8 @@ export default function Sessions() {
     const subscription = AppState.addEventListener("change", (nextAppState) => {
       if (nextAppState === "active") {
         sessions.forEach((session) => {
-          if (session.type === "terminal") {
-            const terminalRef = terminalRefs.current[session.id];
+          if (features.sessionHas(session.type, "terminal-input")) {
+            const terminalRef = tabRefs.current[session.id];
             if (terminalRef?.current) {
               terminalRef.current.notifyForegrounded();
             }
@@ -351,7 +295,7 @@ export default function Sessions() {
 
         if (
           sessions.length > 0 &&
-          activeSession?.type === "terminal" &&
+          activeIsTerminal &&
           !isCustomKeyboardVisible &&
           !keyboardIntentionallyHiddenRef.current
         ) {
@@ -361,8 +305,8 @@ export default function Sessions() {
         }
       } else if (nextAppState === "background") {
         sessions.forEach((session) => {
-          if (session.type === "terminal") {
-            const terminalRef = terminalRefs.current[session.id];
+          if (features.sessionHas(session.type, "terminal-input")) {
+            const terminalRef = tabRefs.current[session.id];
             if (terminalRef?.current) {
               terminalRef.current.notifyBackgrounded();
             }
@@ -406,7 +350,7 @@ export default function Sessions() {
 
       setTimeout(() => {
         const activeRef = activeSessionId
-          ? terminalRefs.current[activeSessionId]
+          ? tabRefs.current[activeSessionId]
           : null;
         activeRef?.current?.fit();
       }, 300);
@@ -422,12 +366,12 @@ export default function Sessions() {
   }, [keyboardHeight, setLastKeyboardHeight]);
 
   useEffect(() => {
-    if (!activeSessionId || activeSession?.type !== "terminal") return;
+    if (!activeSessionId || !activeIsTerminal) return;
 
     // Keyboard stays put while selecting. Hiding it resized the terminal and
     // made the text jump under the finger.
     const checkSelectionState = () => {
-      const activeRef = terminalRefs.current[activeSessionId];
+      const activeRef = tabRefs.current[activeSessionId];
       if (!activeRef?.current) return;
       isSelectingRef.current = activeRef.current.isSelecting();
     };
@@ -437,9 +381,7 @@ export default function Sessions() {
   }, [activeSessionId, activeSession?.type]);
 
   useEffect(() => {
-    const activeRef = activeSessionId
-      ? terminalRefs.current[activeSessionId]
-      : null;
+    const activeRef = activeSessionId ? tabRefs.current[activeSessionId] : null;
     if (activeRef && activeRef.current) {
       setTimeout(() => {
         activeRef.current?.fit();
@@ -471,14 +413,14 @@ export default function Sessions() {
     React.useCallback(() => {
       if (
         sessions.length > 0 &&
-        activeSession?.type === "terminal" &&
+        activeIsTerminal &&
         !isCustomKeyboardVisible &&
         !keyboardIntentionallyHiddenRef.current
       ) {
         setTimeout(() => {
           callImeInput(hiddenInputRef, "focus");
           const activeRef = activeSessionId
-            ? terminalRefs.current[activeSessionId]
+            ? tabRefs.current[activeSessionId]
             : null;
           activeRef?.current?.fit();
         }, 0);
@@ -498,7 +440,10 @@ export default function Sessions() {
 
     setActiveSession(sessionId);
     setTimeout(() => {
-      if (session?.type === "terminal" && !isCustomKeyboardVisible) {
+      if (
+        features.sessionHas(session?.type, "terminal-input") &&
+        !isCustomKeyboardVisible
+      ) {
         callImeInput(hiddenInputRef, "focus");
       }
     }, 100);
@@ -507,11 +452,7 @@ export default function Sessions() {
   const handleTabClose = (sessionId: string) => {
     removeSession(sessionId);
     setTimeout(() => {
-      if (
-        activeSession?.type === "terminal" &&
-        !isCustomKeyboardVisible &&
-        sessions.length > 1
-      ) {
+      if (activeIsTerminal && !isCustomKeyboardVisible && sessions.length > 1) {
         callImeInput(hiddenInputRef, "focus");
       }
     }, 100);
@@ -519,7 +460,7 @@ export default function Sessions() {
 
   const closeConnectionsPanel = useCallback(() => {
     setShowConnectionsPanel(false);
-    if (activeSession?.type === "terminal" && !isCustomKeyboardVisible) {
+    if (activeIsTerminal && !isCustomKeyboardVisible) {
       setKeyboardIntentionallyHidden(false);
       setTimeout(() => callImeInput(hiddenInputRef, "focus"), 100);
     }
@@ -545,7 +486,7 @@ export default function Sessions() {
       }, 50);
       setTimeout(() => {
         const activeRef = activeSessionId
-          ? terminalRefs.current[activeSessionId]
+          ? tabRefs.current[activeSessionId]
           : null;
         if (activeRef?.current) {
           activeRef.current.fit();
@@ -562,7 +503,7 @@ export default function Sessions() {
       });
       setTimeout(() => {
         const activeRef = activeSessionId
-          ? terminalRefs.current[activeSessionId]
+          ? tabRefs.current[activeSessionId]
           : null;
         if (activeRef?.current) {
           activeRef.current.fit();
@@ -585,7 +526,7 @@ export default function Sessions() {
       });
       setTimeout(() => {
         const activeRef = activeSessionId
-          ? terminalRefs.current[activeSessionId]
+          ? tabRefs.current[activeSessionId]
           : null;
         if (activeRef?.current) {
           activeRef.current.fit();
@@ -605,116 +546,30 @@ export default function Sessions() {
   }, []);
 
   const activeTerminalBgColor =
-    activeSession?.type === "terminal" && activeSessionId
+    activeIsTerminal && activeSessionId
       ? terminalBackgroundColors[activeSessionId] || ui.terminal
       : ui.background;
 
   const renderSession = (session: TerminalSession) => {
-    if (session.type === "terminal") {
-      return (
-        <Terminal
-          key={session.id}
-          ref={terminalRefs.current[session.id]}
-          hostConfig={{
-            id: parseInt(session.host.id.toString()),
-            name: session.host.name,
-            ip: session.host.ip,
-            port: parseInt(session.host.port.toString()),
-            username: session.host.username,
-            authType: session.host.authType,
-            password: session.host.password,
-            key: session.host.key,
-            keyPassword: session.host.keyPassword,
-            keyType: session.host.keyType,
-            credentialId: session.host.credentialId
-              ? parseInt(session.host.credentialId.toString())
-              : undefined,
-            jumpHosts: session.host.jumpHosts,
-            forceKeyboardInteractive: session.host.forceKeyboardInteractive,
-            overrideCredentialUsername: session.host.overrideCredentialUsername,
-            terminalConfig: session.host.terminalConfig,
-          }}
-          isVisible={session.id === activeSessionId}
-          title={session.title}
-          tabInstanceId={session.instanceId}
-          initialSessionId={session.restoredSessionId}
-          onSessionIdChange={(backendId) =>
-            setBackendSessionId(session.id, backendId)
-          }
-          onClose={() => handleTabClose(session.id)}
-          onBackgroundColorChange={(color) => {
-            setTerminalBackgroundColors((prev) => ({
-              ...prev,
-              [session.id]: color,
-            }));
-          }}
-        />
-      );
-    } else if (session.type === "stats") {
-      return (
-        <ServerStats
-          key={session.id}
-          ref={statsRefs.current[session.id]}
-          hostConfig={{
-            id: parseInt(session.host.id.toString()),
-            name: session.host.name,
-            statsConfig: session.host.statsConfig,
-            quickActions: session.host.quickActions,
-          }}
-          isVisible={session.id === activeSessionId}
-          title={session.title}
-          onClose={() => handleTabClose(session.id)}
-        />
-      );
-    } else if (session.type === "filemanager") {
-      return (
-        <FileManager
-          key={session.id}
-          ref={fileManagerRefs.current[session.id]}
-          host={session.host}
-          sessionId={session.id}
-          isVisible={session.id === activeSessionId}
-        />
-      );
-    } else if (session.type === "tunnel") {
-      return (
-        <TunnelManager
-          key={session.id}
-          ref={tunnelManagerRefs.current[session.id]}
-          hostConfig={{
-            id: parseInt(session.host.id.toString()),
-            name: session.host.name,
-            ip: session.host.ip,
-            username: session.host.username,
-            enableTunnel: session.host.enableTunnel,
-            tunnelConnections: session.host.tunnelConnections,
-          }}
-          isVisible={session.id === activeSessionId}
-          title={session.title}
-          onClose={() => handleTabClose(session.id)}
-        />
-      );
-    } else if (session.type === "remoteDesktop") {
-      return (
-        <RemoteDesktop
-          key={session.id}
-          host={session.host}
-          isVisible={session.id === activeSessionId}
-          title={session.title}
-          protocol={session.remoteProtocol}
-          onClose={() => handleTabClose(session.id)}
-        />
-      );
-    } else if (session.type === "docker") {
-      return (
-        <Docker
-          key={session.id}
-          host={session.host}
-          isVisible={session.id === activeSessionId}
-        />
-      );
-    }
-    return null;
+    const Tab = features.sessionTab(session.type)?.component;
+    if (!Tab) return null;
+    return (
+      <Tab
+        ref={tabRefs.current[session.id]}
+        session={session}
+        isVisible={session.id === activeSessionId}
+        onClose={() => handleTabClose(session.id)}
+        onBackendSessionId={(backendId) =>
+          setBackendSessionId(session.id, backendId)
+        }
+        onBackgroundColorChange={(color) => {
+          setTerminalBackgroundColors((prev) => ({
+            ...prev,
+            [session.id]: color,
+          }));
+        }}
+      />
+    );
   };
 
   return (
@@ -722,10 +577,9 @@ export default function Sessions() {
       className="flex-1"
       style={{
         paddingTop: insets.top,
-        backgroundColor:
-          activeSession?.type === "terminal"
-            ? activeTerminalBgColor
-            : ui.background,
+        backgroundColor: activeIsTerminal
+          ? activeTerminalBgColor
+          : ui.background,
       }}
     >
       <View
@@ -801,47 +655,44 @@ export default function Sessions() {
         </View>
       )}
 
-      {sessions.length > 0 &&
-        activeSession?.type === "terminal" &&
-        !isCustomKeyboardVisible && (
-          <View
-            style={{
-              position: "absolute",
-              bottom: keyboardIntentionallyHiddenRef.current
-                ? 0
-                : isKeyboardVisible && currentKeyboardHeight > 0
-                  ? currentKeyboardHeight + (isLandscape && !isIPad ? 4 : 0)
-                  : 0,
-              left: 0,
-              right: 0,
-              height: keyboardIntentionallyHiddenRef.current
-                ? KEYBOARD_BAR_HEIGHT_EXTENDED
-                : KEYBOARD_BAR_HEIGHT,
-              zIndex: 1003,
-              overflow: "visible",
-              justifyContent: "center",
-            }}
-          >
-            <KeyboardBar
-              terminalRef={
-                activeSessionId
-                  ? terminalRefs.current[activeSessionId]
-                  : React.createRef<TerminalHandle>()
-              }
-              isVisible={true}
-              onModifierChange={handleModifierChange}
-              isKeyboardIntentionallyHidden={
-                keyboardIntentionallyHiddenRef.current
-              }
-              bottomInset={KEYBOARD_BAR_BOTTOM_INSET}
-              onOpenSnippets={handleOpenSnippets}
-            />
-          </View>
-        )}
+      {sessions.length > 0 && activeIsTerminal && !isCustomKeyboardVisible && (
+        <View
+          style={{
+            position: "absolute",
+            bottom: keyboardIntentionallyHiddenRef.current
+              ? 0
+              : isKeyboardVisible && currentKeyboardHeight > 0
+                ? currentKeyboardHeight + (isLandscape && !isIPad ? 4 : 0)
+                : 0,
+            left: 0,
+            right: 0,
+            height: keyboardIntentionallyHiddenRef.current
+              ? KEYBOARD_BAR_HEIGHT_EXTENDED
+              : KEYBOARD_BAR_HEIGHT,
+            zIndex: 1003,
+            overflow: "visible",
+            justifyContent: "center",
+          }}
+        >
+          <KeyboardBar
+            terminalRef={
+              activeSessionId
+                ? tabRefs.current[activeSessionId]
+                : React.createRef<TerminalHandle>()
+            }
+            isVisible={true}
+            onModifierChange={handleModifierChange}
+            isKeyboardIntentionallyHidden={
+              keyboardIntentionallyHiddenRef.current
+            }
+            bottomInset={KEYBOARD_BAR_BOTTOM_INSET}
+            onOpenSnippets={handleOpenSnippets}
+          />
+        </View>
+      )}
 
       {sessions.length > 0 &&
-        (activeSession?.type === "stats" ||
-          activeSession?.type === "filemanager") &&
+        features.sessionHas(activeSession?.type, "keyboard-cover") &&
         isCustomKeyboardVisible && (
           <View
             style={{
@@ -892,97 +743,91 @@ export default function Sessions() {
         />
       </View>
 
-      {sessions.length > 0 &&
-        isCustomKeyboardVisible &&
-        activeSession?.type === "terminal" && (
-          <View
-            pointerEvents="box-none"
-            style={{
-              position: "absolute",
-              bottom: 0,
-              left: 0,
-              right: 0,
-              zIndex: 1002,
-              backgroundColor: ui.background,
-            }}
-          >
-            <SessionAccountProvider accountId={activeSession.accountId}>
-              <BottomToolbar
-                terminalRef={
-                  activeSessionId
-                    ? terminalRefs.current[activeSessionId]
-                    : React.createRef<TerminalHandle>()
-                }
-                isVisible={isCustomKeyboardVisible}
-                keyboardHeight={customKeyboardHeight}
-                isKeyboardIntentionallyHidden={
-                  keyboardIntentionallyHiddenRef.current
-                }
-                initialTab={customKeyboardInitialTab}
-                hostId={activeSession?.host?.id}
-              />
-            </SessionAccountProvider>
-          </View>
-        )}
-
-      {sessions.length > 0 &&
-        !isCustomKeyboardVisible &&
-        activeSession?.type === "terminal" && (
-          <TerminalImeInput
-            ref={hiddenInputRef}
-            style={{
-              position: "absolute",
-              bottom: -1000,
-              left: -1000,
-              width: 1,
-              height: 1,
-              opacity: 0,
-              zIndex: -1,
-            }}
-            pointerEvents="box-none"
-            onCommitText={({ nativeEvent }) => {
-              dispatchCommittedText(nativeEvent.text);
-            }}
-            onSpecialKey={({ nativeEvent }) => {
-              dispatchSpecialKey(nativeEvent);
-            }}
-            onCompositionStateChange={({ nativeEvent }) => {
-              compositionActiveRef.current = nativeEvent.active;
-              if (nativeEvent.active) {
-                lastSpecialKeyRef.current = null;
+      {activeSession && isCustomKeyboardVisible && activeIsTerminal && (
+        <View
+          pointerEvents="box-none"
+          style={{
+            position: "absolute",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 1002,
+            backgroundColor: ui.background,
+          }}
+        >
+          <SessionAccountProvider accountId={activeSession.accountId}>
+            <BottomToolbar
+              terminalRef={
+                activeSessionId
+                  ? tabRefs.current[activeSessionId]
+                  : React.createRef<TerminalHandle>()
               }
-            }}
-            onImeFocus={() => {
-              setKeyboardIntentionallyHidden(false);
-            }}
-            onImeBlur={() => {
-              const activeRef = activeSessionId
-                ? terminalRefs.current[activeSessionId]
-                : null;
-              const isDialogOpen =
-                activeRef?.current?.isDialogOpen?.() || false;
-              const isCurrentlySelecting =
-                activeRef?.current?.isSelecting?.() || false;
-
-              if (
-                !keyboardIntentionallyHiddenRef.current &&
-                !isCustomKeyboardVisible &&
-                activeSession?.type === "terminal" &&
-                !isDialogOpen &&
-                !isCurrentlySelecting &&
-                !isSelectingRef.current
-              ) {
-                requestAnimationFrame(() => {
-                  const stillNotSelecting =
-                    !activeRef?.current?.isSelecting?.();
-                  if (stillNotSelecting) {
-                    callImeInput(hiddenInputRef, "focus");
-                  }
-                });
+              isVisible={isCustomKeyboardVisible}
+              keyboardHeight={customKeyboardHeight}
+              isKeyboardIntentionallyHidden={
+                keyboardIntentionallyHiddenRef.current
               }
-            }}
-          />
-        )}
+              initialTab={customKeyboardInitialTab}
+              hostId={activeSession?.host?.id}
+            />
+          </SessionAccountProvider>
+        </View>
+      )}
+
+      {sessions.length > 0 && !isCustomKeyboardVisible && activeIsTerminal && (
+        <TerminalImeInput
+          ref={hiddenInputRef}
+          style={{
+            position: "absolute",
+            bottom: -1000,
+            left: -1000,
+            width: 1,
+            height: 1,
+            opacity: 0,
+            zIndex: -1,
+          }}
+          pointerEvents="box-none"
+          onCommitText={({ nativeEvent }) => {
+            dispatchCommittedText(nativeEvent.text);
+          }}
+          onSpecialKey={({ nativeEvent }) => {
+            dispatchSpecialKey(nativeEvent);
+          }}
+          onCompositionStateChange={({ nativeEvent }) => {
+            compositionActiveRef.current = nativeEvent.active;
+            if (nativeEvent.active) {
+              lastSpecialKeyRef.current = null;
+            }
+          }}
+          onImeFocus={() => {
+            setKeyboardIntentionallyHidden(false);
+          }}
+          onImeBlur={() => {
+            const activeRef = activeSessionId
+              ? tabRefs.current[activeSessionId]
+              : null;
+            const isDialogOpen = activeRef?.current?.isDialogOpen?.() || false;
+            const isCurrentlySelecting =
+              activeRef?.current?.isSelecting?.() || false;
+
+            if (
+              !keyboardIntentionallyHiddenRef.current &&
+              !isCustomKeyboardVisible &&
+              activeIsTerminal &&
+              !isDialogOpen &&
+              !isCurrentlySelecting &&
+              !isSelectingRef.current
+            ) {
+              requestAnimationFrame(() => {
+                const stillNotSelecting = !activeRef?.current?.isSelecting?.();
+                if (stillNotSelecting) {
+                  callImeInput(hiddenInputRef, "focus");
+                }
+              });
+            }
+          }}
+        />
+      )}
     </View>
   );
 }

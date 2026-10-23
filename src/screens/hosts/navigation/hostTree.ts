@@ -18,8 +18,9 @@ export type SortKey =
 
 export type FilterState = {
   status: ("online" | "offline" | "pinned")[];
-  protocol: ("ssh" | "rdp" | "vnc" | "telnet")[];
-  features: ("terminal" | "fileManager" | "tunnel" | "docker")[];
+  /** Filter values; features add their own through the registry. */
+  protocol: string[];
+  features: string[];
   tags: string[];
 };
 
@@ -28,6 +29,16 @@ export const DEFAULT_FILTERS: FilterState = {
   protocol: [],
   features: [],
   tags: [],
+};
+
+/** Tests a host against one protocol or feature filter value. */
+export type HostMatchers = Record<string, (host: SSHHost) => boolean>;
+
+// SSH is not a plugin, so its filter lives here.
+const CORE_MATCHERS: HostMatchers = {
+  ssh: (host) =>
+    host.enableSsh ??
+    (!host.enableRdp && !host.enableVnc && !host.enableTelnet),
 };
 
 export function isFolder(
@@ -170,6 +181,7 @@ function hostPassesFilters(
   host: SSHHost,
   filters: FilterState,
   getStatus: GetHostStatus,
+  matchers: HostMatchers,
 ): boolean {
   if (filters.status.length > 0) {
     const status = getStatus(host.id);
@@ -179,27 +191,10 @@ function hostPassesFilters(
       (filters.status.includes("pinned") && !!host.pin);
     if (!ok) return false;
   }
-  if (filters.protocol.length > 0) {
-    // SSH-only legacy hosts have no enableSsh flag; treat them as ssh.
-    const isSsh =
-      host.enableSsh ??
-      (!host.enableRdp && !host.enableVnc && !host.enableTelnet);
-    const ok =
-      (filters.protocol.includes("ssh") && isSsh) ||
-      (filters.protocol.includes("rdp") && !!host.enableRdp) ||
-      (filters.protocol.includes("vnc") && !!host.enableVnc) ||
-      (filters.protocol.includes("telnet") && !!host.enableTelnet);
-    if (!ok) return false;
-  }
-  if (filters.features.length > 0) {
-    const ok =
-      (filters.features.includes("terminal") &&
-        host.enableTerminal !== false) ||
-      (filters.features.includes("fileManager") && !!host.enableFileManager) ||
-      (filters.features.includes("tunnel") && !!host.enableTunnel) ||
-      (filters.features.includes("docker") && !!host.enableDocker);
-    if (!ok) return false;
-  }
+  const anyMatch = (values: string[]) =>
+    values.some((v) => (matchers[v] ?? CORE_MATCHERS[v])?.(host) ?? false);
+  if (filters.protocol.length > 0 && !anyMatch(filters.protocol)) return false;
+  if (filters.features.length > 0 && !anyMatch(filters.features)) return false;
   if (filters.tags.length > 0) {
     const ok = filters.tags.some((tag) => (host.tags ?? []).includes(tag));
     if (!ok) return false;
@@ -212,14 +207,20 @@ export function applyFilters(
   nodes: HostTreeNode[],
   filters: FilterState,
   getStatus: GetHostStatus,
+  matchers: HostMatchers = {},
 ): HostTreeNode[] {
   if (!filtersActive(filters)) return nodes;
   const out: HostTreeNode[] = [];
   for (const node of nodes) {
     if (isFolder(node)) {
-      const children = applyFilters(node.children, filters, getStatus);
+      const children = applyFilters(
+        node.children,
+        filters,
+        getStatus,
+        matchers,
+      );
       if (children.length > 0) out.push({ ...node, children });
-    } else if (hostPassesFilters(node.host, filters, getStatus)) {
+    } else if (hostPassesFilters(node.host, filters, getStatus, matchers)) {
       out.push(node);
     }
   }

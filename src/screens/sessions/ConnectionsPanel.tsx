@@ -1,102 +1,35 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { View, ScrollView, Pressable, RefreshControl } from "react-native";
-import {
-  Plug,
-  SquareTerminal,
-  FolderOpen,
-  Activity,
-  Network,
-  Container,
-  Monitor,
-  ExternalLink,
-  X,
-} from "lucide-react-native";
-import { useServerFeatures } from "@/contexts/ServerFeaturesContext";
-import { sessionFeature } from "@/core/api/compat/server-features";
-import {
-  useTerminalSessions,
-  type RemoteDesktopProtocol,
-  type SessionType,
-} from "@/contexts/TerminalSessionsContext";
+import { Plug, SquareTerminal, ExternalLink, X } from "lucide-react-native";
+import { features, useFeatureContext } from "@/core/features";
+import { useTerminalSessions } from "@/contexts/TerminalSessionsContext";
 import { Text } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { SSHHost } from "@/types";
-import { api, activeClient } from "@/core/accounts";
+import { accounts, api } from "@/core/accounts";
 import type { ActiveSessionInfo, OpenTabRecord } from "@/core/api/types";
 
-const TYPE_LABELS: Record<string, string> = {
-  terminal: "SSH",
-  files: "Files",
-  filemanager: "Files",
-  stats: "Metrics",
-  tunnel: "Tunnel",
-  docker: "Docker",
-  rdp: "RDP",
-  vnc: "VNC",
-  telnet: "Telnet",
-  remoteDesktop: "Remote",
-};
-
-function tabIcon(type: string, color: string) {
-  const size = 16;
-  switch (type) {
-    case "files":
-    case "filemanager":
-      return <FolderOpen size={size} color={color} />;
-    case "stats":
-      return <Activity size={size} color={color} />;
-    case "tunnel":
-      return <Network size={size} color={color} />;
-    case "docker":
-      return <Container size={size} color={color} />;
-    case "rdp":
-    case "vnc":
-    case "telnet":
-    case "remoteDesktop":
-      return <Monitor size={size} color={color} />;
-    default:
-      return <SquareTerminal size={size} color={color} />;
-  }
-}
-
 /**
- * Map an open-tabs record tabType back to our local SessionType. Tabs from
- * plugins the app has no screen for give null.
+ * Icon and label for a tab, from a local session type or an open-tabs record
+ * type. Unknown types come from plugins the app has no screen for.
  */
-function toSessionType(tabType: string): SessionType | null {
-  switch (tabType) {
-    case "terminal":
-      return "terminal";
-    case "files":
-    case "sftp":
-      return "filemanager";
-    case "host-metrics":
-      return "stats";
-    case "rdp":
-    case "vnc":
-    case "telnet":
-      return "remoteDesktop";
-    case "stats":
-    case "tunnel":
-    case "docker":
-      return tabType as SessionType;
-    default:
-      return null;
+function describeTab(tabType: string) {
+  const local = features.sessionTab(tabType);
+  if (local) return { icon: local.icon, label: local.shortLabel({}) };
+  const remote = features.sessionTabForServerType(tabType);
+  if (remote) {
+    return { icon: remote.tab.icon, label: remote.tab.shortLabel(remote.opts) };
   }
+  return { icon: SquareTerminal, label: tabType };
 }
 
-function canRestore(tabType: string): boolean {
-  const type = toSessionType(tabType);
-  if (!type) return false;
-  const feature = sessionFeature(type, toRemoteProtocol(tabType));
-  return !feature || !!activeClient()?.hasFeature(feature);
-}
-
-function toRemoteProtocol(tabType: string): RemoteDesktopProtocol | undefined {
-  if (tabType === "rdp" || tabType === "vnc" || tabType === "telnet") {
-    return tabType;
-  }
-  return undefined;
+/** Whether a server record can be reopened here, and how. */
+function restoreTarget(tabType: string) {
+  const found = features.sessionTabForServerType(tabType);
+  if (!found) return null;
+  const ctx = { account: accounts.active(), client: accounts.activeClient() };
+  if (!features.canOpen(found.tab.type, found.opts, ctx)) return null;
+  return { type: found.tab.type, opts: found.opts };
 }
 
 function SectionHeader({ label, count }: { label: string; count: number }) {
@@ -135,6 +68,7 @@ function ConnectionRow({
   reconnectHint?: boolean;
 }) {
   const color = useThemeColor();
+  const { icon: TabIcon, label } = describeTab(tabType);
   const iconColor =
     (isActive ? color("accent-brand") : color("muted-foreground")) ?? "#a4a4a4";
 
@@ -150,7 +84,7 @@ function ConnectionRow({
           isActive ? "bg-accent-brand/15" : "bg-muted/60"
         }`}
       >
-        {tabIcon(tabType, iconColor)}
+        <TabIcon size={16} color={iconColor} />
       </View>
       <View className="min-w-0 flex-1">
         <View className="flex-row items-center gap-1.5">
@@ -170,9 +104,7 @@ function ConnectionRow({
             {name}
           </Text>
           <View className="border border-border/60 px-1 py-px">
-            <Text className="text-[9px] text-muted-foreground">
-              {TYPE_LABELS[tabType] ?? tabType}
-            </Text>
+            <Text className="text-[9px] text-muted-foreground">{label}</Text>
           </View>
         </View>
         <Text
@@ -211,7 +143,7 @@ function ConnectionRow({
 export function ConnectionsPanel({ onClose }: { onClose?: () => void }) {
   const color = useThemeColor();
   // Re-render when plugins turn on or off.
-  useServerFeatures();
+  useFeatureContext();
   const {
     sessions,
     activeSessionId,
@@ -266,18 +198,18 @@ export function ConnectionsPanel({ onClose }: { onClose?: () => void }) {
   // Background = server records whose instanceId isn't an open tab here.
   const openInstanceIds = new Set(sessions.map((s) => s.instanceId));
   const backgroundTabs = backgroundTabRecords.filter(
-    (r) => !openInstanceIds.has(r.id) && canRestore(r.tabType),
+    (r) => !openInstanceIds.has(r.id) && !!restoreTarget(r.tabType),
   );
 
   const reviveBackground = (record: OpenTabRecord) => {
     const host = hosts.find((h) => h.id === record.hostId);
-    const type = toSessionType(record.tabType);
-    if (!host || !type) return;
+    const target = restoreTarget(record.tabType);
+    if (!host || !target) return;
     const live = sessionByInstance.get(record.id);
-    addSession(host, type, {
+    addSession(host, target.type, {
       instanceId: record.id,
       restoredSessionId: live?.sessionId ?? record.backendSessionId ?? null,
-      remoteProtocol: toRemoteProtocol(record.tabType),
+      remoteProtocol: target.opts.remoteProtocol,
     });
     navigateToSessions();
     onClose?.();
@@ -325,19 +257,18 @@ export function ConnectionsPanel({ onClose }: { onClose?: () => void }) {
           <SectionHeader label="Open" count={sessions.length} />
           {sessions.map((s) => {
             const live = sessionByInstance.get(s.instanceId);
-            const isLive =
-              s.type === "terminal"
-                ? (live?.isConnected ?? !!s.backendSessionId)
-                : true;
+            const isLive = features.sessionHas(s.type, "terminal-input")
+              ? (live?.isConnected ?? !!s.backendSessionId)
+              : true;
             return (
               <ConnectionRow
                 key={s.id}
                 isActive={s.id === activeSessionId}
                 isLive={isLive}
                 tabType={
-                  s.type === "remoteDesktop"
-                    ? (s.remoteProtocol ?? s.type)
-                    : s.type
+                  features
+                    .sessionTab(s.type)
+                    ?.toServerTabType(s, accounts.client(s.accountId)) ?? s.type
                 }
                 name={s.host.name}
                 subLabel={

@@ -71,8 +71,8 @@ test("detects a 2.9 server and rewrites old paths to plugin routes", async () =>
   await c.setToken("t");
   await c.refreshServerApi();
   expect(c.isPluginApi()).toBe(true);
-  expect(c.hasFeature("snippets")).toBe(true);
-  expect(c.hasFeature("docker")).toBe(false);
+  expect(c.supports({ plugin: "snippets" })).toBe(true);
+  expect(c.supports({ plugin: "docker" })).toBe(false);
   await c.api.snippets.getSnippets();
   expect(seen[seen.length - 1].url).toBe(
     "https://termix.example/plugin-api/snippets",
@@ -89,7 +89,8 @@ test("a server that answers the manifest with HTML is pre 2.9", async () => {
   await c.refreshServerApi();
   expect(c.isPluginApi()).toBe(false);
   // Older servers have every feature built in.
-  expect(c.hasFeature("docker")).toBe(true);
+  expect(c.supports({ plugin: "docker" })).toBe(true);
+  expect(c.supports({ plugin: "tailscale", pluginApiOnly: true })).toBe(false);
 });
 
 test("the cached generation and plugin list load before the network", async () => {

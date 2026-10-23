@@ -1,53 +1,17 @@
 import { View, ScrollView } from "react-native";
 import * as Clipboard from "expo-clipboard";
-import {
-  Terminal,
-  FolderSearch,
-  Server,
-  Network,
-  Box,
-  Monitor,
-  MousePointerClick,
-  MessagesSquare,
-  Pencil,
-  Copy,
-  CopyPlus,
-  Trash2,
-  Zap,
-} from "lucide-react-native";
+import { Pencil, Copy, CopyPlus, Trash2 } from "lucide-react-native";
 import { SSHHost } from "@/types";
 import type { HostMetrics } from "@/screens/hosts/navigation/Host";
 import { useTerminalSessions } from "@/contexts/TerminalSessionsContext";
-import type {
-  RemoteDesktopProtocol,
-  SessionType,
-} from "@/contexts/TerminalSessionsContext";
 import { Sheet, SheetRow, Text } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
-import { useServerFeatures } from "@/contexts/ServerFeaturesContext";
 import { toast } from "@/utils/toast";
-import { StatsConfig, DEFAULT_STATS_CONFIG } from "@/constants/stats-config";
-import { api } from "@/core/accounts";
-
-function parseStatsConfig(host: SSHHost): StatsConfig {
-  try {
-    return host.statsConfig
-      ? JSON.parse(host.statsConfig)
-      : DEFAULT_STATS_CONFIG;
-  } catch {
-    return DEFAULT_STATS_CONFIG;
-  }
-}
-
-/**
- * Whether the host speaks SSH. The redesigned multi-protocol backend sets
- * `enableSsh`; legacy SSH-only hosts omit it, so undefined means SSH-enabled
- * (matches the web's getSshActions gating).
- */
-function isSshHost(host: SSHHost): boolean {
-  if (host.enableSsh != null) return host.enableSsh;
-  return !host.enableRdp && !host.enableVnc && !host.enableTelnet;
-}
+import {
+  useHostActions,
+  type HostActionContext,
+  type HostActionDef,
+} from "@/core/features";
 
 export function HostActionSheet({
   host,
@@ -69,21 +33,26 @@ export function HostActionSheet({
   onDelete: (host: SSHHost) => void;
 }) {
   const { navigateToSessions } = useTerminalSessions();
-  const { has } = useServerFeatures();
+  const { ctx, actions } = useHostActions();
   const color = useThemeColor();
   const iconColor = color("foreground") ?? "#fafafa";
 
   if (!host) return null;
 
-  const open = (type: SessionType) => {
-    navigateToSessions(host, type);
+  const actionCtx: HostActionContext = {
+    ...ctx,
+    openSession: (type, opts) => navigateToSessions(host, type, opts),
+    close: onClose,
+  };
+
+  const runAction = (action: HostActionDef) => {
+    void action.run(host, actionCtx);
     onClose();
   };
 
-  const openRemoteDesktop = (protocol: RemoteDesktopProtocol) => {
-    navigateToSessions(host, "remoteDesktop", { remoteProtocol: protocol });
-    onClose();
-  };
+  const available = actions.filter((a) => a.isAvailable(host, ctx));
+  const connectActions = available.filter((a) => a.group === "connect");
+  const manageActions = available.filter((a) => a.group === "manage");
 
   const copyAddress = async () => {
     await Clipboard.setStringAsync(
@@ -92,81 +61,6 @@ export function HostActionSheet({
     toast.success("Address copied");
     onClose();
   };
-
-  const handleWake = async () => {
-    onClose();
-    try {
-      await api().wakeOnLan.wakeHost(host.id);
-      toast.success(`Wake-on-LAN sent to ${host.name}`);
-    } catch {
-      toast.error("Failed to send Wake-on-LAN packet");
-    }
-  };
-
-  const ssh = isSshHost(host);
-  const metricsEnabled =
-    ssh && has("metrics") && parseStatsConfig(host).metricsEnabled !== false;
-
-  // SSH-gated connection actions (mirrors the web's getSshActions).
-  const sshActions = [
-    ssh && has("terminal") && host.enableTerminal !== false
-      ? { type: "terminal" as SessionType, icon: Terminal, label: "Terminal" }
-      : null,
-    ssh && has("fileManager") && host.enableFileManager
-      ? {
-          type: "filemanager" as SessionType,
-          icon: FolderSearch,
-          label: "File Manager",
-        }
-      : null,
-    ssh && has("docker") && host.enableDocker
-      ? { type: "docker" as SessionType, icon: Box, label: "Docker" }
-      : null,
-    ssh &&
-    has("tunnels") &&
-    host.enableTunnel &&
-    host.tunnelConnections &&
-    host.tunnelConnections.length > 0
-      ? { type: "tunnel" as SessionType, icon: Network, label: "Tunnels" }
-      : null,
-    metricsEnabled
-      ? { type: "stats" as SessionType, icon: Server, label: "Host Metrics" }
-      : null,
-  ].filter(Boolean) as {
-    type: SessionType;
-    icon: typeof Terminal;
-    label: string;
-  }[];
-
-  // Separate protocol actions (RDP / VNC / Telnet), each with its own icon -
-  // matches the web rather than lumping them into one "Remote Desktop" row.
-  const protocolActions = [
-    host.enableRdp && has("rdp")
-      ? {
-          icon: Monitor,
-          label: "RDP",
-          protocol: "rdp" as RemoteDesktopProtocol,
-        }
-      : null,
-    host.enableVnc && has("vnc")
-      ? {
-          icon: MousePointerClick,
-          label: "VNC",
-          protocol: "vnc" as RemoteDesktopProtocol,
-        }
-      : null,
-    host.enableTelnet && has("telnet")
-      ? {
-          icon: MessagesSquare,
-          label: "Telnet",
-          protocol: "telnet" as RemoteDesktopProtocol,
-        }
-      : null,
-  ].filter(Boolean) as {
-    icon: typeof Monitor;
-    label: string;
-    protocol: RemoteDesktopProtocol;
-  }[];
 
   const dotColor =
     status === "online"
@@ -217,32 +111,17 @@ export function HostActionSheet({
 
       <ScrollView style={{ maxHeight: 440 }}>
         {/* Connection actions (SSH features + protocols) */}
-        {sshActions.map(({ type, icon: Icon, label }) => (
-          <SheetRow
-            key={type}
-            icon={<Icon size={18} color={iconColor} />}
-            label={label}
-            onPress={() => open(type)}
-          />
-        ))}
-        {protocolActions.map(({ icon: Icon, label, protocol }) => (
-          <SheetRow
-            key={label}
-            icon={<Icon size={18} color={iconColor} />}
-            label={label}
-            onPress={() => openRemoteDesktop(protocol)}
-          />
-        ))}
-
-        {/* Management actions (no pin - matches the web). Rows sit flush with
-            the connection group; each row's own bottom border separates them. */}
-        {host.macAddress && has("wakeOnLan") ? (
-          <SheetRow
-            icon={<Zap size={18} color={iconColor} />}
-            label="Wake on LAN"
-            onPress={handleWake}
-          />
-        ) : null}
+        {[...connectActions, ...manageActions].map((action) => {
+          const Icon = action.icon;
+          return (
+            <SheetRow
+              key={action.id}
+              icon={<Icon size={18} color={iconColor} />}
+              label={action.label}
+              onPress={() => runAction(action)}
+            />
+          );
+        })}
         <SheetRow
           icon={<Pencil size={18} color={iconColor} />}
           label="Edit Host"

@@ -3,12 +3,11 @@ import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { TerminalHandle } from "@/features/terminal/Terminal";
 import CustomKeyboard from "./CustomKeyboard";
-import SnippetsBar from "./SnippetsBar";
-import HistoryBar from "./HistoryBar";
-import { useServerFeatures } from "@/contexts/ServerFeaturesContext";
+import { useKeyboardTabs } from "@/core/features";
 import { useUiColors } from "@/contexts/ThemeContext";
 
-type ToolbarMode = "keyboard" | "snippets" | "history";
+// "keyboard" is built in; the rest are tabs features add.
+type ToolbarMode = string;
 
 interface BottomToolbarProps {
   terminalRef: React.RefObject<TerminalHandle | null>;
@@ -30,7 +29,7 @@ export default function BottomToolbar({
   const ui = useUiColors();
   const [mode, setMode] = useState<ToolbarMode>(initialTab);
   const insets = useSafeAreaInsets();
-  const { has } = useServerFeatures();
+  const extraTabs = useKeyboardTabs();
 
   useEffect(() => {
     setMode(initialTab);
@@ -40,13 +39,11 @@ export default function BottomToolbar({
 
   const safeKeyboardHeight = Math.max(200, Math.min(keyboardHeight, 500));
 
-  const tabs = (
-    [
-      { id: "keyboard", label: "KEYBOARD" },
-      has("snippets") && { id: "snippets", label: "SNIPPETS" },
-      has("commandHistory") && { id: "history", label: "HISTORY" },
-    ] as ({ id: ToolbarMode; label: string } | false)[]
-  ).filter(Boolean) as { id: ToolbarMode; label: string }[];
+  const tabs: { id: ToolbarMode; label: string }[] = [
+    { id: "keyboard", label: "KEYBOARD" },
+    ...extraTabs.map((t) => ({ id: t.id, label: t.label })),
+  ];
+  const ExtraTab = extraTabs.find((t) => t.id === mode)?.component;
   const activeMode = tabs.some((tab) => tab.id === mode) ? mode : "keyboard";
 
   const TAB_BAR_HEIGHT = 36;
@@ -131,21 +128,14 @@ export default function BottomToolbar({
           />
         )}
 
-        {activeMode === "snippets" && (
-          <SnippetsBar
-            terminalRef={terminalRef}
-            isVisible={true}
-            height={safeKeyboardHeight}
-          />
-        )}
-
-        {activeMode === "history" && (
-          <HistoryBar
+        {activeMode !== "keyboard" && ExtraTab ? (
+          <ExtraTab
             terminalRef={terminalRef}
             hostId={hostId}
             isVisible={true}
+            height={safeKeyboardHeight}
           />
-        )}
+        ) : null}
       </View>
     </View>
   );

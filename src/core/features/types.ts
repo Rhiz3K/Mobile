@@ -1,0 +1,213 @@
+import type { ComponentType, Ref, RefObject } from "react";
+import type { Account } from "@/core/accounts/types";
+import type { AccountClient } from "@/core/api/AccountClient";
+import type { SSHHost } from "@/types";
+
+/**
+ * Everything the UI can show for a feature comes from here. Screens list
+ * contributions; they never check a feature or plugin id themselves.
+ */
+
+/** Where a feature comes from: built into the app, or a server plugin UI. */
+export type FeatureSource = "native" | "webview";
+
+/** What a feature needs from the server. Matched against the plugin list. */
+export interface FeatureRequirement {
+  plugin: string;
+  protocol?: string;
+  /** Pre 2.9 servers don't have it built in. */
+  pluginApiOnly?: boolean;
+}
+
+export interface FeatureContext {
+  account: Account;
+  /** Null on This device. */
+  client: AccountClient | null;
+}
+
+/** Light icon type so features can use any lucide icon. */
+export type FeatureIcon = ComponentType<{ size?: number; color?: string }>;
+
+// Session tabs
+
+/** The part of an open session a tab needs. */
+export interface SessionLike {
+  id: string;
+  type: string;
+  title: string;
+  host: SSHHost;
+  instanceId: string;
+  restoredSessionId?: string | null;
+  remoteProtocol?: string;
+}
+
+export interface SessionTabProps {
+  session: SessionLike;
+  isVisible: boolean;
+  onClose: () => void;
+  /** Reports the server session id so other devices can attach to it. */
+  onBackendSessionId: (backendId: string | null) => void;
+  /** Lets the shell read the tab's background color. */
+  onBackgroundColorChange?: (color: string) => void;
+}
+
+/**
+ * Things the session screen does for some tabs.
+ * - `terminal-input`: the tab takes typed input through a TerminalHandle ref,
+ *   so the keyboard bar, custom keyboard and IME input show for it.
+ * - `own-keyboard`: the tab shows the system keyboard itself and the tab bar
+ *   hides while it is open.
+ * - `keyboard-cover`: the custom keyboard area is covered while this tab shows.
+ */
+export type SessionCapability =
+  "terminal-input" | "own-keyboard" | "keyboard-cover";
+
+export interface SessionTabDef {
+  /** Session type stored on the tab. */
+  type: string;
+  icon: FeatureIcon;
+  /** Word added to the tab title, empty for none. */
+  titleSuffix: (session: Pick<SessionLike, "remoteProtocol">) => string;
+  /** Short label in the connections list. */
+  shortLabel: (session: Pick<SessionLike, "remoteProtocol">) => string;
+  /** tabType names the web app uses for this tab (open-tabs). */
+  serverTabTypes: string[];
+  toServerTabType: (
+    session: Pick<SessionLike, "remoteProtocol">,
+    client: AccountClient | null,
+  ) => string;
+  /** Options to reopen a server tab record of one of `serverTabTypes`. */
+  fromServerTabType?: (tabType: string) => { remoteProtocol?: string };
+  /** What the server needs for this tab, per session. */
+  requires?: (
+    session: Pick<SessionLike, "remoteProtocol">,
+  ) => FeatureRequirement;
+  capabilities?: SessionCapability[];
+  // Each tab has its own handle type, so the ref stays loose here.
+  component: ComponentType<SessionTabProps & { ref?: Ref<any> }>;
+}
+
+// Hosts
+
+export interface HostActionContext extends FeatureContext {
+  openSession: (type: string, opts?: { remoteProtocol?: string }) => void;
+  close: () => void;
+}
+
+export interface HostActionDef {
+  id: string;
+  label: string;
+  icon: FeatureIcon;
+  /** "connect" rows sit above "manage" rows. */
+  group: "connect" | "manage";
+  order: number;
+  isAvailable: (host: SSHHost, ctx: FeatureContext) => boolean;
+  run: (host: SSHHost, ctx: HostActionContext) => void | Promise<void>;
+}
+
+/** A host switch in the host editor (Protocols or Features section). */
+export interface HostToggleDef {
+  key: string;
+  label: string;
+  description?: string;
+  group: "protocol" | "feature";
+  order: number;
+  /** An editor tab shown while the switch is on. */
+  formTab?: { id: string; label: string; order: number };
+}
+
+/** A short tag on host rows, like DKR. */
+export interface HostBadgeDef {
+  label: string;
+  order: number;
+  show: (host: SSHHost, sshActive: boolean) => boolean;
+}
+
+/** An option in the host list filter. Values are saved, so keep them stable. */
+export interface HostFilterDef {
+  group: "protocol" | "features";
+  value: string;
+  label: string;
+  order: number;
+  matches: (host: SSHHost) => boolean;
+}
+
+// Settings and quick actions
+
+export interface SettingsLinkDef {
+  id: string;
+  label: string;
+  icon: FeatureIcon;
+  order: number;
+  /** Route to open. */
+  href: string;
+}
+
+export interface QuickActionDef {
+  id: string;
+  label: string;
+  icon: FeatureIcon;
+  order: number;
+  run: (ctx: FeatureContext) => void;
+}
+
+/** What a `terminal-input` tab exposes through its ref. */
+export interface TerminalInputHandle {
+  sendInput: (data: string) => void;
+  fit: () => void;
+  isDialogOpen: () => boolean;
+  notifyBackgrounded: () => void;
+  notifyForegrounded: () => void;
+  scrollToBottom: () => void;
+  isSelecting: () => boolean;
+}
+
+/** A tab in the terminal keyboard toolbar. */
+export interface KeyboardTabDef {
+  id: string;
+  label: string;
+  order: number;
+  component: ComponentType<{
+    terminalRef: RefObject<TerminalInputHandle | null>;
+    hostId?: number;
+    isVisible: boolean;
+    height: number;
+  }>;
+}
+
+export interface FeatureDef {
+  id: string;
+  title: string;
+  source: FeatureSource;
+  /** Server plugin behind a webview feature. */
+  pluginId?: string;
+  /** Needed on linked servers. Unset means always there. */
+  requires?: FeatureRequirement;
+  /** Which accounts can use it. Defaults to linked servers only. */
+  availableOn?: ("local" | "server")[];
+  sessionTabs?: SessionTabDef[];
+  hostActions?: HostActionDef[];
+  hostToggles?: HostToggleDef[];
+  hostBadges?: HostBadgeDef[];
+  hostFilters?: HostFilterDef[];
+  settingsLinks?: SettingsLinkDef[];
+  quickActions?: QuickActionDef[];
+  keyboardTabs?: KeyboardTabDef[];
+  /**
+   * Named things in the app's own vocabulary that this feature fills, for
+   * small spots like a form field. See CAPABILITIES.
+   */
+  capabilities?: Capability[];
+}
+
+/**
+ * Capability names screens may ask about. They describe a spot in the UI,
+ * not a plugin, so a different feature can fill one later.
+ */
+export type Capability =
+  | "host.wake"
+  | "host.quickConnect"
+  | "hosts.discovery"
+  | "credentials.keyTools"
+  | "files.defaultPath"
+  | "widgets.snippets";

@@ -23,6 +23,9 @@ import { FONT_MAP, MONO_FONT, MONO_FONT_BOLD } from "@/constants/fonts";
 import "../global.css";
 import UpdateRequired from "@/screens/authentication/UpdateRequired";
 import { WidgetDeepLinkHost } from "@/widgets";
+import { registerBuiltInFeatures } from "@/features";
+
+registerBuiltInFeatures();
 
 function RootLayoutContent() {
   const {

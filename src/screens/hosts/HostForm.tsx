@@ -14,14 +14,15 @@ import {
   InlineView,
 } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
-import { useServerFeatures } from "@/contexts/ServerFeaturesContext";
+import { useCapability, useHostToggles } from "@/core/features";
 import { toast } from "@/utils/toast";
 import { TailscaleDevicePicker } from "@/features/tailscale/TailscaleDevices";
 import { tailnetAddress } from "@/features/tailscale/tailscale";
 import { api } from "@/core/accounts";
 
 type AuthType = "password" | "key" | "credential" | "none" | "tailscale";
-type TabId = "general" | "ssh" | "tunnels" | "rdp" | "vnc" | "telnet";
+// Feature tabs (tunnels, rdp, ...) come from registered host switches.
+type TabId = string;
 
 interface FormState {
   name: string;
@@ -122,8 +123,10 @@ export default function HostForm({
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("general");
   const isEdit = !!host;
-  const { has } = useServerFeatures();
-  const tailscaleAvailable = api().tailscale.isTailscaleAvailable();
+  const hostToggles = useHostToggles();
+  const canWake = useCapability("host.wake");
+  const hasDefaultPath = useCapability("files.defaultPath");
+  const tailscaleAvailable = useCapability("hosts.discovery");
   // The name a Tailscale draft or device pick filled in, so picking another
   // device can replace it without overwriting a name the user typed.
   const autoNameRef = useRef("");
@@ -214,27 +217,19 @@ export default function HostForm({
     };
   }, [visible, host, draft]);
 
-  // The tab strip: General is always present; protocol tabs follow their toggle.
+  // The tab strip: General is always present; feature tabs follow their switch.
   const tabs = useMemo<{ id: TabId; label: string }[]>(() => {
     const list: { id: TabId; label: string }[] = [
       { id: "general", label: "General" },
     ];
     if (form.enableSsh) list.push({ id: "ssh", label: "SSH" });
-    if (form.enableTunnel && has("tunnels"))
-      list.push({ id: "tunnels", label: "Tunnels" });
-    if (form.enableRdp && has("rdp")) list.push({ id: "rdp", label: "RDP" });
-    if (form.enableVnc && has("vnc")) list.push({ id: "vnc", label: "VNC" });
-    if (form.enableTelnet && has("telnet"))
-      list.push({ id: "telnet", label: "Telnet" });
+    const featureTabs = hostToggles
+      .filter((t) => t.formTab && form[t.key as ToggleKey])
+      .map((t) => t.formTab!)
+      .sort((x, y) => x.order - y.order);
+    for (const tab of featureTabs) list.push({ id: tab.id, label: tab.label });
     return list;
-  }, [
-    has,
-    form.enableSsh,
-    form.enableTunnel,
-    form.enableRdp,
-    form.enableVnc,
-    form.enableTelnet,
-  ]);
+  }, [hostToggles, form]);
 
   type ToggleKey =
     | "enableSsh"
@@ -246,26 +241,18 @@ export default function HostForm({
     | "enableTunnel"
     | "enableDocker";
   type Toggle = { key: ToggleKey; label: string; description?: string };
-  const protocolToggles = (
-    [
-      { key: "enableSsh", label: "SSH", description: "Secure Shell" },
-      has("rdp") && {
-        key: "enableRdp",
-        label: "RDP",
-        description: "Remote Desktop",
-      },
-      has("vnc") && { key: "enableVnc", label: "VNC" },
-      has("telnet") && { key: "enableTelnet", label: "Telnet" },
-    ] as (Toggle | false)[]
-  ).filter(Boolean) as Toggle[];
-  const featureToggles = (
-    [
-      has("terminal") && { key: "enableTerminal", label: "Terminal" },
-      has("fileManager") && { key: "enableFileManager", label: "File Manager" },
-      has("tunnels") && { key: "enableTunnel", label: "Tunnels" },
-      has("docker") && { key: "enableDocker", label: "Docker" },
-    ] as (Toggle | false)[]
-  ).filter(Boolean) as Toggle[];
+  const asToggle = (t: (typeof hostToggles)[number]): Toggle => ({
+    key: t.key as ToggleKey,
+    label: t.label,
+    description: t.description,
+  });
+  const protocolToggles: Toggle[] = [
+    { key: "enableSsh", label: "SSH", description: "Secure Shell" },
+    ...hostToggles.filter((t) => t.group === "protocol").map(asToggle),
+  ];
+  const featureToggles: Toggle[] = hostToggles
+    .filter((t) => t.group === "feature")
+    .map(asToggle);
 
   // If the active tab's protocol gets disabled, fall back to General.
   useEffect(() => {
@@ -481,7 +468,7 @@ export default function HostForm({
                   </Field>
                 </View>
               </View>
-              {has("wakeOnLan") ? (
+              {canWake ? (
                 <Field label="MAC Address (for Wake-on-LAN)">
                   <Input
                     value={form.macAddress}
@@ -711,7 +698,7 @@ export default function HostForm({
                     </SettingRow>
                   ))}
                 </View>
-                {form.enableFileManager && has("fileManager") ? (
+                {form.enableFileManager && hasDefaultPath ? (
                   <Field label="Default Path">
                     <Input
                       value={form.defaultPath}

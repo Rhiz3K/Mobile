@@ -11,10 +11,8 @@ import {
   LogOut,
   Lock,
   Server as ServerIcon,
-  ShieldCheck,
   Monitor,
   Key,
-  FileText,
   LayoutGrid,
   Trash2,
 } from "lucide-react-native";
@@ -22,7 +20,7 @@ import { useAppContext } from "@/contexts/AppContext";
 import { useTerminalSessions } from "@/contexts/TerminalSessionsContext";
 import { useTheme, useThemeColor } from "@/contexts/ThemeContext";
 import { useAppLock } from "@/contexts/AppLockContext";
-import { useServerFeatures } from "@/contexts/ServerFeaturesContext";
+import { useCapability, useSettingsLinks } from "@/core/features";
 import { Screen } from "@/components/Screen";
 import { LockScreen } from "@/components/LockScreen";
 import {
@@ -58,7 +56,8 @@ import { clearSession } from "@/core/api/webSession";
 
 export default function Settings() {
   const router = useRouter();
-  const { has } = useServerFeatures();
+  const settingsLinks = useSettingsLinks();
+  const hasSnippetWidget = useCapability("widgets.snippets");
   const color = useThemeColor();
   const appVersion = Constants.expoConfig?.version ?? "";
   const { isAuthenticated, setAuthenticated, openAuthFlow, authFlowVisible } =
@@ -365,25 +364,30 @@ export default function Settings() {
               ) : null}
 
               <View className="mt-1 gap-0">
-                {has("totp") ? (
-                  <Pressable
-                    onPress={() =>
-                      router.push("/tabs/settings/TwoFactorAuth" as any)
-                    }
-                    className="flex-row items-center justify-between border-t border-border py-3"
-                  >
-                    <View className="flex-row items-center gap-2">
-                      <ShieldCheck
+                {settingsLinks.map((link) => {
+                  const Icon = link.icon;
+                  return (
+                    <Pressable
+                      key={link.id}
+                      onPress={() => router.push(link.href as any)}
+                      className="flex-row items-center justify-between border-t border-border py-3"
+                    >
+                      <View className="flex-row items-center gap-2">
+                        <Icon size={15} color={color("muted-foreground")} />
+                        <Text
+                          weight="medium"
+                          className="text-sm text-foreground"
+                        >
+                          {link.label}
+                        </Text>
+                      </View>
+                      <ChevronRight
                         size={15}
                         color={color("muted-foreground")}
                       />
-                      <Text weight="medium" className="text-sm text-foreground">
-                        Two-Factor Authentication
-                      </Text>
-                    </View>
-                    <ChevronRight size={15} color={color("muted-foreground")} />
-                  </Pressable>
-                ) : null}
+                    </Pressable>
+                  );
+                })}
                 {isAdmin ? (
                   <Pressable
                     onPress={() =>
@@ -409,22 +413,6 @@ export default function Settings() {
                       <Key size={15} color={color("muted-foreground")} />
                       <Text weight="medium" className="text-sm text-foreground">
                         API Keys
-                      </Text>
-                    </View>
-                    <ChevronRight size={15} color={color("muted-foreground")} />
-                  </Pressable>
-                ) : null}
-                {has("snippets") ? (
-                  <Pressable
-                    onPress={() =>
-                      router.push("/tabs/settings/Snippets" as any)
-                    }
-                    className="flex-row items-center justify-between border-t border-border py-3"
-                  >
-                    <View className="flex-row items-center gap-2">
-                      <FileText size={15} color={color("muted-foreground")} />
-                      <Text weight="medium" className="text-sm text-foreground">
-                        Snippets
                       </Text>
                     </View>
                     <ChevronRight size={15} color={color("muted-foreground")} />
@@ -626,7 +614,7 @@ export default function Settings() {
                   <SettingRow
                     label="Pinned hosts only"
                     description="Show only the hosts you pinned"
-                    last={!has("snippets")}
+                    last={!hasSnippetWidget}
                   >
                     <FakeSwitch
                       checked={widgetPrefs.pinnedOnly}
@@ -636,7 +624,7 @@ export default function Settings() {
                     />
                   </SettingRow>
 
-                  {has("snippets") ? (
+                  {hasSnippetWidget ? (
                     <SettingRow
                       label="Snippets widget"
                       description="Show saved commands on the home screen"
@@ -651,7 +639,7 @@ export default function Settings() {
                     </SettingRow>
                   ) : null}
 
-                  {widgetPrefs.includeSnippets && has("snippets") ? (
+                  {widgetPrefs.includeSnippets && hasSnippetWidget ? (
                     <SettingRow
                       label="Show command preview"
                       description="Show the first line of each command"

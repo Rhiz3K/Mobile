@@ -3,7 +3,8 @@ import { Pin, Cpu, MemoryStick } from "lucide-react-native";
 import { SSHHost } from "@/types";
 import { Text } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
-import { useServerFeatures } from "@/contexts/ServerFeaturesContext";
+import { useHostBadges } from "@/core/features";
+import { isSshActive } from "@/utils/hosts";
 import type { HostStatus } from "@/screens/hosts/navigation/hostTree";
 
 export interface HostMetrics {
@@ -77,25 +78,14 @@ export default function Host({
   const color = useThemeColor();
   const accent = color("accent-brand") ?? "#f59145";
   const online = status === "online";
-  const { has } = useServerFeatures();
+  const badges = useHostBadges();
 
-  const sshActive =
-    host.enableSsh !== false &&
-    host.connectionType !== "rdp" &&
-    host.connectionType !== "vnc" &&
-    host.connectionType !== "telnet";
+  const sshActive = isSshActive(host);
   const protocols: string[] = [];
   if (sshActive) protocols.push("SSH");
-  if (host.enableRdp && has("rdp")) protocols.push("RDP");
-  if (host.enableVnc && has("vnc")) protocols.push("VNC");
-  if (host.enableTelnet && has("telnet")) protocols.push("TEL");
-  if (sshActive && host.enableTerminal && has("terminal"))
-    protocols.push("TERM");
-  if (sshActive && host.enableFileManager && has("fileManager"))
-    protocols.push("FILES");
-  if (sshActive && host.enableTunnel && has("tunnels"))
-    protocols.push("TUNNEL");
-  if (host.enableDocker && has("docker")) protocols.push("DKR");
+  for (const badge of badges) {
+    if (badge.show(host, sshActive)) protocols.push(badge.label);
+  }
 
   const showCpu = online && metrics?.cpu != null && metrics.cpu > 0;
   const showRam = online && metrics?.ram != null && metrics.ram > 0;

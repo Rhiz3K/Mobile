@@ -12,8 +12,6 @@ import {
 } from "@/core/api/compat/api-compat";
 import {
   activePlugins,
-  hasServerFeature,
-  type ServerFeature,
   type ServerPlugin,
 } from "@/core/api/compat/server-features";
 import { handleApiError } from "@/core/api/errors";
@@ -326,12 +324,23 @@ export class AccountClient implements HttpOwner {
     return this.apiGeneration === "plugin";
   }
 
-  hasFeature(feature: ServerFeature): boolean {
-    return hasServerFeature(
-      feature,
-      this.apiGeneration === "plugin",
-      this.enabledPlugins,
-    );
+  /**
+   * Whether the server can serve something that needs this plugin, and for
+   * protocol plugins this protocol. Same rules as isPluginEnabled.
+   */
+  supports(req: {
+    plugin: string;
+    protocol?: string;
+    pluginApiOnly?: boolean;
+  }): boolean {
+    if (this.apiGeneration !== "plugin") return !req.pluginApiOnly;
+    if (!this.enabledPlugins) return true;
+    const plugin = this.enabledPlugins.find((p) => p.id === req.plugin);
+    if (!plugin) return false;
+    if (req.protocol && plugin.protocols) {
+      return plugin.protocols.includes(req.protocol);
+    }
+    return true;
   }
 
   /**

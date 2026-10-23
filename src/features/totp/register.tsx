@@ -1,0 +1,18 @@
+import { ShieldCheck } from "lucide-react-native";
+import type { FeatureDef } from "@/core/features/types";
+
+export const totpFeature: FeatureDef = {
+  id: "totp",
+  title: "Two-Factor Authentication",
+  source: "native",
+  requires: { plugin: "totp" },
+  settingsLinks: [
+    {
+      id: "totp",
+      label: "Two-Factor Authentication",
+      icon: ShieldCheck,
+      order: 10,
+      href: "/tabs/settings/TwoFactorAuth",
+    },
+  ],
+};

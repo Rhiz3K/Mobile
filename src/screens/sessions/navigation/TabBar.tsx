@@ -16,11 +16,6 @@ import {
   ChevronDown,
   ChevronUp,
   SquareTerminal,
-  Activity,
-  Folder,
-  Network,
-  Container,
-  Monitor,
   Layers,
 } from "lucide-react-native";
 import {
@@ -35,22 +30,10 @@ import {
   type TerminalImeInputHandle,
 } from "@/modules/terminal-ime-input";
 import { useUiColors } from "@/contexts/ThemeContext";
+import { features } from "@/core/features";
 
 function getSessionIcon(type: SessionType) {
-  switch (type) {
-    case "terminal":
-      return SquareTerminal;
-    case "stats":
-      return Activity;
-    case "filemanager":
-      return Folder;
-    case "tunnel":
-      return Network;
-    case "docker":
-      return Container;
-    case "remoteDesktop":
-      return Monitor;
-  }
+  return features.sessionTab(type)?.icon ?? SquareTerminal;
 }
 
 interface TabBarProps {
@@ -92,7 +75,10 @@ export default function TabBar({
   const tabBarHeight = getTabBarHeight(isLandscape);
   const buttonSize = getButtonSize(isLandscape);
 
-  const needsBottomPadding = activeSessionType !== "terminal";
+  const needsBottomPadding = !features.sessionHas(
+    activeSessionType,
+    "terminal-input",
+  );
 
   const handleToggleSystemKeyboard = () => {
     if (keyboardIntentionallyHiddenRef.current) {
@@ -123,8 +109,12 @@ export default function TabBar({
           borderBottomWidth: 0,
           height: tabBarHeight + (needsBottomPadding ? insets.bottom : 0),
           paddingBottom: needsBottomPadding ? insets.bottom : 0,
-          justifyContent:
-            activeSessionType === "terminal" ? "center" : "flex-start",
+          justifyContent: features.sessionHas(
+            activeSessionType,
+            "terminal-input",
+          )
+            ? "center"
+            : "flex-start",
         }}
         focusable={false}
       >
@@ -281,35 +271,36 @@ export default function TabBar({
             </ScrollView>
           </View>
 
-          {activeSessionType === "terminal" && !isCustomKeyboardVisible && (
-            <TouchableOpacity
-              onPress={handleToggleSystemKeyboard}
-              focusable={false}
-              className="items-center justify-center"
-              activeOpacity={0.7}
-              style={{
-                width: buttonSize,
-                height: buttonSize,
-                borderWidth: StyleSheet.hairlineWidth,
-                borderColor: ui.border,
-                backgroundColor: ui.muted,
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.1,
-                shadowRadius: 4,
-                elevation: 2,
-                marginLeft: isLandscape ? 6 : 8,
-              }}
-            >
-              {keyboardIntentionallyHiddenRef.current ? (
-                <ChevronUp size={isLandscape ? 18 : 20} color={ui.text} />
-              ) : (
-                <ChevronDown size={isLandscape ? 18 : 20} color={ui.text} />
-              )}
-            </TouchableOpacity>
-          )}
+          {features.sessionHas(activeSessionType, "terminal-input") &&
+            !isCustomKeyboardVisible && (
+              <TouchableOpacity
+                onPress={handleToggleSystemKeyboard}
+                focusable={false}
+                className="items-center justify-center"
+                activeOpacity={0.7}
+                style={{
+                  width: buttonSize,
+                  height: buttonSize,
+                  borderWidth: StyleSheet.hairlineWidth,
+                  borderColor: ui.border,
+                  backgroundColor: ui.muted,
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.1,
+                  shadowRadius: 4,
+                  elevation: 2,
+                  marginLeft: isLandscape ? 6 : 8,
+                }}
+              >
+                {keyboardIntentionallyHiddenRef.current ? (
+                  <ChevronUp size={isLandscape ? 18 : 20} color={ui.text} />
+                ) : (
+                  <ChevronDown size={isLandscape ? 18 : 20} color={ui.text} />
+                )}
+              </TouchableOpacity>
+            )}
 
-          {activeSessionType === "terminal" && (
+          {features.sessionHas(activeSessionType, "terminal-input") && (
             <TouchableOpacity
               onPress={() => onToggleKeyboard?.()}
               focusable={false}

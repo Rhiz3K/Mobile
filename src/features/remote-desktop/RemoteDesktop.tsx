@@ -35,7 +35,6 @@ import {
   X,
 } from "lucide-react-native";
 import type { SSHHost } from "@/types";
-import type { RemoteDesktopProtocol } from "@/contexts/TerminalSessionsContext";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { Sheet, Tabs, Button, SheetBody, Input } from "@/ui";
 import { useSessionClient } from "@/core/accounts/session";
@@ -61,6 +60,8 @@ interface Modifiers {
   shift: boolean;
   win: boolean;
 }
+
+export type RemoteDesktopProtocol = "rdp" | "vnc" | "telnet";
 
 interface RemoteDesktopProps {
   host: SSHHost;

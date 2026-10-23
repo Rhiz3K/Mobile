@@ -1,37 +1,24 @@
-import {
-  activePlugins,
-  filterOptionAvailable,
-  hasServerFeature,
-  pluginForFeature,
-  sessionFeature,
-  type ServerFeature,
-} from "@/core/api/compat/server-features";
+import { AccountClient } from "@/core/api/AccountClient";
+import { activePlugins } from "@/core/api/compat/server-features";
+import { accountStorage } from "@/core/storage/kv";
+import { resetStorage } from "../../../helpers/http";
 
-const ALL: ServerFeature[] = [
-  "terminal",
-  "commandHistory",
-  "fileManager",
-  "tunnels",
-  "metrics",
-  "docker",
-  "rdp",
-  "vnc",
-  "telnet",
-  "snippets",
-  "wakeOnLan",
-  "alerts",
-  "totp",
-  "tailscale",
-  "importExport",
-  "credentialTools",
-];
+beforeEach(resetStorage);
 
-test("older servers and an unknown plugin list keep everything on", () => {
-  for (const feature of ALL) {
-    expect(hasServerFeature(feature, false, [])).toBe(true);
-    expect(hasServerFeature(feature, true, null)).toBe(true);
-  }
-});
+async function client(
+  generation: "legacy" | "plugin",
+  plugins: unknown[] | null,
+) {
+  const c = new AccountClient({
+    accountId: "a",
+    serverUrl: "https://t.example",
+    storage: accountStorage("a"),
+  });
+  await c.storage.data.set("apiGeneration", generation);
+  if (plugins) await c.storage.data.setJson("enabledPlugins", plugins);
+  await c.load();
+  return c;
+}
 
 test("only enabled and running plugins count", () => {
   const plugins = activePlugins([
@@ -42,54 +29,6 @@ test("only enabled and running plugins count", () => {
     { name: "no id" },
   ])!;
   expect(plugins.map((p) => p.id)).toEqual(["ssh-terminal", "snippets"]);
-  const has = (f: ServerFeature) => hasServerFeature(f, true, plugins);
-  expect(has("terminal")).toBe(true);
-  expect(has("commandHistory")).toBe(true);
-  expect(has("snippets")).toBe(true);
-  expect(has("docker")).toBe(false);
-  expect(has("tunnels")).toBe(false);
-  expect(has("fileManager")).toBe(false);
-  expect(has("rdp")).toBe(false);
-});
-
-test("Tailscale discovery follows the Tailscale plugin", () => {
-  expect(pluginForFeature("tailscale")).toBe("tailscale");
-  for (const entry of [
-    { id: "tailscale", enabled: false, state: "disabled" },
-    { id: "tailscale", enabled: true, state: "failed" },
-  ]) {
-    expect(hasServerFeature("tailscale", true, activePlugins([entry]))).toBe(
-      false,
-    );
-  }
-  expect(hasServerFeature("tailscale", true, [])).toBe(false);
-  expect(
-    hasServerFeature(
-      "tailscale",
-      true,
-      activePlugins([{ id: "tailscale", enabled: true, state: "active" }]),
-    ),
-  ).toBe(true);
-});
-
-test("remote desktop protocols follow the plugin's declared protocols", () => {
-  const plugins = activePlugins([
-    {
-      id: "remote-desktop",
-      enabled: true,
-      state: "active",
-      contributes: { protocols: [{ id: "rdp" }, { id: "vnc" }] },
-    },
-  ]);
-  const has = (f: ServerFeature) => hasServerFeature(f, true, plugins);
-  expect(has("rdp")).toBe(true);
-  expect(has("vnc")).toBe(true);
-  expect(has("telnet")).toBe(false);
-
-  const noList = activePlugins([
-    { id: "remote-desktop", enabled: true, state: "active", contributes: {} },
-  ]);
-  expect(hasServerFeature("telnet", true, noList)).toBe(true);
 });
 
 test("cached lists survive a JSON round trip", () => {
@@ -101,30 +40,46 @@ test("cached lists survive a JSON round trip", () => {
       contributes: { protocols: [{ id: "rdp" }] },
     },
   ]);
-  const again = activePlugins(JSON.parse(JSON.stringify(plugins)));
-  expect(hasServerFeature("rdp", true, again)).toBe(true);
-  expect(hasServerFeature("vnc", true, again)).toBe(false);
+  expect(activePlugins(JSON.parse(JSON.stringify(plugins)))).toEqual([
+    { id: "remote-desktop", protocols: ["rdp"] },
+  ]);
   expect(activePlugins("nope")).toBeNull();
 });
 
-test("host filters only offer features the server has", () => {
-  const has = (f: ServerFeature) => f !== "docker" && f !== "vnc";
-  expect(filterOptionAvailable("docker", has)).toBe(false);
-  expect(filterOptionAvailable("vnc", has)).toBe(false);
-  expect(filterOptionAvailable("tunnel", has)).toBe(true);
-  expect(filterOptionAvailable("ssh", has)).toBe(true);
-  expect(filterOptionAvailable("online", has)).toBe(true);
+test("older servers and an unknown plugin list keep everything on", async () => {
+  const legacy = await client("legacy", null);
+  expect(legacy.supports({ plugin: "docker" })).toBe(true);
+  const unknown = await client("plugin", null);
+  expect(unknown.supports({ plugin: "docker" })).toBe(true);
 });
 
-test("session tabs map to the feature they need", () => {
-  expect(sessionFeature("terminal")).toBe("terminal");
-  expect(sessionFeature("stats")).toBe("metrics");
-  expect(sessionFeature("filemanager")).toBe("fileManager");
-  expect(sessionFeature("tunnel")).toBe("tunnels");
-  expect(sessionFeature("docker")).toBe("docker");
-  expect(sessionFeature("remoteDesktop", "vnc")).toBe("vnc");
-  expect(sessionFeature("remoteDesktop", "telnet")).toBe("telnet");
-  expect(sessionFeature("remoteDesktop", "ssh")).toBe("rdp");
-  expect(sessionFeature("remoteDesktop")).toBe("rdp");
-  expect(sessionFeature("unknown")).toBeNull();
+test("plugins that are off are not supported", async () => {
+  const c = await client("plugin", [{ id: "ssh-terminal" }]);
+  expect(c.supports({ plugin: "ssh-terminal" })).toBe(true);
+  expect(c.supports({ plugin: "docker" })).toBe(false);
+});
+
+test("protocol plugins follow their declared protocols", async () => {
+  const c = await client("plugin", [
+    { id: "remote-desktop", protocols: ["rdp", "vnc"] },
+  ]);
+  expect(c.supports({ plugin: "remote-desktop", protocol: "rdp" })).toBe(true);
+  expect(c.supports({ plugin: "remote-desktop", protocol: "vnc" })).toBe(true);
+  expect(c.supports({ plugin: "remote-desktop", protocol: "telnet" })).toBe(
+    false,
+  );
+  await resetStorage();
+  const noList = await client("plugin", [{ id: "remote-desktop" }]);
+  expect(
+    noList.supports({ plugin: "remote-desktop", protocol: "telnet" }),
+  ).toBe(true);
+});
+
+test("plugin only features are off on older servers", async () => {
+  const legacy = await client("legacy", null);
+  expect(legacy.supports({ plugin: "tailscale", pluginApiOnly: true })).toBe(
+    false,
+  );
+  const on = await client("plugin", [{ id: "tailscale" }]);
+  expect(on.supports({ plugin: "tailscale", pluginApiOnly: true })).toBe(true);
 });

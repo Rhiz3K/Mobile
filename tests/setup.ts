@@ -30,3 +30,9 @@ if (!process.env.TEST_LOGS) {
     jest.spyOn(console, level).mockImplementation(() => {});
   }
 }
+
+// Native views that have no JS fallback under Jest.
+jest.mock("react-native-webview", () => {
+  const { View } = require("react-native");
+  return { __esModule: true, WebView: View, default: View };
+});

@@ -28,8 +28,7 @@ import {
 import HostTree from "@/screens/hosts/navigation/Folder";
 import type { HostMetrics } from "@/screens/hosts/navigation/Host";
 import { HostActionSheet } from "@/screens/hosts/HostActionSheet";
-import { useServerFeatures } from "@/contexts/ServerFeaturesContext";
-import { filterOptionAvailable } from "@/core/api/compat/server-features";
+import { useCapability, useHostFilters } from "@/core/features";
 import HostForm from "@/screens/hosts/HostForm";
 import { QuickConnect } from "@/screens/hosts/QuickConnect";
 import { TailscaleDevices } from "@/features/tailscale/TailscaleDevices";
@@ -92,22 +91,12 @@ const FILTER_GROUPS: {
   {
     group: "protocol",
     title: "Protocol",
-    options: [
-      { value: "ssh", label: "SSH" },
-      { value: "rdp", label: "RDP" },
-      { value: "vnc", label: "VNC" },
-      { value: "telnet", label: "Telnet" },
-    ],
+    options: [{ value: "ssh", label: "SSH" }],
   },
   {
     group: "features",
     title: "Features",
-    options: [
-      { value: "terminal", label: "Terminal" },
-      { value: "fileManager", label: "File Manager" },
-      { value: "tunnel", label: "Tunnel" },
-      { value: "docker", label: "Docker" },
-    ],
+    options: [],
   },
 ];
 
@@ -117,8 +106,13 @@ const STORAGE_EXPANDED = "hostExpandedFolders";
 
 export default function Hosts() {
   const color = useThemeColor();
-  const { has, refresh: refreshFeatures } = useServerFeatures();
-  const tailscaleAvailable = api().tailscale.isTailscaleAvailable();
+  const hostFilters = useHostFilters();
+  const canQuickConnect = useCapability("host.quickConnect");
+  const tailscaleAvailable = useCapability("hosts.discovery");
+  const refreshFeatures = useCallback(
+    () => activeClient()?.refreshEnabledPlugins() ?? Promise.resolve(),
+    [],
+  );
   const router = useRouter();
   const [hosts, setHosts] = useState<SSHHost[]>([]);
   const [folderColors, setFolderColors] = useState<
@@ -354,32 +348,36 @@ export default function Hosts() {
 
   const q = searchQuery.trim().toLowerCase();
 
+  // Filter options come from the features the server has.
   const filterGroups = useMemo(
     () =>
       FILTER_GROUPS.map((grp) => ({
         ...grp,
-        options: grp.options.filter((opt) =>
-          filterOptionAvailable(opt.value, has),
-        ),
+        options: [
+          ...grp.options,
+          ...hostFilters
+            .filter((f) => f.group === grp.group)
+            .map((f) => ({ value: f.value, label: f.label })),
+        ],
       })),
-    [has],
+    [hostFilters],
   );
 
   const visibleTree = useMemo(() => {
+    const matchers = Object.fromEntries(
+      hostFilters.map((f) => [f.value, f.matches]),
+    );
+    const known = new Set(["ssh", ...hostFilters.map((f) => f.value)]);
     const activeFilters = {
       ...filterState,
-      protocol: filterState.protocol.filter((v) =>
-        filterOptionAvailable(v, has),
-      ),
-      features: filterState.features.filter((v) =>
-        filterOptionAvailable(v, has),
-      ),
+      protocol: filterState.protocol.filter((v) => known.has(v)),
+      features: filterState.features.filter((v) => known.has(v)),
     };
-    let nodes = applyFilters(tree, activeFilters, getHostStatus);
+    let nodes = applyFilters(tree, activeFilters, getHostStatus, matchers);
     nodes = filterTreeByQuery(nodes, q);
     nodes = sortHostTree(nodes, sortKey, getHostStatus);
     return nodes;
-  }, [tree, filterState, q, sortKey, getHostStatus, has]);
+  }, [tree, filterState, q, sortKey, getHostStatus, hostFilters]);
 
   // --- Default expansion: expand all folders the first time hosts load.
   useEffect(() => {
@@ -581,7 +579,7 @@ export default function Hosts() {
             onPress={() => setCredentialListOpen(true)}
             icon={<KeyRound size={18} color={color("muted-foreground")} />}
           />
-          {has("terminal") ? (
+          {canQuickConnect ? (
             <Button
               variant="ghost"
               size="icon"

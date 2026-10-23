@@ -8,7 +8,7 @@ import {
 
 export function createTailscaleApi(c: AccountClient) {
   function isTailscaleAvailable(): boolean {
-    return c.isPluginApi() && c.hasFeature("tailscale");
+    return c.supports({ plugin: "tailscale", pluginApiOnly: true });
   }
 
   async function getTailscaleDevices(): Promise<TailscaleDevicesResult | null> {

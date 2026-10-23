@@ -14,7 +14,7 @@ import {
   InlineView,
 } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
-import { useServerFeatures } from "@/contexts/ServerFeaturesContext";
+import { useCapability } from "@/core/features";
 import { toast } from "@/utils/toast";
 import { api } from "@/core/accounts";
 
@@ -66,7 +66,7 @@ export default function CredentialForm({
   onSaved: () => void;
 }) {
   const color = useThemeColor();
-  const features = useServerFeatures();
+  const hasKeyTools = useCapability("credentials.keyTools");
   const [form, setForm] = useState<CredentialFormState>(EMPTY);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("general");
@@ -362,7 +362,7 @@ export default function CredentialForm({
                   </Field>
                 </Section>
 
-                {features.has("credentialTools") ? (
+                {hasKeyTools ? (
                   <Section title="Key Generation">
                     <View className="gap-2.5 border border-border bg-card px-3 py-3">
                       <View className="gap-0.5">
@@ -452,7 +452,7 @@ export default function CredentialForm({
                   <View className="flex-row items-center justify-between">
                     <Label>Public Key (optional)</Label>
                     <View className="flex-row gap-1.5">
-                      {features.has("credentialTools") ? (
+                      {hasKeyTools ? (
                         <Button
                           variant="muted"
                           size="sm"

@@ -10,17 +10,15 @@ import React, {
 import { SSHHost } from "@/types";
 import { router } from "expo-router";
 import { useAppContext } from "@/contexts/AppContext";
-import { sessionFeature } from "@/core/api/compat/server-features";
 import { toast } from "@/utils/toast";
 import { accounts, clientFor, useActiveAccount } from "@/core/accounts";
 import type { AccountClient } from "@/core/api/AccountClient";
 import type { OpenTabRecord } from "@/core/api/types";
 import { transportFor } from "@/core/transport";
+import { features } from "@/core/features";
 
-export type SessionType =
-  "terminal" | "stats" | "filemanager" | "tunnel" | "docker" | "remoteDesktop";
-
-export type RemoteDesktopProtocol = "rdp" | "vnc" | "telnet";
+/** Session tab type. The registry knows which feature owns each one. */
+export type SessionType = string;
 
 export interface TerminalSession {
   id: string;
@@ -37,56 +35,34 @@ export interface TerminalSession {
   backendSessionId?: string | null;
   /** When set, the terminal should attach to this backend session on connect. */
   restoredSessionId?: string | null;
-  /** Selected protocol for remote desktop tabs. */
-  remoteProtocol?: RemoteDesktopProtocol;
+  /** Protocol for tabs that open more than one, like remote desktop. */
+  remoteProtocol?: string;
 }
 
-const TYPE_LABELS: Record<Exclude<SessionType, "remoteDesktop">, string> = {
-  terminal: "",
-  stats: "Metrics",
-  filemanager: "Files",
-  tunnel: "Tunnels",
-  docker: "Docker",
-};
-
-function getSessionTypeLabel(
-  type: SessionType,
-  remoteProtocol?: RemoteDesktopProtocol,
-): string {
-  if (type === "remoteDesktop") {
-    return remoteProtocol ? remoteProtocol.toUpperCase() : "Remote";
-  }
-  return TYPE_LABELS[type];
+function getSessionTypeLabel(type: SessionType, remoteProtocol?: string) {
+  return features.sessionTab(type)?.titleSuffix({ remoteProtocol }) ?? "";
 }
 
 function isSameSessionKind(
   session: Pick<TerminalSession, "host" | "type" | "remoteProtocol">,
   host: SSHHost,
   type: SessionType,
-  remoteProtocol?: RemoteDesktopProtocol,
+  remoteProtocol?: string,
 ): boolean {
   if (session.host.id !== host.id || session.type !== type) return false;
-  if (type !== "remoteDesktop") return true;
-  return session.remoteProtocol === remoteProtocol;
+  return (session.remoteProtocol ?? null) === (remoteProtocol ?? null);
 }
 
-/** open-tabs tabType is shared with the web app; map our session types to it. */
+/** open-tabs tabType is shared with the web app. */
 function toTabType(
   type: SessionType,
-  remoteProtocol: RemoteDesktopProtocol | undefined,
+  remoteProtocol: string | undefined,
   client: AccountClient | null,
 ): string {
-  switch (type) {
-    case "filemanager":
-      return "files";
-    case "stats":
-      // 2.9+ web names this tab after its plugin.
-      return client?.isPluginApi() ? "host-metrics" : "stats";
-    case "remoteDesktop":
-      return remoteProtocol ?? "rdp";
-    default:
-      return type;
-  }
+  return (
+    features.sessionTab(type)?.toServerTabType({ remoteProtocol }, client) ??
+    type
+  );
 }
 
 function uuid(): string {
@@ -110,7 +86,7 @@ interface TerminalSessionsContextType {
     opts?: {
       instanceId?: string;
       restoredSessionId?: string | null;
-      remoteProtocol?: RemoteDesktopProtocol;
+      remoteProtocol?: string;
     },
   ) => string;
   removeSession: (sessionId: string) => void;
@@ -123,7 +99,7 @@ interface TerminalSessionsContextType {
   navigateToSessions: (
     host?: SSHHost,
     type?: SessionType,
-    opts?: { remoteProtocol?: RemoteDesktopProtocol },
+    opts?: { remoteProtocol?: string },
   ) => void;
   isCustomKeyboardVisible: boolean;
   toggleCustomKeyboard: () => void;
@@ -176,11 +152,11 @@ export const TerminalSessionsProvider: React.FC<
   const addSession = useCallback(
     (
       host: SSHHost,
-      type: SessionType = "terminal",
+      type: SessionType = features.defaultSessionType(),
       opts?: {
         instanceId?: string;
         restoredSessionId?: string | null;
-        remoteProtocol?: RemoteDesktopProtocol;
+        remoteProtocol?: string;
       },
     ): string => {
       const instanceId = opts?.instanceId ?? uuid();
@@ -314,7 +290,10 @@ export const TerminalSessionsProvider: React.FC<
       setSessions((prev) => {
         const newSession = prev.find((s) => s.id === sessionId);
 
-        if (newSession?.type !== "terminal" && isCustomKeyboardVisible) {
+        if (
+          !features.sessionHas(newSession?.type, "terminal-input") &&
+          isCustomKeyboardVisible
+        ) {
           setIsCustomKeyboardVisible(false);
         }
 
@@ -354,21 +333,21 @@ export const TerminalSessionsProvider: React.FC<
   const navigateToSessions = useCallback(
     (
       host?: SSHHost,
-      type: SessionType = "terminal",
-      opts?: { remoteProtocol?: RemoteDesktopProtocol },
+      type: SessionType = features.defaultSessionType(),
+      opts?: { remoteProtocol?: string },
     ) => {
       if (host) {
-        const feature = sessionFeature(
-          type,
-          opts?.remoteProtocol ?? host.connectionType,
-        );
         const transport = transportFor(accounts.active().id);
         if (!transport.available) {
           toast.error(transport.unavailableReason ?? "Can't connect yet.");
           return;
         }
-        const client = accounts.activeClient();
-        if (feature && client && !client.hasFeature(feature)) {
+        const ctx = {
+          account: accounts.active(),
+          client: accounts.activeClient(),
+        };
+        const remoteProtocol = opts?.remoteProtocol ?? host.connectionType;
+        if (!features.canOpen(type, { remoteProtocol }, ctx)) {
           toast.error("This feature is turned off on the server.");
           return;
         }

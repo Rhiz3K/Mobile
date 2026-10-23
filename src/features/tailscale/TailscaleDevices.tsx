@@ -9,7 +9,7 @@ import {
   View,
 } from "react-native";
 import { Check, Radar, RefreshCw, Search, X } from "lucide-react-native";
-import { useServerFeatures } from "@/contexts/ServerFeaturesContext";
+import { useCapability } from "@/core/features";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { Sheet, Button, Input, Label, Text } from "@/ui";
 import {
@@ -236,8 +236,7 @@ export function TailscaleDevices({
 }) {
   const color = useThemeColor();
   const { height } = useWindowDimensions();
-  useServerFeatures();
-  const available = api().tailscale.isTailscaleAvailable();
+  const available = useCapability("hosts.discovery");
   const [query, setQuery] = useState("");
   const [usernames, setUsernames] = useState<Record<string, string>>({});
   const { devices, status, refresh } = useDevices(visible && available);

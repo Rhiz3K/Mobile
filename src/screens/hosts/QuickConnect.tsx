@@ -5,6 +5,7 @@ import { SSHHost } from "@/types";
 import { useTerminalSessions } from "@/contexts/TerminalSessionsContext";
 import { Sheet, Input, Button, Label, Tabs, Text } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
+import { features } from "@/core/features";
 import { toast } from "@/utils/toast";
 
 type AuthType = "password" | "key";
@@ -66,7 +67,7 @@ export function QuickConnect({
     };
     onClose();
     reset();
-    navigateToSessions(transient, "terminal");
+    navigateToSessions(transient, features.defaultSessionType());
   };
 
   return (
