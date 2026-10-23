@@ -24,3 +24,11 @@ export {
 } from "./host-ids";
 export { SYNC_KINDS, kindsOf, typesOf } from "./kinds";
 export type { SyncKind } from "./kinds";
+export {
+  resolveConflict,
+  retryRejected,
+  rowLabel,
+  setKindEnabled,
+  typeLabel,
+} from "./settings";
+export { useAccountSync, useSyncIssues } from "./hooks";

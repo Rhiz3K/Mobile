@@ -86,7 +86,8 @@ export function openEventStream(options: EventStreamOptions): () => void {
   const controller = new AbortController();
   void (async () => {
     try {
-      const fetchImpl = options.fetchImpl ?? (await streamingFetch());
+      // Global fetch is expo/fetch since SDK 56, which streams bodies.
+      const fetchImpl = options.fetchImpl ?? fetch;
       const response = await fetchImpl(options.url, {
         headers: options.headers,
         signal: controller.signal,
@@ -113,14 +114,6 @@ export function openEventStream(options: EventStreamOptions): () => void {
     closed = true;
     controller.abort();
   };
-}
-
-/** expo/fetch streams response bodies; React Native's own fetch does not. */
-async function streamingFetch(): Promise<typeof fetch> {
-  const mod = (await import("expo/fetch")) as unknown as {
-    fetch: typeof fetch;
-  };
-  return mod.fetch;
 }
 
 function decoder(): (bytes: Uint8Array) => string {

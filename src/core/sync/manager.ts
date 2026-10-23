@@ -185,6 +185,8 @@ export class SyncManager {
     for (const account of wanted.values()) {
       if (this.slots.has(account.id)) continue;
       this.slots.set(account.id, this.makeSlot(account));
+      // Linked while the app runs: sync it right away.
+      if (this.stopAccounts) this.schedule(account.id, 0);
       this.setStatus(account.id, {
         state: "idle",
         reason: null,

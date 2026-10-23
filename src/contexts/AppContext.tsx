@@ -18,9 +18,14 @@ import {
   useActiveAccount,
   type ServerAccount,
 } from "@/core/accounts";
-import { moveLegacyData } from "@/core/db/legacy-move";
+import {
+  moveLegacyData,
+  moveServerSecretsForBackground,
+} from "@/core/db/legacy-move";
 import type { AccountClient } from "@/core/api/AccountClient";
 import { getLatestGitHubRelease, isNewerVersion } from "@/core/updates";
+import { linkAccount, sync, SyncError, type LinkOutcome } from "@/core/sync";
+import { updateBackgroundSync } from "@/core/sync/background";
 
 interface Server {
   name: string;
@@ -51,7 +56,8 @@ interface AppContextType {
    */
   linkServer: (serverUrl: string) => Promise<AccountClient>;
   /** Call once the active account has a session. */
-  finishSignIn: () => Promise<void>;
+  /** Links the signed in server for sync. Null when nothing was linked. */
+  finishSignIn: () => Promise<LinkOutcome | null>;
 
   /** Account switcher sheet. */
   accountSwitcherVisible: boolean;
@@ -113,6 +119,31 @@ async function checkShouldShowUpdateScreen(): Promise<boolean> {
   }
 }
 
+const RECHECK_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Signed in servers that never linked for sync (signed in before 2.0) link
+ * now, which also swaps their login for a long lived device session.
+ */
+async function upgradeLogins(): Promise<void> {
+  for (const account of accounts.list()) {
+    if (!isServerAccount(account) || account.status === "signed_out") continue;
+    if (!accounts.client(account.id)?.isAuthenticated()) continue;
+    const { sync: linked, syncCheckedAt } = account.options;
+    if (linked === true) continue;
+    const checked = Date.parse(String(syncCheckedAt ?? ""));
+    if (linked === false && Number.isFinite(checked)) {
+      if (Date.now() - checked < RECHECK_MS) continue;
+    }
+    try {
+      await linkAccount(account.id);
+    } catch {
+      // Tried again on the next start.
+    }
+  }
+  void updateBackgroundSync();
+}
+
 /** Asks the server who we are. False means the saved session is gone. */
 async function validateSession(
   account: ServerAccount,
@@ -131,6 +162,15 @@ async function validateSession(
     });
     return true;
   } catch (e) {
+    // The proxy in front of the server answered, not Termix: the session is
+    // still good, the proxy wants its own sign in.
+    if ((e as { code?: string })?.code === "PROXY_LOGIN") {
+      await accounts.update(account.id, {
+        status: "error",
+        lastError: "proxy_login",
+      });
+      return true;
+    }
     if (getErrorStatus(e) === 401) {
       await client.clearToken();
       await accounts.update(account.id, { status: "signed_out" });
@@ -183,9 +223,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       try {
         setIsLoading(true);
         await accounts.init();
-        await moveLegacyData({
-          accountIds: accounts.list().map((a) => a.id),
-        }).catch(() => {});
+        const accountIds = accounts.list().map((a) => a.id);
+        await moveLegacyData({ accountIds }).catch(() => {});
+        await moveServerSecretsForBackground({ accountIds }).catch(() => {});
+        sync.start();
+        void updateBackgroundSync();
+        void upgradeLogins();
 
         setShowUpdateScreen(await checkShouldShowUpdateScreen());
 
@@ -319,13 +362,26 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     return client;
   }, []);
 
-  const finishSignIn = useCallback(async () => {
+  const finishSignIn = useCallback(async (): Promise<LinkOutcome | null> => {
     const current = accounts.active();
     const client = accounts.activeClient();
-    if (isServerAccount(current) && client) {
-      await validateSession(current, client);
+    if (!isServerAccount(current) || !client) {
+      setAuthenticatedState(true);
+      return null;
     }
-    setAuthenticatedState(true);
+    await validateSession(current, client);
+    try {
+      // The login becomes a long lived device session, so no repeated OTP.
+      const outcome = await linkAccount(current.id);
+      setAuthenticatedState(true);
+      void updateBackgroundSync();
+      return outcome;
+    } catch (error) {
+      setAuthenticatedState(
+        !(error instanceof SyncError && error.kind === "different_account"),
+      );
+      throw error;
+    }
   }, []);
 
   const selectedServer: Server | null = isServerAccount(active)

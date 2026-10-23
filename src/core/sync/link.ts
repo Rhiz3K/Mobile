@@ -52,6 +52,7 @@ export async function linkAccount(accountId: string): Promise<LinkOutcome> {
           ...account.options,
           sync: false,
           syncUnavailable: error.kind,
+          syncCheckedAt: new Date().toISOString(),
         },
       });
       return { synced: false, firstLink: false, reason: error.kind };

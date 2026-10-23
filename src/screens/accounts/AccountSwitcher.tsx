@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { View } from "react-native";
-import { Plus, Server, Smartphone, Trash2 } from "lucide-react-native";
-import { Button, Sheet, SheetRow, Text, useConfirm } from "@/ui";
+import { Plus, Server, Smartphone, Unlink } from "lucide-react-native";
+import { Button, Sheet, SheetRow, Text } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { useAppContext } from "@/contexts/AppContext";
 import {
@@ -8,9 +9,11 @@ import {
   accounts,
   useAccounts,
   type Account,
+  type ServerAccount,
 } from "@/core/accounts";
 import { toUserMessage } from "@/core/errors";
 import { toast } from "@/utils/toast";
+import { UnlinkSheet } from "./UnlinkSheet";
 
 const STATUS: Record<string, string> = {
   idle: "Signed in",
@@ -26,6 +29,7 @@ function details(account: Account): string {
     account.username,
     account.serverUrl.replace(/^https?:\/\//, ""),
     STATUS[account.status],
+    account.options.sync === true ? "Synced copy" : null,
   ];
   return parts.filter(Boolean).join(" | ");
 }
@@ -33,7 +37,7 @@ function details(account: Account): string {
 /** Lists This device and every linked server; tap one to switch to it. */
 export function AccountSwitcher() {
   const color = useThemeColor();
-  const confirm = useConfirm();
+  const [unlinking, setUnlinking] = useState<ServerAccount | null>(null);
   const { accounts: list, active } = useAccounts();
   const { accountSwitcherVisible, closeAccountSwitcher, openAuthFlow } =
     useAppContext();
@@ -49,19 +53,9 @@ export function AccountSwitcher() {
     }
   };
 
-  const remove = async (account: Account) => {
-    const ok = await confirm({
-      title: `Remove ${accountLabel(account)}?`,
-      description:
-        "This removes the server and its saved sign in from this phone. Nothing is deleted on the server.",
-      confirmLabel: "Remove",
-    });
-    if (!ok) return;
-    try {
-      await accounts.remove(account.id);
-    } catch (e) {
-      toast.error(toUserMessage(e, "Could not remove account"));
-    }
+  const unlink = (account: ServerAccount) => {
+    closeAccountSwitcher();
+    setUnlinking(account);
   };
 
   const linkServer = () => {
@@ -70,47 +64,56 @@ export function AccountSwitcher() {
   };
 
   return (
-    <Sheet
-      visible={accountSwitcherVisible}
-      onClose={closeAccountSwitcher}
-      title="Accounts"
-      description="Open tabs keep running when you switch."
-    >
-      {list.map((account) => {
-        const Icon = account.kind === "local" ? Smartphone : Server;
-        const isActive = account.id === active.id;
-        return (
-          <SheetRow
-            key={account.id}
-            icon={<Icon size={18} color={iconColor} />}
-            label={accountLabel(account)}
-            description={details(account)}
-            selected={isActive}
-            onPress={() => switchTo(account)}
-            trailing={
-              account.kind === "server" && !isActive ? (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  accessibilityLabel={`Remove ${accountLabel(account)}`}
-                  onPress={() => remove(account)}
-                  icon={<Trash2 size={16} color={color("muted-foreground")} />}
-                />
-              ) : null
-            }
-          />
-        );
-      })}
-      <SheetRow
-        icon={<Plus size={18} color={iconColor} />}
-        label="Link a server"
-        onPress={linkServer}
+    <>
+      <UnlinkSheet
+        account={unlinking}
+        visible={!!unlinking}
+        onClose={() => setUnlinking(null)}
       />
-      <View className="px-4 py-3">
-        <Text className="text-[11px] text-muted-foreground">
-          Each server keeps its own hosts, logins and settings on this phone.
-        </Text>
-      </View>
-    </Sheet>
+      <Sheet
+        visible={accountSwitcherVisible}
+        onClose={closeAccountSwitcher}
+        title="Accounts"
+        description="Open tabs keep running when you switch."
+      >
+        {list.map((account) => {
+          const Icon = account.kind === "local" ? Smartphone : Server;
+          const isActive = account.id === active.id;
+          return (
+            <SheetRow
+              key={account.id}
+              icon={<Icon size={18} color={iconColor} />}
+              label={accountLabel(account)}
+              description={details(account)}
+              selected={isActive}
+              onPress={() => switchTo(account)}
+              trailing={
+                account.kind === "server" ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    accessibilityLabel={`Unlink ${accountLabel(account)}`}
+                    onPress={() => unlink(account)}
+                    icon={
+                      <Unlink size={16} color={color("muted-foreground")} />
+                    }
+                  />
+                ) : null
+              }
+            />
+          );
+        })}
+        <SheetRow
+          icon={<Plus size={18} color={iconColor} />}
+          label="Link a server"
+          onPress={linkServer}
+        />
+        <View className="px-4 py-3">
+          <Text className="text-[11px] text-muted-foreground">
+            Each server keeps its own hosts, logins and settings on this phone.
+          </Text>
+        </View>
+      </Sheet>
+    </>
   );
 }

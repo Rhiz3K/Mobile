@@ -22,9 +22,13 @@ import {
   RefreshCw,
   Globe,
   X,
+  Fingerprint,
+  Merge,
+  Smartphone,
+  SlidersHorizontal,
 } from "lucide-react-native";
 import { WebView, WebViewNavigation } from "react-native-webview";
-import { Text, Input, Button, Label } from "@/ui";
+import { Text, Input, Button, Label, InlineView, SheetRow } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { toast } from "@/utils/toast";
 import { useAppContext } from "@/contexts/AppContext";
@@ -33,10 +37,23 @@ import {
   isOidcCallbackHandled,
   markOidcCallbackHandled,
 } from "@/utils/oidc-callback";
-import { api, activeClient, requireActiveClient } from "@/core/accounts";
+import {
+  accounts,
+  api,
+  activeClient,
+  requireActiveClient,
+} from "@/core/accounts";
+import { readWebCookies } from "@/modules/termix-net";
+import {
+  sync,
+  SyncError,
+  thisDeviceHasData,
+  type LinkOutcome,
+} from "@/core/sync";
+import { ProxySettings } from "@/screens/accounts/ProxySettings";
 import { clearSession, consumeFreshWebSession } from "@/core/api/webSession";
 
-type Step = "server" | "login" | "totp" | "signup" | "reset" | "oidc";
+type Step = "server" | "login" | "totp" | "signup" | "reset" | "oidc" | "merge";
 
 // TEMP (testing): force the embedded web-version login (WebView) for every
 // sign-in - skip the native login form AND the system-browser OIDC popup.
@@ -99,6 +116,11 @@ export default function AuthFlow() {
   const [busy, setBusy] = useState(false);
   // Carries the TOTP temp token between the login and totp steps.
   const totpTempTokenRef = useRef<string>("");
+  // SSO through the server's provider, or the server's own login page in the
+  // system browser (passkeys and security keys work there).
+  const [oidcMode, setOidcMode] = useState<"sso" | "browser">("sso");
+  const [proxyOpen, setProxyOpen] = useState(false);
+  const [mergeAccountId, setMergeAccountId] = useState<string | null>(null);
 
   // Hostname shown in the shared header.
   const activeHost = (activeClient()?.serverUrl ?? serverUrl).replace(
@@ -112,11 +134,50 @@ export default function AuthFlow() {
   }, []);
 
   const finishAuthenticated = useCallback(async () => {
+    let outcome: LinkOutcome | null = null;
     try {
-      await finishSignIn();
-    } catch {}
+      outcome = await finishSignIn();
+    } catch (e) {
+      if (e instanceof SyncError && e.kind === "different_account") {
+        toast.error("Different user", e.message);
+        setStep("login");
+        return;
+      }
+      toast.warning(
+        "Signed in",
+        "Sync could not start yet. It will try again on its own.",
+      );
+    }
+    const accountId = accounts.active().id;
+    if (outcome?.synced) {
+      if (outcome.firstLink && (await thisDeviceHasData())) {
+        setMergeAccountId(accountId);
+        setStep("merge");
+        return;
+      }
+      void sync.firstSync(accountId, false);
+    }
     closeAuthFlow();
   }, [closeAuthFlow, finishSignIn]);
+
+  const chooseMerge = (merge: boolean) => {
+    if (mergeAccountId) void sync.firstSync(mergeAccountId, merge);
+    closeAuthFlow();
+  };
+
+  const openProxySettings = async () => {
+    const url = serverUrl.trim().replace(/\/$/, "");
+    if (!/^https?:\/\//.test(url)) {
+      toast.error("Enter the server address first");
+      return;
+    }
+    try {
+      await linkServer(url);
+      setProxyOpen(true);
+    } catch (e: any) {
+      toast.error(errMessage(e, "Could not set up that server"));
+    }
+  };
 
   // ── Step: server ────────────────────────────────────────────────────────
 
@@ -205,7 +266,10 @@ export default function AuthFlow() {
 
       const ok = await probeServer();
       if (!ok) {
-        toast.error("Could not reach that server");
+        toast.error(
+          "Could not reach that server",
+          "If a proxy sits in front of it, set it up under Proxy settings.",
+        );
       }
     } catch (e: any) {
       toast.error(errMessage(e, "Could not reach that server"));
@@ -261,6 +325,21 @@ export default function AuthFlow() {
     // so padding on an ancestor makes it under-shoot by exactly that amount and
     // the keyboard ends up covering the fields.
     <View className="flex-1 bg-background">
+      <InlineView
+        open={proxyOpen}
+        onClose={() => setProxyOpen(false)}
+        title="Proxy settings"
+        subtitle={activeHost}
+      >
+        <View className="p-4">
+          {activeClient() ? (
+            <ProxySettings
+              key={activeClient()!.accountId}
+              client={activeClient()!}
+            />
+          ) : null}
+        </View>
+      </InlineView>
       {step === "oidc" ? (
         <View
           className="flex-1"
@@ -269,6 +348,7 @@ export default function AuthFlow() {
           <OidcStep
             bg={bg}
             accent={accent}
+            mode={oidcMode}
             onBack={() =>
               // If there's a usable native login step, return to it; otherwise
               // (pure reverse-proxy case) go back to the server step.
@@ -299,7 +379,7 @@ export default function AuthFlow() {
             className="flex-row items-center justify-between border-b border-border px-4 pb-3"
             style={{ paddingTop: insets.top + 12 }}
           >
-            {step !== "server" ? (
+            {step !== "server" && step !== "merge" ? (
               <TouchableOpacity
                 onPress={goToServer}
                 className="flex-row items-center gap-1.5 py-1 pr-2"
@@ -365,6 +445,7 @@ export default function AuthFlow() {
                   setServerUrl={setServerUrl}
                   busy={busy}
                   onConnect={handleConnect}
+                  onProxy={() => void openProxySettings()}
                   color={color}
                 />
               )}
@@ -380,7 +461,14 @@ export default function AuthFlow() {
                   onAuthenticated={finishAuthenticated}
                   onForgot={() => setStep("reset")}
                   onSignup={() => setStep("signup")}
-                  onOidc={() => setStep("oidc")}
+                  onOidc={() => {
+                    setOidcMode("sso");
+                    setStep("oidc");
+                  }}
+                  onBrowser={() => {
+                    setOidcMode("browser");
+                    setStep("oidc");
+                  }}
                 />
               )}
 
@@ -392,6 +480,10 @@ export default function AuthFlow() {
                     Connecting…
                   </Text>
                 </View>
+              )}
+
+              {step === "merge" && (
+                <MergeStep color={color} onChoose={chooseMerge} />
               )}
 
               {step === "totp" && (
@@ -454,12 +546,14 @@ function ServerStep({
   setServerUrl,
   busy,
   onConnect,
+  onProxy,
   color,
 }: {
   serverUrl: string;
   setServerUrl: (v: string) => void;
   busy: boolean;
   onConnect: () => void;
+  onProxy: () => void;
   color: ReturnType<typeof useThemeColor>;
 }) {
   return (
@@ -492,6 +586,18 @@ function ServerStep({
           onPress={onConnect}
         >
           {busy ? "Connecting…" : "Continue"}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="mt-2"
+          onPress={onProxy}
+          disabled={busy}
+          icon={
+            <SlidersHorizontal size={14} color={color("muted-foreground")} />
+          }
+        >
+          Proxy settings
         </Button>
       </View>
 
@@ -560,6 +666,7 @@ function LoginStep({
   onForgot,
   onSignup,
   onOidc,
+  onBrowser,
 }: {
   caps: ServerCaps;
   color: ReturnType<typeof useThemeColor>;
@@ -568,6 +675,7 @@ function LoginStep({
   onForgot: () => void;
   onSignup: () => void;
   onOidc: () => void;
+  onBrowser: () => void;
 }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -684,6 +792,19 @@ function LoginStep({
           </Button>
         </>
       ) : null}
+
+      <Button
+        variant="ghost"
+        size="lg"
+        className="mt-3"
+        onPress={onBrowser}
+        icon={<Fingerprint size={16} color={color("foreground")} />}
+      >
+        Sign in in the browser
+      </Button>
+      <Text className="mt-1 text-center text-[10px] text-muted-foreground">
+        For passkeys and security keys. Needs Termix 26.10.6 or newer.
+      </Text>
 
       {!showPasswordCard && !caps.oidcAvailable ? (
         <View className="mt-3 border border-destructive/40 bg-card p-4">
@@ -1071,12 +1192,14 @@ const OIDC_CALLBACK_URL = "termix-mobile://oidc-callback";
 function OidcStep({
   bg,
   accent,
+  mode,
   onBack,
   onAuthenticated,
   onSecondFactor,
 }: {
   bg: string;
   accent: string;
+  mode: "sso" | "browser";
   onBack: () => void;
   onAuthenticated: () => void;
   onSecondFactor: (tempToken: string) => void;
@@ -1098,6 +1221,7 @@ function OidcStep({
   // pass a useState check before the first re-render. Refs prevent that.
   const authStartedRef = useRef(false);
   const browserOpenedRef = useRef(false);
+  const usedWebViewRef = useRef(false);
   // Set when a reset (logout/change-server) asked for a fresh sign-in. Drives an
   // ephemeral system-browser auth session (no shared Safari cookies) and an
   // incognito embedded WebView, so the proxy/IdP login is shown instead of
@@ -1116,6 +1240,14 @@ function OidcStep({
           toast.error("Failed to save the sign in token");
           authStartedRef.current = false;
           return;
+        }
+        // A proxy in front of the server let the web view through with its
+        // own cookies; keep them so the app's requests get through too.
+        if (usedWebViewRef.current) {
+          const cookies = await readWebCookies(client.rootBase()).catch(
+            () => [],
+          );
+          if (cookies.length) await client.setProxyCookies(cookies);
         }
 
         // Confirm the token, tolerating transient gateway hiccups (502 / brief
@@ -1315,6 +1447,21 @@ function OidcStep({
       const useEmbeddedForFresh =
         (fresh && Platform.OS === "android") || FORCE_WEBVIEW_LOGIN;
 
+      // The server's own login page in the system browser, for every sign in
+      // method. It sends the token back to the app (Termix 26.10.6+). Always a
+      // fresh browser session, so it never reuses the browser's own login.
+      if (mode === "browser") {
+        const root = activeClient()?.rootBase();
+        if (root) {
+          freshSessionRef.current = true;
+          const loginUrl = `${root}/?return_to=${encodeURIComponent(OIDC_CALLBACK_URL)}`;
+          setBrowserAuthUrl(loginUrl);
+          setUrl(loginUrl);
+          await openBrowser(loginUrl);
+          return;
+        }
+      }
+
       if (!useEmbeddedForFresh) {
         const callbackUrl = OIDC_CALLBACK_URL;
         try {
@@ -1333,6 +1480,7 @@ function OidcStep({
 
       const fallbackUrl = activeClient()?.serverUrl;
       if (fallbackUrl) {
+        usedWebViewRef.current = true;
         setSource({ uri: fallbackUrl });
         setUrl(fallbackUrl);
       }
@@ -1601,6 +1749,40 @@ function OidcStep({
           <ActivityIndicator size="large" color={accent} />
         </View>
       )}
+    </View>
+  );
+}
+
+function MergeStep({
+  color,
+  onChoose,
+}: {
+  color: ReturnType<typeof useThemeColor>;
+  onChoose: (merge: boolean) => void;
+}) {
+  return (
+    <View className="w-full max-w-md border border-border bg-card">
+      <View className="p-5 pb-3">
+        <Text weight="medium" className="text-base text-foreground">
+          {"Bring this phone's hosts along?"}
+        </Text>
+        <Text className="mt-1 text-xs leading-5 text-muted-foreground">
+          This device has hosts, logins or snippets. This device keeps them
+          either way.
+        </Text>
+      </View>
+      <SheetRow
+        icon={<Merge size={18} color={color("foreground")} />}
+        label="Merge"
+        description="Copy them to this server too. Ones that look the same are skipped."
+        onPress={() => onChoose(true)}
+      />
+      <SheetRow
+        icon={<Smartphone size={18} color={color("foreground")} />}
+        label="Replace"
+        description="Use only what is on the server for this account."
+        onPress={() => onChoose(false)}
+      />
     </View>
   );
 }
