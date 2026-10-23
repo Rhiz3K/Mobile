@@ -18,6 +18,7 @@ import {
   useActiveAccount,
   type ServerAccount,
 } from "@/core/accounts";
+import { moveLegacyData } from "@/core/db/legacy-move";
 import type { AccountClient } from "@/core/api/AccountClient";
 import { getLatestGitHubRelease, isNewerVersion } from "@/core/updates";
 
@@ -182,6 +183,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       try {
         setIsLoading(true);
         await accounts.init();
+        await moveLegacyData({
+          accountIds: accounts.list().map((a) => a.id),
+        }).catch(() => {});
 
         setShowUpdateScreen(await checkShouldShowUpdateScreen());
 

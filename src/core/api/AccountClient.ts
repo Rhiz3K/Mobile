@@ -49,7 +49,13 @@ export interface AccountClientOptions {
   storage: AccountStorage;
 }
 
-const SECRET_KEYS = ["session", "customHeaders", "basicAuth", "clientCert"];
+/** Every secret an account keeps in SecureStore. */
+export const SECRET_KEYS = [
+  "session",
+  "customHeaders",
+  "basicAuth",
+  "clientCert",
+];
 const DATA_KEYS = ["apiGeneration", "enabledPlugins"];
 
 /**
