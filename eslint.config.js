@@ -26,7 +26,8 @@ module.exports = defineConfig([
     },
   },
   {
-    // React Compiler rules from eslint-config-expo 57. The app doesn't use the compiler yet.
+    // React Compiler rules from eslint-config-expo 57. The compiler skips components that
+    // break them, so they warn until those components are cleaned up.
     rules: {
       "react-hooks/set-state-in-effect": "warn",
       "react-hooks/refs": "warn",
