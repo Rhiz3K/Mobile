@@ -9,29 +9,8 @@ import {
 import { TerminalHandle } from "@/features/terminal/Terminal";
 import { showToast } from "@/utils/toast";
 import { useUiColors } from "@/contexts/ThemeContext";
-import { useSessionClient } from "@/core/accounts/session";
-
-interface Snippet {
-  id: number;
-  name: string;
-  content: string;
-  description?: string | null;
-  folder: string | null;
-  order: number;
-  userId: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface SnippetFolder {
-  id: number;
-  name: string;
-  color: string | null;
-  icon: string | null;
-  userId: string;
-  createdAt: string;
-  updatedAt: string;
-}
+import { useSessionRepositories } from "@/core/data/hooks";
+import type { Snippet, SnippetFolder } from "@/types";
 
 interface SnippetsBarProps {
   terminalRef: React.RefObject<TerminalHandle | null>;
@@ -44,7 +23,7 @@ export default function SnippetsBar({
   terminalRef,
   isVisible,
 }: SnippetsBarProps) {
-  const client = useSessionClient();
+  const repos = useSessionRepositories();
   const ui = useUiColors();
   const [snippets, setSnippets] = useState<Snippet[]>([]);
   const [folders, setFolders] = useState<SnippetFolder[]>([]);
@@ -61,13 +40,15 @@ export default function SnippetsBar({
     try {
       setLoading(true);
       const [snippetsData, foldersData] = await Promise.all([
-        client.api.snippets.getSnippets().catch(() => []),
-        client.api.snippets.getSnippetFolders().catch(() => []),
+        repos.snippets.list().catch(() => []),
+        repos.snippetFolders.list().catch(() => []),
       ]);
       const snippetsArray = Array.isArray(snippetsData) ? snippetsData : [];
       const foldersArray = Array.isArray(foldersData) ? foldersData : [];
       setSnippets(
-        snippetsArray.sort((a: Snippet, b: Snippet) => a.order - b.order),
+        snippetsArray.sort(
+          (a: Snippet, b: Snippet) => (a.order ?? 0) - (b.order ?? 0),
+        ),
       );
       setFolders(foldersArray);
     } catch {

@@ -8,6 +8,7 @@ import { toast } from "@/utils/toast";
 import { systemLogger } from "@/core/log/logger";
 import type { SSHHost, Snippet } from "@/types";
 import { api } from "@/core/accounts";
+import { useRepositories } from "@/core/data/hooks";
 
 /** Remembers the host a widget-run snippet last targeted. */
 const LAST_HOST_KEY = "widgetSnippetLastHostId";
@@ -29,6 +30,7 @@ interface RunSnippetSheetProps {
  */
 export function RunSnippetSheet({ snippet, onClose }: RunSnippetSheetProps) {
   const color = useThemeColor();
+  const repos = useRepositories();
 
   const [hosts, setHosts] = useState<SSHHost[]>([]);
   const [loading, setLoading] = useState(false);
@@ -46,7 +48,7 @@ export function RunSnippetSheet({ snippet, onClose }: RunSnippetSheetProps) {
     (async () => {
       try {
         const [list, storedHostId] = await Promise.all([
-          api().hosts.getSSHHosts(),
+          repos.hosts.list(),
           AsyncStorage.getItem(LAST_HOST_KEY).catch(() => null),
         ]);
         if (cancelled) return;
@@ -70,7 +72,7 @@ export function RunSnippetSheet({ snippet, onClose }: RunSnippetSheetProps) {
     return () => {
       cancelled = true;
     };
-  }, [visible]);
+  }, [visible, repos]);
 
   const run = useCallback(
     async (host: SSHHost) => {

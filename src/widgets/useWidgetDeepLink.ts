@@ -26,7 +26,7 @@ import { systemLogger } from "@/core/log/logger";
 import { toast } from "@/utils/toast";
 import type { Snippet } from "@/types";
 import { WIDGET_LINK_PREFIX } from "./types";
-import { api } from "@/core/accounts";
+import { useRepositories } from "@/core/data/hooks";
 
 /** Session types a widget link is allowed to open. */
 const ALLOWED_SESSION_TYPES: SessionType[] = [
@@ -91,6 +91,9 @@ export function useWidgetDeepLink(): {
 } {
   const { isAuthenticated } = useAppContext();
   const { navigateToSessions } = useTerminalSessions();
+  const repos = useRepositories();
+  const reposRef = useRef(repos);
+  reposRef.current = repos;
 
   // router.push is a no-op until the root navigator has mounted, which is not
   // the case yet on a cold start from a widget tap. Links are parked until this
@@ -127,10 +130,7 @@ export function useWidgetDeepLink(): {
    */
   const runSnippetLink = useCallback(async (snippetId: number) => {
     try {
-      const snippets = await api().snippets.getSnippets();
-      const snippet = Array.isArray(snippets)
-        ? snippets.find((candidate: Snippet) => candidate.id === snippetId)
-        : undefined;
+      const snippet = await reposRef.current.snippets.get(snippetId);
 
       if (!snippet) {
         toast.error("That snippet no longer exists.");
@@ -173,10 +173,8 @@ export function useWidgetDeepLink(): {
       }
 
       try {
-        const hosts = await api().hosts.getSSHHosts();
-        const host = Array.isArray(hosts)
-          ? hosts.find((candidate) => candidate.id === link.hostId)
-          : undefined;
+        const hosts = await reposRef.current.hosts.list();
+        const host = hosts.find((candidate) => candidate.id === link.hostId);
 
         if (!host) {
           toast.error("That host no longer exists.");

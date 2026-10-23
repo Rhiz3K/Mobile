@@ -20,7 +20,7 @@ import { useThemeColor } from "@/contexts/ThemeContext";
 import { Screen } from "@/components/Screen";
 import { Text, Button, Input, Label, Sheet, SheetBody, EmptyState } from "@/ui";
 import { toast } from "@/utils/toast";
-import { api } from "@/core/accounts";
+import { useRepositories } from "@/core/data/hooks";
 
 type SnippetFormData = {
   name: string;
@@ -31,6 +31,7 @@ type SnippetFormData = {
 
 export default function Snippets() {
   const color = useThemeColor();
+  const repos = useRepositories();
   const router = useRouter();
 
   const [snippets, setSnippets] = useState<Snippet[]>([]);
@@ -77,12 +78,8 @@ export default function Snippets() {
   const load = useCallback(async () => {
     try {
       const [s, f] = await Promise.all([
-        api()
-          .snippets.getSnippets()
-          .catch(() => []),
-        api()
-          .snippets.getSnippetFolders()
-          .catch(() => []),
+        repos.snippets.list().catch(() => []),
+        repos.snippetFolders.list().catch(() => []),
       ]);
       const ordered = Array.isArray(s)
         ? s.sort((a: Snippet, b: Snippet) => (a.order ?? 0) - (b.order ?? 0))
@@ -94,11 +91,17 @@ export default function Snippets() {
     } catch {
       toast.error("Failed to load snippets");
     }
-  }, []);
+  }, [repos]);
 
   useEffect(() => {
     load().finally(() => setLoading(false));
-  }, [load]);
+    const reload = () => void load();
+    const stops = [
+      repos.snippets.subscribe(reload),
+      repos.snippetFolders.subscribe(reload),
+    ];
+    return () => stops.forEach((stop) => stop());
+  }, [load, repos]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -161,10 +164,10 @@ export default function Snippets() {
         folder: form.folder.trim() || undefined,
       };
       if (editingSnippet) {
-        await api().snippets.updateSnippet(editingSnippet.id, payload);
+        await repos.snippets.update(editingSnippet.id, payload);
         toast.success("Snippet updated");
       } else {
-        await api().snippets.createSnippet(payload);
+        await repos.snippets.create(payload);
         toast.success("Snippet created");
       }
       await load();
@@ -180,7 +183,7 @@ export default function Snippets() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      await api().snippets.deleteSnippet(deleteTarget.id);
+      await repos.snippets.remove(deleteTarget.id);
       toast.success("Snippet deleted");
       setDeleteTarget(null);
       await load();
@@ -198,7 +201,7 @@ export default function Snippets() {
     }
     setCreatingFolder(true);
     try {
-      await api().snippets.createSnippetFolder({ name: folderName.trim() });
+      await repos.snippetFolders.create({ name: folderName.trim() });
       toast.success("Folder created");
       setFolderDialog(false);
       setFolderName("");
@@ -214,7 +217,7 @@ export default function Snippets() {
     if (!deleteFolderTarget) return;
     setDeletingFolder(true);
     try {
-      await api().snippets.deleteSnippetFolder(deleteFolderTarget.name);
+      await repos.snippetFolders.remove(deleteFolderTarget.name);
       toast.success("Folder deleted");
       setDeleteFolderTarget(null);
       await load();
@@ -236,7 +239,7 @@ export default function Snippets() {
     }
     setRenamingFolder(true);
     try {
-      await api().snippets.renameSnippetFolder(oldName, newName);
+      await repos.snippetFolders.rename(oldName, newName);
       setRenameFolderTarget(null);
       setRenameFolderName("");
       await load();
@@ -269,7 +272,7 @@ export default function Snippets() {
     );
 
     try {
-      await api().snippets.reorderSnippets(
+      await repos.snippets.reorder(
         reordered.map((sn, i) => ({
           id: sn.id,
           order: i,

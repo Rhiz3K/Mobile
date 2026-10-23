@@ -46,6 +46,7 @@ import {
 } from "@/screens/sessions/shared/useConnectionLog";
 import { useUiColors } from "@/contexts/ThemeContext";
 import { useSessionClient } from "@/core/accounts/session";
+import { useSessionRepositories } from "@/core/data/hooks";
 
 interface TerminalProps {
   hostConfig: {
@@ -94,6 +95,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
     ref,
   ) => {
     const client = useSessionClient();
+    const repos = useSessionRepositories();
     const transport = useSessionTransport();
     const ui = useUiColors();
     const webViewRef = useRef<WebView>(null);
@@ -1161,7 +1163,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
             100 * (terminalConfig.environmentVariables?.length || 0) + 200;
           setTimeout(async () => {
             try {
-              const snippets = await client.api.snippets.getSnippets();
+              const snippets = await repos.snippets.list();
               const snippet = snippets.find(
                 (s: any) => s.id === terminalConfig.startupSnippetId,
               );

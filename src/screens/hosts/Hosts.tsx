@@ -64,6 +64,7 @@ import {
   filtersActive,
 } from "@/screens/hosts/navigation/hostTree";
 import { api, activeClient } from "@/core/accounts";
+import { useRepositories } from "@/core/data/hooks";
 
 const SORT_OPTIONS: { id: SortKey; label: string }[] = [
   { id: "default", label: "Default" },
@@ -117,6 +118,7 @@ export default function Hosts() {
     [],
   );
   const router = useRouter();
+  const repos = useRepositories();
   const [hosts, setHosts] = useState<SSHHost[]>([]);
   const [folderColors, setFolderColors] = useState<
     Record<string, string | undefined>
@@ -189,6 +191,7 @@ export default function Hosts() {
   // list always renders.
   const fetchMetrics = useCallback(
     async (hostList: SSHHost[], statuses: Record<number, ServerStatus>) => {
+      if (!activeClient()) return;
       const onlineIds = hostList
         .filter((h) => statuses[h.id]?.status === "online")
         .map((h) => h.id);
@@ -199,7 +202,9 @@ export default function Hosts() {
         return;
       }
       const results = await Promise.allSettled(
-        onlineIds.map((id) => api().metrics.getServerMetricsById(id)),
+        onlineIds.map((id) =>
+          activeClient()!.api.metrics.getServerMetricsById(id),
+        ),
       );
       setMetrics((previous) => {
         const next: Record<number, HostMetrics> = {};
@@ -222,24 +227,24 @@ export default function Hosts() {
     [],
   );
 
+  // "quiet" reloads after a change without showing a spinner.
   const fetchData = useCallback(
-    async (isRefresh = false) => {
+    async (mode: boolean | "quiet" = false) => {
       if (isRefreshingRef.current) return;
       try {
         isRefreshingRef.current = true;
-        if (isRefresh) setRefreshing(true);
-        else setLoading(true);
+        if (mode === true) setRefreshing(true);
+        else if (mode !== "quiet") setLoading(true);
 
-        if (!activeClient()) {
-          toast.error("No server configured. Set one up in Settings.");
-          return;
-        }
-
+        // Live status and metrics come from a linked server only.
+        const client = activeClient();
         const [hostsResult, statusesResult, snippetsResult] =
           await Promise.allSettled([
-            api().hosts.getSSHHosts(),
-            api().metrics.getAllServerStatuses(),
-            api().snippets.getSnippets(),
+            repos.hosts.list(),
+            client
+              ? client.api.metrics.getAllServerStatuses()
+              : Promise.resolve({}),
+            repos.snippets.list(),
           ]);
 
         if (hostsResult.status !== "fulfilled") throw hostsResult.reason;
@@ -253,17 +258,13 @@ export default function Hosts() {
         const statuses =
           statusesResult.status === "fulfilled" ? statusesResult.value : {};
 
-        let foldersData: any = null;
+        const colors: Record<string, string | undefined> = {};
         try {
-          foldersData = await api().folders.getFoldersWithStats();
+          (await repos.hostFolders.list()).forEach((f) => {
+            colors[f.name] = f.color;
+          });
         } catch {
           // folders are optional
-        }
-        const colors: Record<string, string | undefined> = {};
-        if (Array.isArray(foldersData)) {
-          foldersData.forEach((f: any) => {
-            if (f?.name) colors[f.name] = f.color;
-          });
         }
 
         setHosts(hostList);
@@ -282,6 +283,7 @@ export default function Hosts() {
       } catch (error: any) {
         const isAuth =
           error?.response?.status === 401 ||
+          error?.code === "APP_LOCKED" ||
           error?.message?.includes("Authentication required");
         if (!isAuth) {
           toast.error(error?.message || "Failed to load hosts.");
@@ -292,8 +294,19 @@ export default function Hosts() {
         isRefreshingRef.current = false;
       }
     },
-    [fetchMetrics],
+    [fetchMetrics, repos],
   );
+
+  // Lists follow the store: sync and other screens write, this reloads.
+  useEffect(() => {
+    const reload = () => void fetchData("quiet");
+    const stops = [
+      repos.hosts.subscribe(reload),
+      repos.hostFolders.subscribe(reload),
+      repos.snippets.subscribe(reload),
+    ];
+    return () => stops.forEach((stop) => stop());
+  }, [repos, fetchData]);
 
   const handleRefresh = useCallback(() => {
     if (!isRefreshingRef.current) {
@@ -304,8 +317,13 @@ export default function Hosts() {
 
   // Server-side notices (maintenance, warnings) shown until dismissed.
   const loadAlerts = useCallback(async () => {
+    const client = activeClient();
+    if (!client) {
+      setAlerts([]);
+      return;
+    }
     try {
-      const res = await api().alerts.getUserAlerts();
+      const res = await client.api.alerts.getUserAlerts();
       setAlerts(Array.isArray(res?.alerts) ? res.alerts : []);
     } catch {
       setAlerts([]);
@@ -451,9 +469,8 @@ export default function Hosts() {
 
   const handleDelete = async (host: SSHHost) => {
     try {
-      await api().hosts.deleteSSHHost(host.id);
+      await repos.hosts.remove(host.id);
       toast.success(`Deleted ${host.name}`);
-      fetchData(true);
     } catch (e: any) {
       toast.error(e?.message || "Failed to delete host");
     }
@@ -461,7 +478,7 @@ export default function Hosts() {
 
   const handleClone = async (host: SSHHost) => {
     try {
-      await api().hosts.createSSHHost({
+      await repos.hosts.create({
         name: `${host.name} (copy)`,
         ip: host.ip,
         port: host.port,
@@ -471,6 +488,7 @@ export default function Hosts() {
         pin: false,
         authType: host.authType,
         password: host.password,
+        key: host.key,
         keyPassword: host.keyPassword,
         keyType: host.keyType,
         credentialId: host.credentialId ?? null,
@@ -502,7 +520,6 @@ export default function Hosts() {
         terminalConfig: host.terminalConfig,
       } as any);
       toast.success(`Cloned ${host.name}`);
-      fetchData(true);
     } catch (e: any) {
       toast.error(e?.message || "Failed to clone host");
     }
@@ -547,10 +564,7 @@ export default function Hosts() {
             host={formHost}
             draft={formDraft}
             onClose={() => setFormOpen(false)}
-            onSaved={() => {
-              setFormOpen(false);
-              fetchData(true);
-            }}
+            onSaved={() => setFormOpen(false)}
           />
           {/* Credential manager */}
           <CredentialListModal

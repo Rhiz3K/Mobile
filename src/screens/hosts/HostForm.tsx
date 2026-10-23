@@ -18,7 +18,7 @@ import { useCapability, useHostToggles } from "@/core/features";
 import { toast } from "@/utils/toast";
 import { TailscaleDevicePicker } from "@/features/tailscale/TailscaleDevices";
 import { tailnetAddress } from "@/features/tailscale/tailscale";
-import { api } from "@/core/accounts";
+import { useRepositories } from "@/core/data/hooks";
 
 type AuthType = "password" | "key" | "credential" | "none" | "tailscale";
 // Feature tabs (tunnels, rdp, ...) come from registered host switches.
@@ -131,24 +131,22 @@ export default function HostForm({
   // device can replace it without overwriting a name the user typed.
   const autoNameRef = useRef("");
 
+  const repos = useRepositories();
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
 
   // Load credentials list for the credential picker.
   useEffect(() => {
     if (!visible) return;
-    api()
-      .credentials.getCredentials()
-      .then((res) => {
-        const list = Array.isArray(res) ? res : (res?.credentials ?? []);
-        setCredentials(list);
-      })
+    repos.credentials
+      .list()
+      .then(setCredentials)
       .catch(() => {});
-    api()
-      .hosts.getSSHHosts()
+    repos.hosts
+      .list()
       .then(setAllHosts)
       .catch(() => {});
-  }, [visible]);
+  }, [visible, repos]);
 
   // Populate the form when opening (prefill secrets on edit) and reset the tab.
   useEffect(() => {
@@ -197,8 +195,8 @@ export default function HostForm({
     });
     if (!host) return;
     let cancelled = false;
-    api()
-      .credentials.getSSHHostWithCredentials(host.id)
+    repos.hosts
+      .get(host.id)
       .then((full) => {
         if (!full || cancelled) return;
         setForm((f) => ({
@@ -215,7 +213,7 @@ export default function HostForm({
     return () => {
       cancelled = true;
     };
-  }, [visible, host, draft]);
+  }, [visible, host, draft, repos]);
 
   // The tab strip: General is always present; feature tabs follow their switch.
   const tabs = useMemo<{ id: TabId; label: string }[]>(() => {
@@ -381,10 +379,10 @@ export default function HostForm({
     setSaving(true);
     try {
       if (isEdit && host) {
-        await api().hosts.updateSSHHost(host.id, payload);
+        await repos.hosts.update(host.id, payload);
         toast.success("Host updated");
       } else {
-        await api().hosts.createSSHHost(payload);
+        await repos.hosts.create(payload);
         toast.success("Host created");
       }
       onSaved();

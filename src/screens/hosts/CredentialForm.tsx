@@ -17,6 +17,7 @@ import { useThemeColor } from "@/contexts/ThemeContext";
 import { useCapability } from "@/core/features";
 import { toast } from "@/utils/toast";
 import { api } from "@/core/accounts";
+import { useRepositories } from "@/core/data/hooks";
 
 type TabId = "general" | "auth";
 type GeneratingKey = "ed25519" | "ecdsa" | "rsa" | null;
@@ -66,6 +67,7 @@ export default function CredentialForm({
   onSaved: () => void;
 }) {
   const color = useThemeColor();
+  const repos = useRepositories();
   const hasKeyTools = useCapability("credentials.keyTools");
   const [form, setForm] = useState<CredentialFormState>(EMPTY);
   const [saving, setSaving] = useState(false);
@@ -98,8 +100,8 @@ export default function CredentialForm({
       username: credential.username ?? "",
       publicKey: credential.publicKey ?? "",
     });
-    api()
-      .credentials.getCredentialDetails(credential.id)
+    repos.credentials
+      .get(credential.id)
       .then((details: any) => {
         if (!details) return;
         setForm((f) => ({
@@ -114,7 +116,7 @@ export default function CredentialForm({
         setKeyExistsOnServer(hasKey);
       })
       .catch(() => {});
-  }, [visible, credential]);
+  }, [visible, credential, repos]);
 
   const pickPrivateKeyFile = async () => {
     try {
@@ -225,10 +227,10 @@ export default function CredentialForm({
     setSaving(true);
     try {
       if (isEdit && credential) {
-        await api().credentials.updateCredential(credential.id, payload);
+        await repos.credentials.update(credential.id, payload);
         toast.success("Credential updated");
       } else {
-        await api().credentials.createCredential(payload);
+        await repos.credentials.create(payload);
         toast.success("Credential created");
       }
       onSaved();

@@ -29,7 +29,7 @@ import {
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { toast } from "@/utils/toast";
 import CredentialForm from "@/screens/hosts/CredentialForm";
-import { api } from "@/core/accounts";
+import { useRepositories } from "@/core/data/hooks";
 
 export default function CredentialListModal({
   visible,
@@ -39,6 +39,7 @@ export default function CredentialListModal({
   onClose: () => void;
 }) {
   const color = useThemeColor();
+  const repos = useRepositories();
 
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [loading, setLoading] = useState(false);
@@ -56,11 +57,7 @@ export default function CredentialListModal({
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     try {
-      const res = await api().credentials.getCredentials();
-      const list: Credential[] = Array.isArray(res)
-        ? res
-        : (res?.credentials ?? []);
-      setCredentials(list);
+      setCredentials(await repos.credentials.list());
     } catch (e: any) {
       toast.error(e?.message || "Failed to load credentials");
     } finally {
@@ -73,7 +70,12 @@ export default function CredentialListModal({
     if (!visible) return;
     setSearchQuery("");
     load();
-  }, [visible]);
+    // Reload when logins change (a save here, or a sync).
+    return repos.credentials.subscribe(() => {
+      void load(true);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, repos]);
 
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -101,10 +103,9 @@ export default function CredentialListModal({
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      await api().credentials.deleteCredential(deleteTarget.id);
+      await repos.credentials.remove(deleteTarget.id);
       toast.success(`Deleted "${deleteTarget.name}"`);
       setDeleteTarget(null);
-      load(true);
     } catch (e: any) {
       toast.error(e?.message || "Failed to delete credential");
     } finally {
