@@ -29,14 +29,30 @@ This starts the Expo development server. Open it in Expo Go or a development bui
 
 ## Theme and icons
 
-Theme colors in `src/constants/theme.ts` are copied from the [Classic Themes](https://github.com/Termix-SSH/Plugin-Classic-Themes) plugin. Change them there first, then here. `npm run verify:theme` checks the set is complete.
+Theme colors in `src/constants/theme.ts` are copied from the [Classic Themes](https://github.com/Termix-SSH/Plugin-Classic-Themes) plugin. Change them there first, then here. `npm test` checks the set is complete.
 
 Every app icon, splash and status bar icon is built from `assets/brand/logo.svg`. After changing the logo or `scripts/icon-spec.cjs`, run:
 
 ```sh
 npm run icons
-npm run verify:app-icons
+npm test
 ```
+
+## Project layout
+
+- `app/` holds routes only. Each route file imports a screen from `src/`.
+- `src/core/` is the shared base: accounts, the API client per server, transports, the feature registry, storage and logging.
+- `src/features/` holds one folder per feature. Each has a `register.tsx` that adds its tabs, host actions and settings to the registry. Screens read the registry and never check a feature by name.
+- `src/screens/`, `src/ui/`, `src/contexts/` hold the app screens, UI parts and providers.
+- `tests/` mirrors `src/` and runs with Jest.
+
+## Checks
+
+```sh
+npm run verify
+```
+
+This runs the type check, lint, format check and tests. `npm test` runs only the tests.
 
 ## Making a change
 

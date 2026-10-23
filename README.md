@@ -42,6 +42,7 @@ Try Termix at [demo.termix.site](https://demo.termix.site/). Any username and pa
 - Remote desktop: RDP, VNC and Telnet.
 - Home screen widgets on iOS and Android: open a host, run a snippet or check metrics without opening the app.
 - Hosts: folders, saved credentials and keys, Quick Connect and Wake-on-LAN.
+- Accounts: link more than one Termix server and switch between them. Open tabs keep running.
 - Settings: terminal look, keyboard, API keys, active sessions, two-factor, password and account deletion.
 - App lock: Face ID, Touch ID or fingerprint, with a PIN as backup.
 

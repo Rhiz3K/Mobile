@@ -7,9 +7,12 @@
 - Add hosts from your Tailscale device list when the Tailscale plugin is on
 - Answer the Tailscale SSH check from the terminal
 - Themed app icon on Android 13 and newer
+- Link more than one Termix server and switch between them from Settings or the Hosts screen
+- Open tabs keep running when you switch to another server
 
 ### Changed
 
+- Your server sign in is now kept in the phone's secure storage
 - Theme colors now match Termix on the web and desktop exactly
 - The terminal, keyboard bar and tab bar follow the chosen theme instead of always being dark
 - The theme picker shows the same swatches as Termix
