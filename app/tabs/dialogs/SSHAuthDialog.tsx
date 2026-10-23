@@ -1,13 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { View, Platform } from "react-native";
 import { Lock } from "lucide-react-native";
-import {
-  Dialog,
-  Input,
-  Button,
-  Text,
-  SegmentedControl,
-} from "@/app/components/ui";
+import { Dialog, Input, Button, Text, Tabs } from "@/app/components/ui";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
 
 interface SSHAuthDialogProps {
@@ -89,11 +83,11 @@ export function SSHAuthDialog({
       description={hostLabel}
       footer={
         <View className="flex-1 flex-row gap-2">
-          <Button variant="outline" className="flex-1" onPress={onCancel}>
+          <Button variant="muted" className="flex-1" onPress={onCancel}>
             Cancel
           </Button>
           <Button
-            variant="accent"
+            variant="default"
             className="flex-1"
             onPress={handleSubmit}
             disabled={!isValid}
@@ -107,7 +101,7 @@ export function SSHAuthDialog({
         <Text className={`text-xs ${bannerText}`}>{reasonText}</Text>
       </View>
 
-      <SegmentedControl<"password" | "key">
+      <Tabs<"password" | "key">
         options={[
           { id: "password", label: "Password" },
           { id: "key", label: "SSH Key" },

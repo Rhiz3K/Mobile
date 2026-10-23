@@ -20,11 +20,11 @@ export function SettingRow({
 }) {
   return (
     <View
-      className={`flex-row items-center justify-between gap-3 py-2.5 ${last ? "" : "border-b border-border"}`}
+      className={`min-h-11 flex-row items-center justify-between gap-3 py-2.5 ${last ? "" : "border-b border-border/40"}`}
     >
       <View className="min-w-0 flex-1">
         <View className="flex-row items-center gap-1.5">
-          <Text weight="medium" className="text-xs text-foreground">
+          <Text weight="medium" className="text-row text-foreground">
             {label}
           </Text>
           {badge ? (
@@ -39,7 +39,7 @@ export function SettingRow({
           ) : null}
         </View>
         {description ? (
-          <Text className="mt-0.5 text-[10px] text-muted-foreground">
+          <Text className="mt-0.5 text-meta text-muted-foreground">
             {description}
           </Text>
         ) : null}

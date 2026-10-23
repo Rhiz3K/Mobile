@@ -71,11 +71,11 @@ export function PermissionsDialog({
       description={fileName}
       footer={
         <View className="flex-row gap-2">
-          <Button variant="outline" className="flex-1" onPress={onClose}>
+          <Button variant="muted" className="flex-1" onPress={onClose}>
             Cancel
           </Button>
           <Button
-            variant="accent"
+            variant="default"
             className="flex-1"
             onPress={() => onApply(octal)}
           >{`Apply (${octal})`}</Button>

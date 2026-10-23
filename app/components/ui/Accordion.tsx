@@ -32,14 +32,14 @@ export function AccordionSection({
 
   return (
     <View
-      className={`overflow-hidden border border-border bg-card ${containerClassName}`}
+      className={`overflow-hidden border border-border bg-card ${containerClassName ?? ""}`}
     >
       <Pressable
         onPress={() => {
           if (isControlled) onToggle?.();
           else setInternalOpen((o) => !o);
         }}
-        className="flex-row items-center gap-2 px-3 py-3 active:bg-muted/40"
+        className="min-h-11 flex-row items-center gap-2 px-3 py-2.5 active:bg-muted/50"
       >
         {icon ? <View className="shrink-0">{icon}</View> : null}
         <Text

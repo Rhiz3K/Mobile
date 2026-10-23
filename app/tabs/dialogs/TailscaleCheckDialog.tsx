@@ -50,11 +50,11 @@ export function TailscaleCheckDialog({
       }
       footer={
         <View className="flex-1 flex-row flex-wrap gap-2">
-          <Button variant="outline" onPress={onCancel} className="flex-1">
+          <Button variant="muted" onPress={onCancel} className="flex-1">
             Cancel
           </Button>
           <Button
-            variant="outline"
+            variant="muted"
             onPress={handleCopy}
             disabled={!url}
             icon={<Copy size={13} color={color("accent-brand")} />}
@@ -63,7 +63,7 @@ export function TailscaleCheckDialog({
             Copy URL
           </Button>
           <Button
-            variant="accent"
+            variant="default"
             onPress={handleOpenBrowser}
             disabled={!url}
             icon={<ExternalLink size={13} color={color("accent-foreground")} />}

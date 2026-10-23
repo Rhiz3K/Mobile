@@ -23,6 +23,7 @@ import {
   KeyRound,
   FileText,
   Radar,
+  Server,
 } from "lucide-react-native";
 import HostTree from "@/app/tabs/hosts/navigation/Folder";
 import type { HostMetrics } from "@/app/tabs/hosts/navigation/Host";
@@ -57,6 +58,7 @@ import {
   BottomSheet,
   SheetRow,
   Checkbox,
+  EmptyState,
 } from "@/app/components/ui";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
 import { toast } from "@/app/utils/toast";
@@ -634,7 +636,7 @@ export default function Hosts() {
           }
         />
         <Button
-          variant="outline"
+          variant="muted"
           size="icon"
           accessibilityLabel="Filter hosts"
           onPress={() => setShowFilter(true)}
@@ -650,7 +652,7 @@ export default function Hosts() {
           }
         />
         <Button
-          variant="outline"
+          variant="muted"
           size="icon"
           accessibilityLabel="Sort hosts"
           onPress={() => setShowSort(true)}
@@ -717,23 +719,26 @@ export default function Hosts() {
           ))}
 
           {isEmpty ? (
-            <View className="items-center justify-center gap-3 py-16">
-              <Text className="text-center text-sm text-muted-foreground">
-                {q || isFilterActive
+            <EmptyState
+              icon={Server}
+              title={
+                q || isFilterActive
                   ? "No hosts match your search"
-                  : "No hosts yet"}
-              </Text>
-              {!q && !isFilterActive ? (
-                <Button
-                  variant="accent"
-                  size="sm"
-                  onPress={openCreate}
-                  icon={<Plus size={15} color={color("accent-brand")} />}
-                >
-                  Add host
-                </Button>
-              ) : null}
-            </View>
+                  : "No hosts yet"
+              }
+              action={
+                !q && !isFilterActive ? (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onPress={openCreate}
+                    icon={<Plus size={15} color={color("accent-brand")} />}
+                  >
+                    Add host
+                  </Button>
+                ) : undefined
+              }
+            />
           ) : (
             <HostTree
               nodes={visibleTree}

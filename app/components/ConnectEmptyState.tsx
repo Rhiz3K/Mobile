@@ -1,7 +1,6 @@
 import { View } from "react-native";
 import { ServerOff } from "lucide-react-native";
-import { Text, Button } from "@/app/components/ui";
-import { useThemeColor } from "@/app/contexts/ThemeContext";
+import { Button, EmptyState } from "@/app/components/ui";
 import { useAppContext } from "@/app/AppContext";
 
 /**
@@ -16,28 +15,26 @@ export function ConnectEmptyState({
   title?: string;
   message?: string;
 }) {
-  const color = useThemeColor();
   const { hasServerConfigured, openAuthFlow } = useAppContext();
 
   return (
-    <View className="flex-1 items-center justify-center px-8">
-      <View className="mb-5 h-16 w-16 items-center justify-center border border-border bg-card">
-        <ServerOff size={28} color={color("muted-foreground")} />
-      </View>
-      <Text weight="bold" className="text-center text-lg text-foreground">
-        {title}
-      </Text>
-      <Text className="mt-2 text-center text-sm leading-5 text-muted-foreground">
-        {message}
-      </Text>
-      <Button
-        variant="accent"
-        size="lg"
-        className="mt-6 w-full max-w-xs"
-        onPress={() => openAuthFlow(hasServerConfigured ? "login" : "server")}
-      >
-        {hasServerConfigured ? "Sign in" : "Add server"}
-      </Button>
+    <View className="flex-1 justify-center">
+      <EmptyState
+        icon={ServerOff}
+        title={title}
+        hint={message}
+        action={
+          <Button
+            size="lg"
+            className="min-w-48"
+            onPress={() =>
+              openAuthFlow(hasServerConfigured ? "login" : "server")
+            }
+          >
+            {hasServerConfigured ? "Sign in" : "Add server"}
+          </Button>
+        }
+      />
     </View>
   );
 }

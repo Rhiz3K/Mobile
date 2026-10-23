@@ -303,7 +303,7 @@ export default function Settings() {
             </View>
 
             <Button
-              variant="outline"
+              variant="muted"
               className="mt-1"
               onPress={handleChangeServer}
               icon={<ServerIcon size={15} color={color("foreground")} />}
@@ -320,7 +320,7 @@ export default function Settings() {
                 Sign out
               </Button>
             ) : serverUrl ? (
-              <Button variant="accent" onPress={() => openAuthFlow("login")}>
+              <Button variant="default" onPress={() => openAuthFlow("login")}>
                 Sign in
               </Button>
             ) : null}
@@ -739,7 +739,7 @@ export default function Settings() {
               Cancel
             </Button>
             <Button
-              variant="accent"
+              variant="default"
               size="sm"
               disabled={accountBusy || !oldPassword || !newPassword}
               onPress={submitPasswordChange}
@@ -815,7 +815,7 @@ export default function Settings() {
             <Button variant="ghost" size="sm" onPress={closePinDialog}>
               Cancel
             </Button>
-            <Button variant="accent" size="sm" onPress={advancePin}>
+            <Button variant="default" size="sm" onPress={advancePin}>
               {pinStep === "enter" ? "Next" : "Enable"}
             </Button>
           </>

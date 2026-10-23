@@ -81,7 +81,7 @@ export default function UnifiedDraggableList({
             ) : null}
           </View>
           {item.onAddPress ? (
-            <Button variant="accent" size="sm" onPress={item.onAddPress}>
+            <Button variant="default" size="sm" onPress={item.onAddPress}>
               {item.addButtonLabel ?? "+ Add"}
             </Button>
           ) : null}
@@ -126,7 +126,7 @@ export default function UnifiedDraggableList({
               Keys in this row
             </Text>
             {item.onAddPress ? (
-              <Button variant="accent" size="sm" onPress={item.onAddPress}>
+              <Button variant="default" size="sm" onPress={item.onAddPress}>
                 + Add Key
               </Button>
             ) : null}
@@ -138,7 +138,7 @@ export default function UnifiedDraggableList({
     if (item.type === "button") {
       return (
         <Button
-          variant={item.variant === "danger" ? "destructive" : "outline"}
+          variant={item.variant === "danger" ? "destructive" : "muted"}
           onPress={item.onPress}
           className="mb-3"
         >

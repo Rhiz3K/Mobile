@@ -1,25 +1,26 @@
-import { Pressable, View } from "react-native";
+import { Pressable } from "react-native";
 import Animated, {
   useAnimatedStyle,
   withTiming,
 } from "react-native-reanimated";
+import { Check } from "lucide-react-native";
+import { useThemeColor } from "@/app/contexts/ThemeContext";
 
-/**
- * FakeSwitch - pill toggle matching the web design (bg-accent-brand when on,
- * bg-muted when off). One of the few intentionally rounded elements.
- */
+/** Square toggle like core's switch: accent track when on, muted when off. */
 export function FakeSwitch({
   checked,
   onChange,
   disabled,
+  accessibilityLabel,
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
   disabled?: boolean;
+  accessibilityLabel?: string;
 }) {
   const thumbStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateX: withTiming(checked ? 16 : 2, { duration: 150 }) },
+      { translateX: withTiming(checked ? 16 : 0, { duration: 110 }) },
     ],
   }));
 
@@ -27,35 +28,42 @@ export function FakeSwitch({
     <Pressable
       disabled={disabled}
       onPress={() => onChange(!checked)}
-      hitSlop={8}
-      className={`h-5 w-9 justify-center rounded-full ${checked ? "bg-accent-brand" : "bg-muted"} ${disabled ? "opacity-50" : ""}`}
+      hitSlop={12}
+      accessibilityRole="switch"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ checked, disabled: !!disabled }}
+      className={`h-5 w-9 justify-center border-2 ${checked ? "border-accent-brand bg-accent-brand" : "border-border bg-muted"} ${disabled ? "opacity-50" : ""}`}
     >
-      <Animated.View
-        style={thumbStyle}
-        className="h-4 w-4 rounded-full bg-white"
-      />
+      <Animated.View style={thumbStyle} className="h-3 w-3 bg-background" />
     </Pressable>
   );
 }
 
-/** Square checkbox with 4px rounding (matches web). */
 export function Checkbox({
   checked,
   onChange,
   disabled,
+  accessibilityLabel,
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
   disabled?: boolean;
+  accessibilityLabel?: string;
 }) {
+  const color = useThemeColor();
   return (
     <Pressable
       disabled={disabled}
       onPress={() => onChange(!checked)}
-      hitSlop={8}
-      className={`h-4 w-4 items-center justify-center rounded-check border ${checked ? "border-accent-brand bg-accent-brand" : "border-input bg-transparent"} ${disabled ? "opacity-50" : ""}`}
+      hitSlop={14}
+      accessibilityRole="checkbox"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ checked, disabled: !!disabled }}
+      className={`h-4 w-4 items-center justify-center border ${checked ? "border-accent-brand bg-accent-brand" : "border-input bg-transparent"} ${disabled ? "opacity-50" : ""}`}
     >
-      {checked ? <View className="h-2 w-2 rounded-check bg-white" /> : null}
+      {checked ? (
+        <Check size={12} strokeWidth={3} color={color("background")} />
+      ) : null}
     </Pressable>
   );
 }

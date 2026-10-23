@@ -116,7 +116,7 @@ export default function UpdateRequired() {
       </View>
 
       <View className="px-5" style={{ paddingBottom: insets.bottom + 20 }}>
-        <Button variant="accent" size="lg" onPress={handleDismiss}>
+        <Button variant="default" size="lg" onPress={handleDismiss}>
           Continue Anyway
         </Button>
       </View>

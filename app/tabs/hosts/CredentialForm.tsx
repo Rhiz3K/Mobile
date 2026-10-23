@@ -17,7 +17,7 @@ import {
   Input,
   Button,
   Label,
-  SegmentedControl,
+  Tabs,
   AccordionSection,
 } from "@/app/components/ui";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
@@ -269,7 +269,7 @@ export default function CredentialForm({
             {isEdit ? "Edit Credential" : "New Credential"}
           </Text>
           <Button
-            variant="accent"
+            variant="default"
             size="sm"
             loading={saving}
             onPress={handleSave}
@@ -362,7 +362,7 @@ export default function CredentialForm({
           {activeTab === "auth" ? (
             <>
               <Section title="Credential Type">
-                <SegmentedControl<"password" | "key">
+                <Tabs<"password" | "key">
                   value={form.authType}
                   onChange={(v) => set("authType", v)}
                   options={[
@@ -429,7 +429,7 @@ export default function CredentialForm({
                         </View>
                         <View className="flex-row flex-wrap gap-2">
                           <Button
-                            variant="outline"
+                            variant="muted"
                             size="sm"
                             loading={generatingKey === "ed25519"}
                             onPress={() =>
@@ -443,7 +443,7 @@ export default function CredentialForm({
                             Ed25519
                           </Button>
                           <Button
-                            variant="outline"
+                            variant="muted"
                             size="sm"
                             loading={generatingKey === "ecdsa"}
                             onPress={() =>
@@ -457,7 +457,7 @@ export default function CredentialForm({
                             ECDSA
                           </Button>
                           <Button
-                            variant="outline"
+                            variant="muted"
                             size="sm"
                             loading={generatingKey === "rsa"}
                             onPress={() =>
@@ -475,7 +475,7 @@ export default function CredentialForm({
                     <View className="flex-row items-center justify-between">
                       <Label>Private Key</Label>
                       <Button
-                        variant="outline"
+                        variant="muted"
                         size="sm"
                         onPress={pickPrivateKeyFile}
                         icon={<Upload size={13} color={color("foreground")} />}
@@ -505,7 +505,7 @@ export default function CredentialForm({
                       <View className="flex-row gap-1.5">
                         {features.has("credentialTools") ? (
                           <Button
-                            variant="outline"
+                            variant="muted"
                             size="sm"
                             loading={generatingPublicKey}
                             onPress={handleGeneratePublicKey}
@@ -514,7 +514,7 @@ export default function CredentialForm({
                           </Button>
                         ) : null}
                         <Button
-                          variant="outline"
+                          variant="muted"
                           size="sm"
                           disabled={!form.publicKey}
                           onPress={() => {
@@ -557,7 +557,7 @@ export default function CredentialForm({
                           Certificate signed by a CA for certificate-based auth
                         </Text>
                         <Button
-                          variant="outline"
+                          variant="muted"
                           size="sm"
                           onPress={pickCertFile}
                           icon={

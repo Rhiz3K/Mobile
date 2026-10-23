@@ -12,6 +12,7 @@
 - Theme colors now match Termix on the web and desktop exactly
 - The terminal, keyboard bar and tab bar follow the chosen theme instead of always being dark
 - The theme picker shows the same swatches as Termix
+- Buttons, inputs, switches, tabs, lists and toasts now look the same as in Termix
 
 ## 1.6.0
 

@@ -27,6 +27,7 @@ import {
   BottomSheet,
   SheetRow,
   Dialog,
+  EmptyState,
 } from "@/app/components/ui";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
 import { toast } from "@/app/utils/toast";
@@ -138,7 +139,7 @@ export default function CredentialListModal({
             Credentials
           </Text>
           <Button
-            variant="accent"
+            variant="default"
             size="sm"
             onPress={openCreate}
             icon={<Plus size={14} color="#fff" />}
@@ -186,18 +187,21 @@ export default function CredentialListModal({
             keyboardShouldPersistTaps="handled"
           >
             {filtered.length === 0 ? (
-              <View className="items-center justify-center gap-3 py-16">
-                <Text className="text-sm text-muted-foreground">
-                  {searchQuery.trim()
+              <EmptyState
+                icon={KeyRound}
+                title={
+                  searchQuery.trim()
                     ? "No credentials match your search"
-                    : "No credentials yet"}
-                </Text>
-                {!searchQuery.trim() ? (
-                  <Button variant="accent" size="sm" onPress={openCreate}>
-                    Add credential
-                  </Button>
-                ) : null}
-              </View>
+                    : "No credentials yet"
+                }
+                action={
+                  !searchQuery.trim() ? (
+                    <Button variant="default" size="sm" onPress={openCreate}>
+                      Add credential
+                    </Button>
+                  ) : undefined
+                }
+              />
             ) : (
               filtered.map((c) => (
                 <CredentialRow
@@ -260,7 +264,7 @@ export default function CredentialListModal({
         footer={
           <>
             <Button
-              variant="outline"
+              variant="muted"
               size="sm"
               onPress={() => setDeleteTarget(null)}
             >

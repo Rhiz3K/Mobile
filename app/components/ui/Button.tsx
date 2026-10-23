@@ -6,15 +6,20 @@ import {
 } from "react-native";
 import { Text } from "./Text";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
+import { HEIGHTS, hitSlopFor } from "@/app/constants/tokens";
 
+// Same variants as core's button. "muted" is core's prompt button, used for
+// Cancel and other quiet actions.
 export type ButtonVariant =
-  | "default" // solid primary
-  | "accent" // accent-brand outline (primary action in the web design)
+  | "default"
   | "outline"
+  | "secondary"
+  | "muted"
   | "ghost"
-  | "destructive";
+  | "destructive"
+  | "link";
 
-export type ButtonSize = "sm" | "default" | "lg" | "icon";
+export type ButtonSize = "xs" | "sm" | "default" | "lg" | "icon";
 
 interface ButtonProps extends Omit<PressableProps, "children"> {
   variant?: ButtonVariant;
@@ -23,35 +28,59 @@ interface ButtonProps extends Omit<PressableProps, "children"> {
   className?: string;
   textClassName?: string;
   children?: React.ReactNode;
-  /** Leading icon element (already colored, or it inherits via color prop). */
   icon?: React.ReactNode;
 }
 
-const SIZES: Record<ButtonSize, string> = {
-  sm: "h-8 px-2.5",
-  default: "h-10 px-3",
-  lg: "h-12 px-4",
-  icon: "h-10 w-10",
+const SIZES: Record<ButtonSize, { box: string; height: number }> = {
+  xs: { box: "h-7 px-2", height: HEIGHTS.controlXs },
+  sm: { box: "h-8 px-2.5", height: HEIGHTS.controlSm },
+  default: { box: "h-9 px-3", height: HEIGHTS.control },
+  lg: { box: "h-11 px-4", height: HEIGHTS.controlLg },
+  icon: { box: "h-9 w-9", height: HEIGHTS.control },
 };
 
-const VARIANT_CONTAINER: Record<ButtonVariant, string> = {
-  default: "bg-primary border border-primary",
-  accent: "bg-accent-brand/10 border border-accent-brand/40",
-  outline: "bg-transparent border border-border",
-  ghost: "bg-transparent border border-transparent",
-  destructive: "bg-transparent border border-destructive/40",
+export const BUTTON_CONTAINER: Record<ButtonVariant, string> = {
+  default: "border border-accent-brand/40 bg-accent-brand/15",
+  outline: "border border-accent-brand/40 bg-transparent",
+  secondary: "border border-accent-brand/20 bg-accent-brand/10",
+  muted: "border border-border bg-transparent",
+  ghost: "border border-transparent bg-transparent",
+  destructive: "border border-destructive/40 bg-destructive/15",
+  link: "border border-transparent bg-transparent",
 };
 
-const VARIANT_TEXT: Record<ButtonVariant, string> = {
-  default: "text-primary-foreground",
-  accent: "text-accent-brand",
-  outline: "text-foreground",
+export const BUTTON_PRESSED: Record<ButtonVariant, string> = {
+  default: "active:bg-accent-brand/25",
+  outline: "active:bg-accent-brand/10",
+  secondary: "active:bg-accent-brand/20",
+  muted: "active:bg-muted",
+  ghost: "active:bg-muted",
+  destructive: "active:bg-destructive/25",
+  link: "active:opacity-70",
+};
+
+export const BUTTON_TEXT: Record<ButtonVariant, string> = {
+  default: "text-accent-brand",
+  outline: "text-accent-brand",
+  secondary: "text-accent-brand",
+  muted: "text-muted-foreground",
   ghost: "text-foreground",
   destructive: "text-destructive",
+  link: "text-accent-brand underline",
+};
+
+const SPINNER_TOKEN: Record<ButtonVariant, string> = {
+  default: "accent-brand",
+  outline: "accent-brand",
+  secondary: "accent-brand",
+  muted: "muted-foreground",
+  ghost: "foreground",
+  destructive: "destructive",
+  link: "accent-brand",
 };
 
 export function Button({
-  variant = "outline",
+  variant = "default",
   size = "default",
   loading = false,
   disabled,
@@ -59,29 +88,31 @@ export function Button({
   textClassName,
   children,
   icon,
+  hitSlop,
   ...props
 }: ButtonProps) {
-  const accent = useThemeColor()("accent-brand");
+  const color = useThemeColor();
   const isDisabled = disabled || loading;
+  const { box, height } = SIZES[size];
 
   return (
     <Pressable
       disabled={isDisabled}
-      className={`flex-row items-center justify-center gap-1.5 ${SIZES[size]} ${VARIANT_CONTAINER[variant]} ${isDisabled ? "opacity-50" : "active:opacity-80"} ${className ?? ""}`}
+      hitSlop={hitSlop ?? hitSlopFor(height)}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !!isDisabled, busy: loading }}
+      className={`flex-row items-center justify-center gap-1.5 ${box} ${BUTTON_CONTAINER[variant]} ${isDisabled ? "opacity-50" : BUTTON_PRESSED[variant]} ${className ?? ""}`}
       {...props}
     >
       {loading ? (
-        <ActivityIndicator
-          size="small"
-          color={variant === "default" ? undefined : accent}
-        />
+        <ActivityIndicator size="small" color={color(SPINNER_TOKEN[variant])} />
       ) : (
         <>
           {icon ? <View className="shrink-0">{icon}</View> : null}
           {typeof children === "string" ? (
             <Text
               weight="medium"
-              className={`text-xs ${VARIANT_TEXT[variant]} ${textClassName ?? ""}`}
+              className={`text-xs ${BUTTON_TEXT[variant]} ${textClassName ?? ""}`}
             >
               {children}
             </Text>

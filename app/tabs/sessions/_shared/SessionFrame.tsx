@@ -118,7 +118,7 @@ export function SessionFrame({
           </Text>
           {onRetry ? (
             <Button
-              variant="outline"
+              variant="muted"
               size="sm"
               icon={<RotateCcw size={14} color={color("foreground")} />}
               onPress={onRetry}

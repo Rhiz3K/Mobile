@@ -38,13 +38,7 @@ import {
   getGuacamoleWebSocketUrl,
 } from "@/app/main-axios";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
-import {
-  BottomSheet,
-  SegmentedControl,
-  Button,
-  Dialog,
-  Input,
-} from "@/app/components/ui";
+import { BottomSheet, Tabs, Button, Dialog, Input } from "@/app/components/ui";
 
 // Height of the always-visible key strip at the bottom.
 // The parent session area already accounts for the tab bar + safe-area insets,
@@ -864,10 +858,11 @@ export function RemoteDesktop({
         description={`Enter credentials for ${title}. They will not be saved.`}
         footer={
           <View className="flex-row justify-end gap-2">
-            <Button variant="outline" onPress={cancelPrompt}>
+            <Button variant="muted" onPress={cancelPrompt}>
               Cancel
             </Button>
             <Button
+              variant="muted"
               disabled={!promptUsername.trim()}
               onPress={() => {
                 const credentials = {
@@ -967,7 +962,7 @@ export function RemoteDesktop({
             <Text style={styles.overlayText}>{errorMessage}</Text>
           ) : null}
           <Button
-            variant="outline"
+            variant="muted"
             onPress={reconnect}
             className="mt-4"
             icon={<RotateCcw size={14} color={themeFg} />}
@@ -1187,7 +1182,7 @@ export function RemoteDesktop({
         {/* Mouse mode */}
         <View style={styles.sheetSection}>
           <Text style={styles.sheetLabel}>Mouse Mode</Text>
-          <SegmentedControl
+          <Tabs
             options={[
               { id: "touch" as MouseMode, label: "Touch" },
               { id: "trackpad" as MouseMode, label: "Trackpad" },
@@ -1212,7 +1207,7 @@ export function RemoteDesktop({
           <Text style={styles.zoomLabel}>
             Zoom: {zoomLevel.toFixed(1)}×. Pinch anywhere to zoom
           </Text>
-          <Button variant="outline" size="sm" onPress={resetZoom}>
+          <Button variant="muted" size="sm" onPress={resetZoom}>
             Reset
           </Button>
         </View>

@@ -56,11 +56,11 @@ export function PassphraseDialog({
       description="Enter the passphrase for your SSH key."
       footer={
         <View className="flex-1 flex-row gap-2">
-          <Button variant="outline" className="flex-1" onPress={onCancel}>
+          <Button variant="muted" className="flex-1" onPress={onCancel}>
             Cancel
           </Button>
           <Button
-            variant="accent"
+            variant="default"
             className="flex-1"
             onPress={handleSubmit}
             loading={busy}

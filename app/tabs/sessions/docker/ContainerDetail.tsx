@@ -14,7 +14,7 @@ import {
   getDockerContainerLogs,
   getDockerContainerStats,
 } from "@/app/main-axios";
-import { Text, Badge, SegmentedControl } from "@/app/components/ui";
+import { Text, Badge, Tabs } from "@/app/components/ui";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
 import { MONO_FONT } from "@/app/constants/fonts";
 import { toast } from "@/app/utils/toast";
@@ -111,7 +111,7 @@ export function ContainerDetail({
 
       {/* Tab strip */}
       <View className="border-b border-border px-3 py-2">
-        <SegmentedControl<DetailTab>
+        <Tabs<DetailTab>
           value={tab}
           onChange={setTab}
           options={[

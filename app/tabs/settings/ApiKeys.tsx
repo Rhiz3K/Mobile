@@ -8,7 +8,14 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ArrowLeft, Plus, Copy, Trash2, Key } from "lucide-react-native";
+import {
+  ArrowLeft,
+  Plus,
+  Copy,
+  Trash2,
+  Key,
+  KeyRound,
+} from "lucide-react-native";
 import * as Clipboard from "expo-clipboard";
 import {
   getApiKeys,
@@ -18,7 +25,14 @@ import {
   type ApiKey,
 } from "@/app/main-axios";
 import { UserInfo } from "@/types";
-import { Text, Button, Input, Dialog, Label } from "@/app/components/ui";
+import {
+  Text,
+  Button,
+  Input,
+  Dialog,
+  Label,
+  EmptyState,
+} from "@/app/components/ui";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
 import { toast } from "@/app/utils/toast";
 
@@ -212,9 +226,7 @@ export default function ApiKeys() {
           </Text>
 
           {keys.length === 0 ? (
-            <Text className="mt-6 text-center text-sm text-muted-foreground">
-              No API keys yet.
-            </Text>
+            <EmptyState icon={KeyRound} title="No API keys yet" />
           ) : (
             keys.map((k) => (
               <View
@@ -268,11 +280,11 @@ export default function ApiKeys() {
         title="New API Key"
         footer={
           <View className="flex-row gap-2">
-            <Button variant="outline" className="flex-1" onPress={closeCreate}>
+            <Button variant="muted" className="flex-1" onPress={closeCreate}>
               Cancel
             </Button>
             <Button
-              variant="accent"
+              variant="default"
               className="flex-1"
               onPress={handleCreate}
               loading={createBusy}
@@ -363,7 +375,7 @@ export default function ApiKeys() {
         footer={
           <View className="flex-row gap-2">
             <Button
-              variant="outline"
+              variant="muted"
               className="flex-1"
               onPress={async () => {
                 await Clipboard.setStringAsync(newKeySecret);
@@ -374,7 +386,7 @@ export default function ApiKeys() {
               Copy
             </Button>
             <Button
-              variant="accent"
+              variant="default"
               className="flex-1"
               onPress={() => {
                 setRevealDialog(false);

@@ -55,11 +55,11 @@ export function WarpgateDialog({
       description="Authenticate via the Warpgate portal, then tap Continue."
       footer={
         <View className="flex-1 flex-row flex-wrap gap-2">
-          <Button variant="outline" onPress={onCancel} className="flex-1">
+          <Button variant="muted" onPress={onCancel} className="flex-1">
             Cancel
           </Button>
           <Button
-            variant="outline"
+            variant="muted"
             onPress={handleOpenBrowser}
             icon={<ExternalLink size={13} color={color("accent-brand")} />}
             className="flex-1 border-accent-brand/40"
@@ -67,7 +67,7 @@ export function WarpgateDialog({
           >
             Open Browser
           </Button>
-          <Button variant="accent" onPress={onContinue} className="flex-1">
+          <Button variant="default" onPress={onContinue} className="flex-1">
             Continue
           </Button>
         </View>
@@ -100,7 +100,7 @@ export function WarpgateDialog({
           autoCapitalize="none"
           trailing={
             <Button
-              variant={copied ? "accent" : "ghost"}
+              variant={copied ? "default" : "ghost"}
               size="icon"
               onPress={handleCopy}
               className="h-8 w-8"

@@ -519,7 +519,7 @@ function ServerStep({
           or https://.
         </Text>
         <Button
-          variant="accent"
+          variant="default"
           size="lg"
           className="mt-5"
           loading={busy}
@@ -664,7 +664,7 @@ function LoginStep({
           </Field>
 
           <Button
-            variant="accent"
+            variant="default"
             size="lg"
             className="mt-5"
             loading={busy}
@@ -709,7 +709,7 @@ function LoginStep({
             <View className="h-4" />
           )}
           <Button
-            variant="outline"
+            variant="muted"
             size="lg"
             onPress={onOidc}
             icon={<Globe size={16} color={color("foreground")} />}
@@ -784,7 +784,7 @@ function TotpStep({
         backup codes.
       </Text>
       <Button
-        variant="accent"
+        variant="default"
         size="lg"
         className="mt-5"
         loading={busy}
@@ -891,7 +891,7 @@ function SignupStep({
       </Field>
 
       <Button
-        variant="accent"
+        variant="default"
         size="lg"
         className="mt-5"
         loading={busy}
@@ -1008,7 +1008,7 @@ function ResetStep({
             />
           </Field>
           <Button
-            variant="accent"
+            variant="default"
             size="lg"
             className="mt-5"
             loading={busy}
@@ -1037,7 +1037,7 @@ function ResetStep({
             />
           </Field>
           <Button
-            variant="accent"
+            variant="default"
             size="lg"
             className="mt-5"
             loading={busy}
@@ -1064,7 +1064,7 @@ function ResetStep({
             />
           </Field>
           <Button
-            variant="accent"
+            variant="default"
             size="lg"
             className="mt-5"
             loading={busy}
@@ -1560,7 +1560,7 @@ function OidcStep({
             in.
           </Text>
           <Button
-            variant="accent"
+            variant="default"
             size="lg"
             className="mt-6 w-full max-w-xs"
             loading={openingBrowser || authenticating}

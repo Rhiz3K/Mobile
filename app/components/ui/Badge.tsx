@@ -1,7 +1,8 @@
 import { View } from "react-native";
 import { Text } from "./Text";
 
-export type BadgeVariant = "accent" | "muted" | "destructive" | "success";
+export type BadgeVariant =
+  "accent" | "muted" | "destructive" | "success" | "warning";
 
 const VARIANTS: Record<BadgeVariant, { box: string; text: string }> = {
   accent: {
@@ -13,7 +14,11 @@ const VARIANTS: Record<BadgeVariant, { box: string; text: string }> = {
     box: "bg-destructive/10 border-destructive/40",
     text: "text-destructive",
   },
-  success: { box: "bg-chart-3/15 border-chart-3/40", text: "text-chart-3" },
+  success: {
+    box: "bg-green-500/10 border-green-500/40",
+    text: "text-green-500",
+  },
+  warning: { box: "bg-warning/10 border-warning/40", text: "text-warning" },
 };
 
 export function Badge({
@@ -30,10 +35,7 @@ export function Badge({
     <View
       className={`self-start border px-1.5 py-0.5 ${v.box} ${className ?? ""}`}
     >
-      <Text
-        weight="medium"
-        className={`text-[9px] uppercase tracking-wider ${v.text}`}
-      >
+      <Text weight="medium" className={`text-2xs ${v.text}`}>
         {children}
       </Text>
     </View>

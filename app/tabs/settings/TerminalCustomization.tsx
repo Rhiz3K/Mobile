@@ -376,7 +376,7 @@ export default function TerminalCustomization() {
             >
               Cancel
             </Button>
-            <Button variant="accent" size="sm" onPress={handleCustomFontSize}>
+            <Button variant="default" size="sm" onPress={handleCustomFontSize}>
               Apply
             </Button>
           </>

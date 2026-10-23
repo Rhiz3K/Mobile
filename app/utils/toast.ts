@@ -1,28 +1,35 @@
 import { toast as sonnerToast } from "sonner-native";
 
-/**
- * Toast helpers. Visual styling (background/border) is handled globally by the
- * themed <Toaster> in app/_layout.tsx, so we only pass the message + intent
- * here. Status accent borders are applied per-intent for quick recognition.
- */
-const STATUS_BORDER: Record<string, string> = {
-  success: "#16a34a",
-  error: "#dc2626",
-  warning: "#d97706",
-  info: "#2563eb",
+export type ToastIntent = "success" | "error" | "warning" | "info";
+
+/** Border and text color per intent. The Toaster keeps it in step with the theme. */
+const palette: Record<ToastIntent, string> = {
+  success: "#f59145",
+  info: "#f59145",
+  error: "#ff6467",
+  warning: "#fdc700",
 };
 
-function withBorder(color?: string) {
-  return color ? { style: { borderColor: color } } : undefined;
+export function setToastPalette(next: Record<ToastIntent, string>) {
+  Object.assign(palette, next);
+}
+
+// Same as core: success and info use the accent, errors the destructive color.
+export function toastStyle(intent: ToastIntent) {
+  const c = palette[intent];
+  return {
+    styles: {
+      toast: { borderColor: c + "4d" },
+      title: { color: c },
+    },
+  };
 }
 
 export const toast = {
-  success: (m: string) =>
-    sonnerToast.success(m, withBorder(STATUS_BORDER.success)),
-  error: (m: string) => sonnerToast.error(m, withBorder(STATUS_BORDER.error)),
-  warning: (m: string) =>
-    sonnerToast.warning(m, withBorder(STATUS_BORDER.warning)),
-  info: (m: string) => sonnerToast.info(m, withBorder(STATUS_BORDER.info)),
+  success: (m: string) => sonnerToast.success(m, toastStyle("success")),
+  error: (m: string) => sonnerToast.error(m, toastStyle("error")),
+  warning: (m: string) => sonnerToast.warning(m, toastStyle("warning")),
+  info: (m: string) => sonnerToast.info(m, toastStyle("info")),
   message: (m: string) => sonnerToast(m),
 };
 

@@ -220,7 +220,7 @@ export default function ActiveSessions() {
         footer={
           <View className="flex-row gap-2">
             <Button
-              variant="outline"
+              variant="muted"
               className="flex-1"
               onPress={() => setRevokeAllDialog(false)}
             >

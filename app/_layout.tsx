@@ -15,7 +15,8 @@ import AuthFlow from "@/app/authentication/AuthFlow";
 import { View, Text, ActivityIndicator, TouchableOpacity } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { Toaster } from "sonner-native";
+import { Toaster } from "@/app/components/ui/Toast";
+import { ConfirmProvider } from "@/app/components/ui/Confirm";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useFonts } from "expo-font";
 import { FONT_MAP, MONO_FONT, MONO_FONT_BOLD } from "./constants/fonts";
@@ -92,29 +93,6 @@ function AppLockGate() {
   return <LockScreen />;
 }
 
-function ThemedToaster() {
-  const { isDark } = useTheme();
-  const card = useThemeColor()("card");
-  const border = useThemeColor()("border");
-  return (
-    <Toaster
-      theme={isDark ? "dark" : "light"}
-      position="top-center"
-      toastOptions={{
-        style: {
-          backgroundColor: card,
-          borderWidth: 1,
-          borderColor: border,
-          borderRadius: 0,
-        },
-      }}
-      richColors={false}
-      closeButton
-      duration={4000}
-    />
-  );
-}
-
 function ThemedStatusBar() {
   const { isDark } = useTheme();
   return <StatusBar style={isDark ? "light" : "dark"} />;
@@ -137,8 +115,10 @@ export default function RootLayout() {
                   <TerminalCustomizationProvider>
                     <KeyboardProvider>
                       <KeyboardCustomizationProvider>
-                        <RootLayoutContent />
-                        <ThemedToaster />
+                        <ConfirmProvider>
+                          <RootLayoutContent />
+                        </ConfirmProvider>
+                        <Toaster />
                       </KeyboardCustomizationProvider>
                     </KeyboardProvider>
                   </TerminalCustomizationProvider>

@@ -190,7 +190,7 @@ export default function TwoFactorAuth() {
               autoFocus
             />
             <Button
-              variant="accent"
+              variant="default"
               onPress={confirmEnable}
               loading={busy}
               disabled={verifyCode.trim().length < 6}
@@ -221,13 +221,13 @@ export default function TwoFactorAuth() {
               ))}
             </View>
             <Button
-              variant="outline"
+              variant="muted"
               onPress={copyBackupCodes}
               icon={<Copy size={15} color={color("foreground")} />}
             >
               Copy all codes
             </Button>
-            <Button variant="accent" onPress={() => setPhase("idle")}>
+            <Button variant="default" onPress={() => setPhase("idle")}>
               Done
             </Button>
           </View>
@@ -256,7 +256,7 @@ export default function TwoFactorAuth() {
                 {/* 2.9+ servers only regenerate codes, they can't show old ones */}
                 {!isPluginApi() && (
                   <Button
-                    variant="outline"
+                    variant="muted"
                     onPress={fetchBackupCodes}
                     loading={busy}
                     icon={<KeyRound size={15} color={color("foreground")} />}
@@ -274,7 +274,7 @@ export default function TwoFactorAuth() {
               </View>
             ) : (
               <Button
-                variant="accent"
+                variant="default"
                 onPress={startSetup}
                 loading={busy}
                 icon={<ShieldCheck size={15} color={color("background")} />}
@@ -302,7 +302,7 @@ export default function TwoFactorAuth() {
         footer={
           <View className="flex-row gap-2">
             <Button
-              variant="outline"
+              variant="muted"
               className="flex-1"
               onPress={() => {
                 setDisableDialog(false);

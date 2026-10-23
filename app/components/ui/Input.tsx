@@ -1,4 +1,4 @@
-import { forwardRef } from "react";
+import { forwardRef, useState } from "react";
 import { Platform, TextInput, type TextInputProps, View } from "react-native";
 import { MONO_FONT } from "@/app/constants/fonts";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
@@ -32,7 +32,7 @@ const SIZES: Record<
   { box: string; fontSize: number; line: number }
 > = {
   sm: { box: "h-8", fontSize: 12, line: 16 },
-  default: { box: "h-10", fontSize: 14, line: 18 },
+  default: { box: "h-10", fontSize: 13, line: 17 },
 };
 
 export const Input = forwardRef<TextInput, InputProps>(function Input(
@@ -44,10 +44,14 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
     style,
     multiline,
     size = "default",
+    onFocus,
+    onBlur,
+    editable,
     ...props
   },
   ref,
 ) {
+  const [focused, setFocused] = useState(false);
   const placeholderColor = useThemeColor()("muted-foreground", 0.7);
   const { box, fontSize, line } = SIZES[size];
 
@@ -60,12 +64,21 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
 
   return (
     <View
-      className={`${layout} border border-input bg-card ${containerClassName ?? ""}`}
+      className={`${layout} border bg-input/30 ${focused ? "border-ring" : "border-input"} ${editable === false ? "opacity-50" : ""} ${containerClassName ?? ""}`}
     >
       {leading ? <View className="shrink-0">{leading}</View> : null}
       <TextInput
         ref={ref}
         multiline={multiline}
+        editable={editable}
+        onFocus={(e) => {
+          setFocused(true);
+          onFocus?.(e);
+        }}
+        onBlur={(e) => {
+          setFocused(false);
+          onBlur?.(e);
+        }}
         placeholderTextColor={placeholderColor}
         className={`flex-1 text-foreground ${className ?? ""}`}
         style={[

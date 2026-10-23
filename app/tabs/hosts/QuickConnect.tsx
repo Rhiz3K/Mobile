@@ -8,7 +8,7 @@ import {
   Input,
   Button,
   Label,
-  SegmentedControl,
+  Tabs,
   Text,
 } from "@/app/components/ui";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
@@ -133,7 +133,7 @@ export function QuickConnect({
             />
           </View>
 
-          <SegmentedControl<AuthType>
+          <Tabs<AuthType>
             value={authType}
             onChange={setAuthType}
             options={[
@@ -172,7 +172,7 @@ export function QuickConnect({
             <Button variant="ghost" size="sm" onPress={onClose}>
               Cancel
             </Button>
-            <Button variant="accent" size="sm" onPress={connect}>
+            <Button variant="default" size="sm" onPress={connect}>
               Connect
             </Button>
           </View>

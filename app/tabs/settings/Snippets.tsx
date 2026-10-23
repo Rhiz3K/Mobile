@@ -29,7 +29,14 @@ import { Snippet, SnippetFolder } from "@/types";
 import { publishSnippetSnapshot } from "@/app/widgets";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
 import { Screen } from "@/app/components/Screen";
-import { Text, Button, Input, Label, Dialog } from "@/app/components/ui";
+import {
+  Text,
+  Button,
+  Input,
+  Label,
+  Dialog,
+  EmptyState,
+} from "@/app/components/ui";
 import { toast } from "@/app/utils/toast";
 
 type SnippetFormData = {
@@ -439,7 +446,7 @@ export default function Snippets() {
           >
             Folder
           </Button>
-          <Button variant="accent" size="sm" onPress={openCreate}>
+          <Button variant="default" size="sm" onPress={openCreate}>
             New
           </Button>
         </View>
@@ -450,23 +457,17 @@ export default function Snippets() {
           <Text className="text-sm text-muted-foreground">Loading…</Text>
         </View>
       ) : snippets.length === 0 && folders.length === 0 ? (
-        <View className="flex-1 items-center justify-center px-8">
-          <FileText size={32} color={color("muted-foreground")} />
-          <Text weight="medium" className="mt-4 text-base text-foreground">
-            No snippets yet
-          </Text>
-          <Text className="mt-2 text-center text-sm text-muted-foreground">
-            Create your first snippet, or add snippets from the Termix web or
-            desktop app.
-          </Text>
-          <Button
-            variant="accent"
-            size="lg"
-            className="mt-6"
-            onPress={openCreate}
-          >
-            Create snippet
-          </Button>
+        <View className="flex-1 justify-center">
+          <EmptyState
+            icon={FileText}
+            title="No snippets yet"
+            hint="Create your first snippet, or add snippets from the Termix web or desktop app."
+            action={
+              <Button variant="default" size="lg" onPress={openCreate}>
+                Create snippet
+              </Button>
+            }
+          />
         </View>
       ) : (
         <ScrollView
@@ -495,14 +496,14 @@ export default function Snippets() {
         footer={
           <View className="flex-row gap-2">
             <Button
-              variant="outline"
+              variant="muted"
               className="flex-1"
               onPress={() => setEditDialog(false)}
             >
               Cancel
             </Button>
             <Button
-              variant="accent"
+              variant="default"
               className="flex-1"
               loading={saving}
               onPress={handleSave}
@@ -613,7 +614,7 @@ export default function Snippets() {
         footer={
           <View className="flex-row gap-2">
             <Button
-              variant="outline"
+              variant="muted"
               className="flex-1"
               onPress={() => setDeleteTarget(null)}
             >
@@ -639,14 +640,14 @@ export default function Snippets() {
         footer={
           <View className="flex-row gap-2">
             <Button
-              variant="outline"
+              variant="muted"
               className="flex-1"
               onPress={() => setRenameFolderTarget(null)}
             >
               Cancel
             </Button>
             <Button
-              variant="accent"
+              variant="default"
               className="flex-1"
               loading={renamingFolder}
               onPress={submitFolderRename}
@@ -675,14 +676,14 @@ export default function Snippets() {
         footer={
           <View className="flex-row gap-2">
             <Button
-              variant="outline"
+              variant="muted"
               className="flex-1"
               onPress={() => setFolderDialog(false)}
             >
               Cancel
             </Button>
             <Button
-              variant="accent"
+              variant="default"
               className="flex-1"
               loading={creatingFolder}
               onPress={handleCreateFolder}
@@ -712,7 +713,7 @@ export default function Snippets() {
         footer={
           <View className="flex-row gap-2">
             <Button
-              variant="outline"
+              variant="muted"
               className="flex-1"
               onPress={() => setDeleteFolderTarget(null)}
             >

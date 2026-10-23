@@ -19,7 +19,7 @@ import {
   Label,
   FakeSwitch,
   SettingRow,
-  SegmentedControl,
+  Tabs,
 } from "@/app/components/ui";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
 import { useServerFeatures } from "@/app/contexts/ServerFeaturesContext";
@@ -437,7 +437,7 @@ export default function HostForm({
             {isEdit ? "Edit Host" : "New Host"}
           </Text>
           <Button
-            variant="accent"
+            variant="default"
             size="sm"
             loading={saving}
             onPress={handleSave}
@@ -610,7 +610,7 @@ export default function HostForm({
                     autoCorrect={false}
                   />
                 </Field>
-                <SegmentedControl<AuthType>
+                <Tabs<AuthType>
                   value={form.authType}
                   onChange={(v) => set("authType", v)}
                   options={[
@@ -673,7 +673,7 @@ export default function HostForm({
                     <View className="flex-row items-center justify-between">
                       <Label>Private Key</Label>
                       <Button
-                        variant="outline"
+                        variant="muted"
                         size="sm"
                         onPress={pickKeyFile}
                         icon={<Upload size={13} color={color("foreground")} />}
@@ -795,10 +795,11 @@ export default function HostForm({
                   </View>
 
                   <Field label="Endpoint Host">
-                    <SegmentedControl<string>
+                    <Tabs<string>
                       value={tunnel.endpointHost ?? ""}
                       onChange={(v) => setTunnel(idx, { endpointHost: v })}
                       options={endpointOptions}
+                      fill={false}
                     />
                   </Field>
 
@@ -873,7 +874,7 @@ export default function HostForm({
                 </View>
               ))}
 
-              <Button variant="outline" size="sm" onPress={addTunnel}>
+              <Button variant="muted" size="sm" onPress={addTunnel}>
                 Add Tunnel
               </Button>
             </Section>

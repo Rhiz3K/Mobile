@@ -33,7 +33,7 @@ import {
   getDockerContainers,
   dockerContainerAction,
 } from "@/app/main-axios";
-import { Text, Input, Badge, SegmentedControl } from "@/app/components/ui";
+import { Text, Input, Badge, Tabs } from "@/app/components/ui";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
 import { toast } from "@/app/utils/toast";
 import {
@@ -266,7 +266,7 @@ export function Docker({ host, isVisible }: DockerProps) {
                 autoCorrect={false}
                 leading={<Search size={15} color={color("muted-foreground")} />}
               />
-              <SegmentedControl<StatusFilter>
+              <Tabs<StatusFilter>
                 value={statusFilter}
                 onChange={setStatusFilter}
                 options={[

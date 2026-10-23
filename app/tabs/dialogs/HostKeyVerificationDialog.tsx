@@ -59,7 +59,7 @@ function FingerprintRow({
             {formatFingerprint(fingerprint)}
           </Text>
           <Button
-            variant={copied ? "accent" : "outline"}
+            variant={copied ? "default" : "muted"}
             size="sm"
             onPress={handleCopy}
             icon={
@@ -225,11 +225,11 @@ export function HostKeyVerificationDialog({
 
               {/* Footer */}
               <View className="flex-row justify-end gap-2 border-t border-border px-4 py-3">
-                <Button variant="outline" className="flex-1" onPress={onReject}>
+                <Button variant="muted" className="flex-1" onPress={onReject}>
                   Cancel
                 </Button>
                 <Button
-                  variant={isChanged ? "destructive" : "accent"}
+                  variant={isChanged ? "destructive" : "default"}
                   className="flex-1"
                   onPress={onAccept}
                 >

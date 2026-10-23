@@ -148,7 +148,7 @@ function DeviceSearch({
         }
       />
       <Button
-        variant="outline"
+        variant="muted"
         size="icon"
         accessibilityLabel="Refresh Tailscale devices"
         onPress={refresh}
@@ -315,7 +315,7 @@ export function TailscaleDevices({
                     />
                   </View>
                   <Button
-                    variant="accent"
+                    variant="default"
                     size="sm"
                     disabled={!tailnetAddress(device)}
                     onPress={() =>

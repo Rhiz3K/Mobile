@@ -162,7 +162,7 @@ export default function KeySelector({
                   ) : null}
                 </View>
                 <Button
-                  variant="accent"
+                  variant="default"
                   size="sm"
                   onPress={() => onSelectKey(key)}
                 >

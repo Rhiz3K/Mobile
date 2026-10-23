@@ -1,13 +1,7 @@
 import { useEffect, useState } from "react";
 import { View } from "react-native";
 import { ShieldCheck, KeyRound, Lock, Clock } from "lucide-react-native";
-import {
-  Dialog,
-  Input,
-  Button,
-  Text,
-  SegmentedControl,
-} from "@/app/components/ui";
+import { Dialog, Input, Button, Text, Tabs } from "@/app/components/ui";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
 import { SessionAuthOverrides } from "@/types";
 import type { SessionConnectState } from "./useSessionConnect";
@@ -135,11 +129,11 @@ export function AuthDialogs({
         description="Enter the 6-digit code from your authenticator app."
         footer={
           <View className="flex-row gap-2">
-            <Button variant="outline" className="flex-1" onPress={onCancel}>
+            <Button variant="muted" className="flex-1" onPress={onCancel}>
               Cancel
             </Button>
             <Button
-              variant="accent"
+              variant="default"
               className="flex-1"
               onPress={submitTotp}
               loading={totpBusy}
@@ -189,11 +183,11 @@ export function AuthDialogs({
         description="Confirm the Warpgate authentication URL and security key."
         footer={
           <View className="flex-row gap-2">
-            <Button variant="outline" className="flex-1" onPress={onCancel}>
+            <Button variant="muted" className="flex-1" onPress={onCancel}>
               Cancel
             </Button>
             <Button
-              variant="accent"
+              variant="default"
               className="flex-1"
               onPress={submitWarpgate}
               loading={wgBusy}
@@ -233,11 +227,11 @@ export function AuthDialogs({
         description="This host needs credentials to connect."
         footer={
           <View className="flex-row gap-2">
-            <Button variant="outline" className="flex-1" onPress={onCancel}>
+            <Button variant="muted" className="flex-1" onPress={onCancel}>
               Cancel
             </Button>
             <Button
-              variant="accent"
+              variant="default"
               className="flex-1"
               onPress={submitAuth}
               loading={authBusy}
@@ -250,7 +244,7 @@ export function AuthDialogs({
           </View>
         }
       >
-        <SegmentedControl<"password" | "key">
+        <Tabs<"password" | "key">
           options={[
             { id: "password", label: "Password" },
             { id: "key", label: "SSH Key" },
