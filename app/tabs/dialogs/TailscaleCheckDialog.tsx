@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { View, Linking } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { Shield, Copy, ExternalLink } from "lucide-react-native";
-import { Dialog, Button, Text } from "@/app/components/ui";
+import { Sheet, SheetBody, Button, Text } from "@/app/components/ui";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
 import { showToast } from "@/app/utils/toast";
 
@@ -39,7 +39,8 @@ export function TailscaleCheckDialog({
   }, [url]);
 
   return (
-    <Dialog
+    <Sheet
+      scroll
       visible={visible}
       onClose={onCancel}
       icon={<Shield size={18} color={color("accent-brand")} />}
@@ -74,9 +75,11 @@ export function TailscaleCheckDialog({
         </View>
       }
     >
-      <Text selectable className="text-xs text-muted-foreground">
-        {url}
-      </Text>
-    </Dialog>
+      <SheetBody>
+        <Text selectable className="text-xs text-muted-foreground">
+          {url}
+        </Text>
+      </SheetBody>
+    </Sheet>
   );
 }

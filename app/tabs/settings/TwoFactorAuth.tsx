@@ -25,7 +25,7 @@ import {
   getUserInfo,
   isPluginApi,
 } from "@/app/main-axios";
-import { Text, Button, Input, Dialog } from "@/app/components/ui";
+import { Text, Button, Input, Sheet, SheetBody } from "@/app/components/ui";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
 import { toast } from "@/app/utils/toast";
 
@@ -286,7 +286,8 @@ export default function TwoFactorAuth() {
         )}
       </ScrollView>
 
-      <Dialog
+      <Sheet
+        scroll
         visible={disableDialog}
         onClose={() => {
           setDisableDialog(false);
@@ -322,16 +323,18 @@ export default function TwoFactorAuth() {
           </View>
         }
       >
-        <Input
-          value={disablePassword}
-          onChangeText={setDisablePassword}
-          placeholder={isPluginApi() ? "000000" : "Your password"}
-          secureTextEntry={!isPluginApi()}
-          keyboardType={isPluginApi() ? "number-pad" : "default"}
-          autoCapitalize="none"
-          autoFocus
-        />
-      </Dialog>
+        <SheetBody>
+          <Input
+            value={disablePassword}
+            onChangeText={setDisablePassword}
+            placeholder={isPluginApi() ? "000000" : "Your password"}
+            secureTextEntry={!isPluginApi()}
+            keyboardType={isPluginApi() ? "number-pad" : "default"}
+            autoCapitalize="none"
+            autoFocus
+          />
+        </SheetBody>
+      </Sheet>
     </KeyboardAvoidingView>
   );
 }

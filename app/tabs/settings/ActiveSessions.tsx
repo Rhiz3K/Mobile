@@ -1,11 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import {
-  View,
-  ScrollView,
-  Pressable,
-  RefreshControl,
-  Alert,
-} from "react-native";
+import { View, ScrollView, Pressable, RefreshControl } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -22,7 +16,7 @@ import {
   revokeAllUserSessions,
   getUserInfo,
 } from "@/app/main-axios";
-import { Text, Button, Dialog } from "@/app/components/ui";
+import { Text, Button, Sheet, useConfirm } from "@/app/components/ui";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
 import { toast } from "@/app/utils/toast";
 
@@ -66,6 +60,7 @@ function formatDate(iso: string): string {
 export default function ActiveSessions() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const confirm = useConfirm();
   const color = useThemeColor();
 
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -186,20 +181,14 @@ export default function ActiveSessions() {
                   </Text>
                 </View>
                 <Pressable
-                  onPress={() =>
-                    Alert.alert(
-                      "Revoke session?",
-                      "This will sign out that device.",
-                      [
-                        { text: "Cancel", style: "cancel" },
-                        {
-                          text: "Revoke",
-                          style: "destructive",
-                          onPress: () => handleRevoke(session.id),
-                        },
-                      ],
-                    )
-                  }
+                  onPress={async () => {
+                    const ok = await confirm({
+                      title: "Revoke session?",
+                      description: "This will sign out that device.",
+                      confirmLabel: "Revoke",
+                    });
+                    if (ok) handleRevoke(session.id);
+                  }}
                   hitSlop={8}
                   className="mt-0.5"
                 >
@@ -211,7 +200,8 @@ export default function ActiveSessions() {
         </ScrollView>
       )}
 
-      <Dialog
+      <Sheet
+        scroll
         visible={revokeAllDialog}
         onClose={() => setRevokeAllDialog(false)}
         icon={<LogOut size={20} color={color("destructive")} />}

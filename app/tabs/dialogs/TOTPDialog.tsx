@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { View } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { ShieldCheck, Clipboard as ClipboardIcon } from "lucide-react-native";
-import { Dialog, Input, Button } from "@/app/components/ui";
+import { Sheet, SheetBody, Input, Button } from "@/app/components/ui";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
 
 interface TOTPDialogProps {
@@ -58,7 +58,8 @@ export function TOTPDialog({
     : "Enter the 6-digit code from your authenticator app.";
 
   return (
-    <Dialog
+    <Sheet
+      scroll
       visible={visible}
       onClose={onCancel}
       icon={<ShieldCheck size={18} color={color("accent-brand")} />}
@@ -83,31 +84,33 @@ export function TOTPDialog({
         </View>
       }
     >
-      <Input
-        value={code}
-        onChangeText={(t) =>
-          setCode(isPasswordPrompt ? t : t.replace(/[^0-9]/g, "").slice(0, 6))
-        }
-        placeholder={isPasswordPrompt ? "Password" : "000000"}
-        keyboardType={isPasswordPrompt ? "default" : "number-pad"}
-        secureTextEntry={isPasswordPrompt}
-        autoFocus
-        autoCapitalize="none"
-        autoCorrect={false}
-        autoComplete="off"
-        maxLength={isPasswordPrompt ? undefined : 6}
-        onSubmitEditing={handleSubmit}
-        trailing={
-          <Button
-            variant="ghost"
-            size="icon"
-            onPress={handlePaste}
-            className="h-8 w-8"
-          >
-            <ClipboardIcon size={16} color={color("accent-brand")} />
-          </Button>
-        }
-      />
-    </Dialog>
+      <SheetBody>
+        <Input
+          value={code}
+          onChangeText={(t) =>
+            setCode(isPasswordPrompt ? t : t.replace(/[^0-9]/g, "").slice(0, 6))
+          }
+          placeholder={isPasswordPrompt ? "Password" : "000000"}
+          keyboardType={isPasswordPrompt ? "default" : "number-pad"}
+          secureTextEntry={isPasswordPrompt}
+          autoFocus
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="off"
+          maxLength={isPasswordPrompt ? undefined : 6}
+          onSubmitEditing={handleSubmit}
+          trailing={
+            <Button
+              variant="ghost"
+              size="icon"
+              onPress={handlePaste}
+              className="h-8 w-8"
+            >
+              <ClipboardIcon size={16} color={color("accent-brand")} />
+            </Button>
+          }
+        />
+      </SheetBody>
+    </Sheet>
   );
 }

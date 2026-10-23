@@ -6,7 +6,7 @@ import { ArrowLeft, Type, AlignLeft, Rows3 } from "lucide-react-native";
 import { useTerminalCustomization } from "@/app/contexts/TerminalCustomizationContext";
 import { toast } from "@/app/utils/toast";
 import { TERMINAL_FONTS } from "@/constants/terminal-themes";
-import { Text, Button, Input, Dialog } from "@/app/components/ui";
+import { Text, Button, Input, Sheet, SheetBody } from "@/app/components/ui";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
 
 const FONT_SIZE_OPTIONS = [
@@ -356,7 +356,8 @@ export default function TerminalCustomization() {
       </ScrollView>
 
       {/* Custom font size dialog */}
-      <Dialog
+      <Sheet
+        scroll
         visible={showCustomInput}
         onClose={() => {
           setShowCustomInput(false);
@@ -382,17 +383,20 @@ export default function TerminalCustomization() {
           </>
         }
       >
-        <Input
-          value={customFontSize}
-          onChangeText={setCustomFontSize}
-          placeholder="e.g. 15"
-          keyboardType="number-pad"
-          autoFocus
-        />
-      </Dialog>
+        <SheetBody>
+          <Input
+            value={customFontSize}
+            onChangeText={setCustomFontSize}
+            placeholder="e.g. 15"
+            keyboardType="number-pad"
+            autoFocus
+          />
+        </SheetBody>
+      </Sheet>
 
       {/* Reset confirm dialog */}
-      <Dialog
+      <Sheet
+        scroll
         visible={showResetConfirm}
         onClose={() => setShowResetConfirm(false)}
         title="Confirm Reset"

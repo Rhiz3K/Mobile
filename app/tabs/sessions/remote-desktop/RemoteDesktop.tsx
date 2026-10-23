@@ -38,7 +38,7 @@ import {
   getGuacamoleWebSocketUrl,
 } from "@/app/main-axios";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
-import { BottomSheet, Tabs, Button, Dialog, Input } from "@/app/components/ui";
+import { Sheet, Tabs, Button, SheetBody, Input } from "@/app/components/ui";
 
 // Height of the always-visible key strip at the bottom.
 // The parent session area already accounts for the tab bar + safe-area insets,
@@ -851,7 +851,8 @@ export function RemoteDesktop({
       ]}
       onLayout={handleContainerLayout}
     >
-      <Dialog
+      <Sheet
+        scroll
         visible={isVisible && connectionState === "awaiting-credentials"}
         onClose={cancelPrompt}
         title="RDP sign-in"
@@ -880,34 +881,36 @@ export function RemoteDesktop({
           </View>
         }
       >
-        <View className="gap-3">
-          <Text style={{ color: themeFg }}>Username</Text>
-          <Input
-            accessibilityLabel="RDP username"
-            value={promptUsername}
-            onChangeText={setPromptUsername}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          <Text style={{ color: themeFg }}>Domain (optional)</Text>
-          <Input
-            accessibilityLabel="RDP domain"
-            value={promptDomain}
-            onChangeText={setPromptDomain}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          <Text style={{ color: themeFg }}>Password</Text>
-          <Input
-            accessibilityLabel="RDP password"
-            value={promptPassword}
-            onChangeText={setPromptPassword}
-            secureTextEntry
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-        </View>
-      </Dialog>
+        <SheetBody>
+          <View className="gap-3">
+            <Text style={{ color: themeFg }}>Username</Text>
+            <Input
+              accessibilityLabel="RDP username"
+              value={promptUsername}
+              onChangeText={setPromptUsername}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <Text style={{ color: themeFg }}>Domain (optional)</Text>
+            <Input
+              accessibilityLabel="RDP domain"
+              value={promptDomain}
+              onChangeText={setPromptDomain}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <Text style={{ color: themeFg }}>Password</Text>
+            <Input
+              accessibilityLabel="RDP password"
+              value={promptPassword}
+              onChangeText={setPromptPassword}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+        </SheetBody>
+      </Sheet>
 
       {/* WebView */}
       {htmlContent ? (
@@ -1173,7 +1176,7 @@ export function RemoteDesktop({
       )}
 
       {/* ── Settings sheet (mouse mode + zoom only - compact) ── */}
-      <BottomSheet
+      <Sheet
         visible={showSettingsSheet}
         onClose={() => setShowSettings(false)}
         title="Remote Settings"
@@ -1211,7 +1214,7 @@ export function RemoteDesktop({
             Reset
           </Button>
         </View>
-      </BottomSheet>
+      </Sheet>
     </View>
   );
 }

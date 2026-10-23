@@ -1,7 +1,14 @@
 import { useEffect, useState } from "react";
 import { View } from "react-native";
 import { ShieldCheck, KeyRound, Lock, Clock } from "lucide-react-native";
-import { Dialog, Input, Button, Text, Tabs } from "@/app/components/ui";
+import {
+  Sheet,
+  SheetBody,
+  Input,
+  Button,
+  Text,
+  Tabs,
+} from "@/app/components/ui";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
 import { SessionAuthOverrides } from "@/types";
 import type { SessionConnectState } from "./useSessionConnect";
@@ -121,7 +128,8 @@ export function AuthDialogs({
   return (
     <>
       {/* TOTP */}
-      <Dialog
+      <Sheet
+        scroll
         visible={state === "totp"}
         onClose={onCancel}
         icon={<ShieldCheck size={22} color={color("accent-brand")} />}
@@ -144,38 +152,43 @@ export function AuthDialogs({
           </View>
         }
       >
-        <Input
-          value={code}
-          onChangeText={(t) => setCode(t.replace(/[^0-9]/g, "").slice(0, 6))}
-          placeholder="000000"
-          keyboardType="number-pad"
-          autoFocus
-          maxLength={6}
-        />
-        <View className="mt-2 flex-row items-center gap-1">
-          <Clock
-            size={12}
-            color={
-              totpExpiringSoon
-                ? color("destructive")
-                : color("muted-foreground")
-            }
+        <SheetBody>
+          <Input
+            value={code}
+            onChangeText={(t) => setCode(t.replace(/[^0-9]/g, "").slice(0, 6))}
+            placeholder="000000"
+            keyboardType="number-pad"
+            autoFocus
+            maxLength={6}
           />
-          <Text
-            className={`text-xs ${totpExpiringSoon ? "text-destructive" : "text-muted-foreground"}`}
-          >
-            {totpExpiringSoon
-              ? `Code expires in ${totpCountdown}s, get a fresh code`
-              : `${totpCountdown}s remaining`}
-          </Text>
-        </View>
-        {errorMessage ? (
-          <Text className="mt-2 text-xs text-destructive">{errorMessage}</Text>
-        ) : null}
-      </Dialog>
+          <View className="mt-2 flex-row items-center gap-1">
+            <Clock
+              size={12}
+              color={
+                totpExpiringSoon
+                  ? color("destructive")
+                  : color("muted-foreground")
+              }
+            />
+            <Text
+              className={`text-xs ${totpExpiringSoon ? "text-destructive" : "text-muted-foreground"}`}
+            >
+              {totpExpiringSoon
+                ? `Code expires in ${totpCountdown}s, get a fresh code`
+                : `${totpCountdown}s remaining`}
+            </Text>
+          </View>
+          {errorMessage ? (
+            <Text className="mt-2 text-xs text-destructive">
+              {errorMessage}
+            </Text>
+          ) : null}
+        </SheetBody>
+      </Sheet>
 
       {/* Warpgate */}
-      <Dialog
+      <Sheet
+        scroll
         visible={state === "warpgate"}
         onClose={onCancel}
         icon={<KeyRound size={22} color={color("accent-brand")} />}
@@ -198,28 +211,33 @@ export function AuthDialogs({
           </View>
         }
       >
-        <View className="gap-2">
-          <Input
-            value={wgUrl}
-            onChangeText={setWgUrl}
-            placeholder="Warpgate URL"
-            autoCapitalize="none"
-          />
-          <Input
-            value={wgKey}
-            onChangeText={setWgKey}
-            placeholder="Security key (optional)"
-            autoCapitalize="none"
-            secureTextEntry
-          />
-        </View>
-        {errorMessage ? (
-          <Text className="mt-2 text-xs text-destructive">{errorMessage}</Text>
-        ) : null}
-      </Dialog>
+        <SheetBody>
+          <View className="gap-2">
+            <Input
+              value={wgUrl}
+              onChangeText={setWgUrl}
+              placeholder="Warpgate URL"
+              autoCapitalize="none"
+            />
+            <Input
+              value={wgKey}
+              onChangeText={setWgKey}
+              placeholder="Security key (optional)"
+              autoCapitalize="none"
+              secureTextEntry
+            />
+          </View>
+          {errorMessage ? (
+            <Text className="mt-2 text-xs text-destructive">
+              {errorMessage}
+            </Text>
+          ) : null}
+        </SheetBody>
+      </Sheet>
 
       {/* Interactive auth */}
-      <Dialog
+      <Sheet
+        scroll
         visible={state === "auth"}
         onClose={onCancel}
         icon={<Lock size={22} color={color("accent-brand")} />}
@@ -244,48 +262,52 @@ export function AuthDialogs({
           </View>
         }
       >
-        <Tabs<"password" | "key">
-          options={[
-            { id: "password", label: "Password" },
-            { id: "key", label: "SSH Key" },
-          ]}
-          value={authMethod}
-          onChange={setAuthMethod}
-          className="mb-3"
-        />
-        {authMethod === "password" ? (
-          <Input
-            value={authPassword}
-            onChangeText={setAuthPassword}
-            placeholder="Password"
-            secureTextEntry
-            autoCapitalize="none"
-            autoFocus
+        <SheetBody>
+          <Tabs<"password" | "key">
+            options={[
+              { id: "password", label: "Password" },
+              { id: "key", label: "SSH Key" },
+            ]}
+            value={authMethod}
+            onChange={setAuthMethod}
+            className="mb-3"
           />
-        ) : (
-          <View className="gap-2">
+          {authMethod === "password" ? (
             <Input
-              value={authKey}
-              onChangeText={setAuthKey}
-              placeholder="Paste private key"
-              multiline
-              numberOfLines={4}
-              autoCapitalize="none"
-              style={{ minHeight: 90, textAlignVertical: "top" }}
-            />
-            <Input
-              value={authKeyPassword}
-              onChangeText={setAuthKeyPassword}
-              placeholder="Key passphrase (optional)"
+              value={authPassword}
+              onChangeText={setAuthPassword}
+              placeholder="Password"
               secureTextEntry
               autoCapitalize="none"
+              autoFocus
             />
-          </View>
-        )}
-        {errorMessage ? (
-          <Text className="mt-2 text-xs text-destructive">{errorMessage}</Text>
-        ) : null}
-      </Dialog>
+          ) : (
+            <View className="gap-2">
+              <Input
+                value={authKey}
+                onChangeText={setAuthKey}
+                placeholder="Paste private key"
+                multiline
+                numberOfLines={4}
+                autoCapitalize="none"
+                style={{ minHeight: 90, textAlignVertical: "top" }}
+              />
+              <Input
+                value={authKeyPassword}
+                onChangeText={setAuthKeyPassword}
+                placeholder="Key passphrase (optional)"
+                secureTextEntry
+                autoCapitalize="none"
+              />
+            </View>
+          )}
+          {errorMessage ? (
+            <Text className="mt-2 text-xs text-destructive">
+              {errorMessage}
+            </Text>
+          ) : null}
+        </SheetBody>
+      </Sheet>
     </>
   );
 }

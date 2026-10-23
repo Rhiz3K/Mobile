@@ -1,11 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import {
-  View,
-  ScrollView,
-  Pressable,
-  RefreshControl,
-  Alert,
-} from "react-native";
+import { View, ScrollView, Pressable, RefreshControl } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -29,9 +23,11 @@ import {
   Text,
   Button,
   Input,
-  Dialog,
+  Sheet,
+  SheetBody,
   Label,
   EmptyState,
+  useConfirm,
 } from "@/app/components/ui";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
 import { toast } from "@/app/utils/toast";
@@ -57,6 +53,7 @@ function getUserId(u: UserInfo): string {
 export default function ApiKeys() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const confirm = useConfirm();
   const color = useThemeColor();
 
   const [keys, setKeys] = useState<ApiKey[]>([]);
@@ -167,23 +164,19 @@ export default function ApiKeys() {
     }
   };
 
-  const handleDelete = (keyId: string, name: string) => {
-    Alert.alert("Delete API key?", `"${name}" will stop working immediately.`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await deleteApiKey(keyId);
-            setKeys((prev) => prev.filter((k) => k.id !== keyId));
-            toast.success("API key deleted");
-          } catch {
-            toast.error("Failed to delete API key");
-          }
-        },
-      },
-    ]);
+  const handleDelete = async (keyId: string, name: string) => {
+    const ok = await confirm({
+      title: "Delete API key?",
+      description: `"${name}" will stop working right away.`,
+    });
+    if (!ok) return;
+    try {
+      await deleteApiKey(keyId);
+      setKeys((prev) => prev.filter((k) => k.id !== keyId));
+      toast.success("API key deleted");
+    } catch {
+      toast.error("Failed to delete API key");
+    }
   };
 
   return (
@@ -273,7 +266,8 @@ export default function ApiKeys() {
       )}
 
       {/* Create dialog */}
-      <Dialog
+      <Sheet
+        scroll
         visible={createDialog}
         onClose={closeCreate}
         icon={<Key size={20} color={color("accent-brand")} />}
@@ -295,75 +289,78 @@ export default function ApiKeys() {
           </View>
         }
       >
-        <View className="gap-4">
-          {/* Name */}
-          <View className="gap-1.5">
-            <Label>Name *</Label>
-            <Input
-              value={keyName}
-              onChangeText={setKeyName}
-              placeholder="e.g. CI Pipeline"
-              autoCapitalize="none"
-              autoFocus
-            />
-          </View>
+        <SheetBody>
+          <View className="gap-4">
+            {/* Name */}
+            <View className="gap-1.5">
+              <Label>Name *</Label>
+              <Input
+                value={keyName}
+                onChangeText={setKeyName}
+                placeholder="e.g. CI Pipeline"
+                autoCapitalize="none"
+                autoFocus
+              />
+            </View>
 
-          {/* User */}
-          <View className="gap-1.5">
-            <Label>User *</Label>
-            {users.length === 0 ? (
-              <Text className="text-xs text-muted-foreground">
-                No users available.
-              </Text>
-            ) : (
-              <View className="overflow-hidden border border-border bg-card">
-                {users.map((u, i) => {
-                  const uid = getUserId(u);
-                  const selected = keyUserId === uid;
-                  return (
-                    <Pressable
-                      key={uid || u.username}
-                      onPress={() => setKeyUserId(uid)}
-                      className={`flex-row items-center justify-between px-3 py-2.5 ${
-                        i > 0 ? "border-t border-border/50" : ""
-                      } ${selected ? "bg-accent-brand/10" : "active:bg-muted/40"}`}
-                    >
-                      <Text
-                        className={`text-sm ${selected ? "text-accent-brand" : "text-foreground"}`}
+            {/* User */}
+            <View className="gap-1.5">
+              <Label>User *</Label>
+              {users.length === 0 ? (
+                <Text className="text-xs text-muted-foreground">
+                  No users available.
+                </Text>
+              ) : (
+                <View className="overflow-hidden border border-border bg-card">
+                  {users.map((u, i) => {
+                    const uid = getUserId(u);
+                    const selected = keyUserId === uid;
+                    return (
+                      <Pressable
+                        key={uid || u.username}
+                        onPress={() => setKeyUserId(uid)}
+                        className={`flex-row items-center justify-between px-3 py-2.5 ${
+                          i > 0 ? "border-t border-border/50" : ""
+                        } ${selected ? "bg-accent-brand/10" : "active:bg-muted/40"}`}
                       >
-                        {u.username}
-                      </Text>
-                      {u.is_admin ? (
-                        <Text className="text-[10px] text-muted-foreground">
-                          admin
+                        <Text
+                          className={`text-sm ${selected ? "text-accent-brand" : "text-foreground"}`}
+                        >
+                          {u.username}
                         </Text>
-                      ) : null}
-                    </Pressable>
-                  );
-                })}
-              </View>
-            )}
-          </View>
+                        {u.is_admin ? (
+                          <Text className="text-[10px] text-muted-foreground">
+                            admin
+                          </Text>
+                        ) : null}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
 
-          {/* Expires At */}
-          <View className="gap-1.5">
-            <Label>Expires At (optional)</Label>
-            <Input
-              value={expiresAt}
-              onChangeText={handleExpiresChange}
-              placeholder="YYYY/MM/DD"
-              keyboardType="number-pad"
-              maxLength={10}
-            />
-            <Text className="text-[11px] text-muted-foreground">
-              Year / Month / Day
-            </Text>
+            {/* Expires At */}
+            <View className="gap-1.5">
+              <Label>Expires At (optional)</Label>
+              <Input
+                value={expiresAt}
+                onChangeText={handleExpiresChange}
+                placeholder="YYYY/MM/DD"
+                keyboardType="number-pad"
+                maxLength={10}
+              />
+              <Text className="text-[11px] text-muted-foreground">
+                Year / Month / Day
+              </Text>
+            </View>
           </View>
-        </View>
-      </Dialog>
+        </SheetBody>
+      </Sheet>
 
       {/* Secret reveal - shown once */}
-      <Dialog
+      <Sheet
+        scroll
         visible={revealDialog}
         onClose={() => {
           setRevealDialog(false);
@@ -398,12 +395,14 @@ export default function ApiKeys() {
           </View>
         }
       >
-        <View className="border border-border bg-muted/30 p-3">
-          <Text className="font-mono text-xs text-foreground" selectable>
-            {newKeySecret}
-          </Text>
-        </View>
-      </Dialog>
+        <SheetBody>
+          <View className="border border-border bg-muted/30 p-3">
+            <Text className="font-mono text-xs text-foreground" selectable>
+              {newKeySecret}
+            </Text>
+          </View>
+        </SheetBody>
+      </Sheet>
     </View>
   );
 }

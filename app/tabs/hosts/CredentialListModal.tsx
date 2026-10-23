@@ -1,13 +1,11 @@
 import { useEffect, useState, useMemo } from "react";
 import {
-  Modal,
   View,
   ScrollView,
   Pressable,
   ActivityIndicator,
   RefreshControl,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   X,
   Plus,
@@ -24,10 +22,10 @@ import {
   Text,
   Input,
   Button,
-  BottomSheet,
+  Sheet,
   SheetRow,
-  Dialog,
   EmptyState,
+  InlineView,
 } from "@/app/components/ui";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
 import { toast } from "@/app/utils/toast";
@@ -40,7 +38,6 @@ export default function CredentialListModal({
   visible: boolean;
   onClose: () => void;
 }) {
-  const insets = useSafeAreaInsets();
   const color = useThemeColor();
 
   const [credentials, setCredentials] = useState<Credential[]>([]);
@@ -116,40 +113,26 @@ export default function CredentialListModal({
   };
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      onRequestClose={onClose}
-      presentationStyle="fullScreen"
-    >
-      <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
-        {/* Header */}
-        <View className="flex-row items-center justify-between border-b border-border px-4 py-3">
-          <Pressable
-            onPress={onClose}
-            hitSlop={8}
-            className="flex-row items-center gap-1.5"
-          >
-            <X size={18} color={color("foreground")} />
-            <Text weight="medium" className="text-sm text-foreground">
-              Cancel
-            </Text>
-          </Pressable>
-          <Text weight="bold" className="text-base text-foreground">
-            Credentials
-          </Text>
+    <>
+      <InlineView
+        open={visible}
+        onClose={onClose}
+        title="Credentials"
+        scroll={false}
+        bare
+        actions={
           <Button
             variant="default"
             size="sm"
             onPress={openCreate}
-            icon={<Plus size={14} color="#fff" />}
+            icon={<Plus size={14} color={color("accent-brand")} />}
           >
             Add
           </Button>
-        </View>
-
+        }
+      >
         {/* Search bar */}
-        <View className="px-4 pb-2 pt-3">
+        <View className="border-b border-border px-3 py-2.5">
           <Input
             placeholder="Search credentials…"
             value={searchQuery}
@@ -214,26 +197,18 @@ export default function CredentialListModal({
             )}
           </ScrollView>
         )}
-      </View>
+      </InlineView>
 
       {/* Action bottom sheet */}
-      <BottomSheet
+      <Sheet
         visible={sheetCredential !== null}
         onClose={() => setSheetCredential(null)}
+        title={sheetCredential?.name}
+        description={
+          (sheetCredential?.authType === "key" ? "SSH key" : "Password") +
+          (sheetCredential?.username ? ` | ${sheetCredential.username}` : "")
+        }
       >
-        <View className="border-b border-border px-4 pb-3 pt-1">
-          <Text
-            weight="bold"
-            className="text-base text-foreground"
-            numberOfLines={1}
-          >
-            {sheetCredential?.name}
-          </Text>
-          <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-            {sheetCredential?.authType === "key" ? "SSH Key" : "Password"}
-            {sheetCredential?.username ? ` · ${sheetCredential.username}` : ""}
-          </Text>
-        </View>
         <SheetRow
           icon={<Pencil size={18} color={color("foreground")} />}
           label="Edit"
@@ -252,10 +227,11 @@ export default function CredentialListModal({
             setSheetCredential(null);
           }}
         />
-      </BottomSheet>
+      </Sheet>
 
-      {/* Delete confirmation dialog */}
-      <Dialog
+      {/* Delete confirmation */}
+      <Sheet
+        tone="destructive"
         visible={deleteTarget !== null}
         onClose={() => setDeleteTarget(null)}
         title="Delete Credential"
@@ -292,7 +268,7 @@ export default function CredentialListModal({
           load(true);
         }}
       />
-    </Modal>
+    </>
   );
 }
 
@@ -305,7 +281,7 @@ function CredentialRow({
   onPress: () => void;
   color: (key: string) => string | undefined;
 }) {
-  const subtitle = [c.username, c.folder].filter(Boolean).join(" · ");
+  const subtitle = [c.username, c.folder].filter(Boolean).join(" | ");
 
   return (
     <Pressable

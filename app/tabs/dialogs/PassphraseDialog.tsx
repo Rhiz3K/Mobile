@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { View, Platform } from "react-native";
 import { KeyRound } from "lucide-react-native";
-import { Dialog, Input, Button, Text } from "@/app/components/ui";
+import { Sheet, SheetBody, Input, Button, Text } from "@/app/components/ui";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
 
 interface PassphraseDialogProps {
@@ -48,7 +48,8 @@ export function PassphraseDialog({
     : `${hostInfo.username}@${hostInfo.ip}:${hostInfo.port}`;
 
   return (
-    <Dialog
+    <Sheet
+      scroll
       visible={visible}
       onClose={onCancel}
       icon={<KeyRound size={18} color={color("accent-brand")} />}
@@ -71,23 +72,27 @@ export function PassphraseDialog({
         </View>
       }
     >
-      <Text
-        className="mb-3 text-xs text-muted-foreground"
-        style={{ fontFamily: Platform.OS === "ios" ? "Courier" : "monospace" }}
-      >
-        {hostLabel}
-      </Text>
-      <Input
-        value={passphrase}
-        onChangeText={setPassphrase}
-        placeholder="Key passphrase"
-        secureTextEntry
-        autoCapitalize="none"
-        autoCorrect={false}
-        autoComplete="off"
-        autoFocus
-        onSubmitEditing={handleSubmit}
-      />
-    </Dialog>
+      <SheetBody>
+        <Text
+          className="mb-3 text-xs text-muted-foreground"
+          style={{
+            fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
+          }}
+        >
+          {hostLabel}
+        </Text>
+        <Input
+          value={passphrase}
+          onChangeText={setPassphrase}
+          placeholder="Key passphrase"
+          secureTextEntry
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="off"
+          autoFocus
+          onSubmitEditing={handleSubmit}
+        />
+      </SheetBody>
+    </Sheet>
   );
 }

@@ -3,14 +3,7 @@ import { View, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
 import { Zap } from "lucide-react-native";
 import { SSHHost } from "@/types";
 import { useTerminalSessions } from "@/app/contexts/TerminalSessionsContext";
-import {
-  BottomSheet,
-  Input,
-  Button,
-  Label,
-  Tabs,
-  Text,
-} from "@/app/components/ui";
+import { Sheet, Input, Button, Label, Tabs, Text } from "@/app/components/ui";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
 import { toast } from "@/app/utils/toast";
 
@@ -77,7 +70,7 @@ export function QuickConnect({
   };
 
   return (
-    <BottomSheet visible={visible} onClose={onClose}>
+    <Sheet visible={visible} onClose={onClose}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
@@ -178,6 +171,6 @@ export function QuickConnect({
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </BottomSheet>
+    </Sheet>
   );
 }

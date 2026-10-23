@@ -42,7 +42,8 @@ import {
   AccordionSection,
   SettingRow,
   FakeSwitch,
-  Dialog,
+  Sheet,
+  SheetBody,
 } from "@/app/components/ui";
 import {
   ACCENT_PRESET_COLORS,
@@ -727,7 +728,8 @@ export default function Settings() {
       </ScrollView>
 
       {/* Change password */}
-      <Dialog
+      <Sheet
+        scroll
         visible={passwordDialog}
         onClose={closePasswordDialog}
         title="Change Password"
@@ -749,26 +751,29 @@ export default function Settings() {
           </>
         }
       >
-        <View className="gap-2">
-          <Input
-            value={oldPassword}
-            onChangeText={setOldPassword}
-            secureTextEntry
-            placeholder="Current password"
-            autoCapitalize="none"
-          />
-          <Input
-            value={newPassword}
-            onChangeText={setNewPassword}
-            secureTextEntry
-            placeholder="New password"
-            autoCapitalize="none"
-          />
-        </View>
-      </Dialog>
+        <SheetBody>
+          <View className="gap-2">
+            <Input
+              value={oldPassword}
+              onChangeText={setOldPassword}
+              secureTextEntry
+              placeholder="Current password"
+              autoCapitalize="none"
+            />
+            <Input
+              value={newPassword}
+              onChangeText={setNewPassword}
+              secureTextEntry
+              placeholder="New password"
+              autoCapitalize="none"
+            />
+          </View>
+        </SheetBody>
+      </Sheet>
 
       {/* Delete account */}
-      <Dialog
+      <Sheet
+        scroll
         visible={deleteDialog}
         onClose={closeDeleteDialog}
         title="Delete Account"
@@ -790,17 +795,20 @@ export default function Settings() {
           </>
         }
       >
-        <Input
-          value={deletePassword}
-          onChangeText={setDeletePassword}
-          secureTextEntry
-          placeholder="Confirm your password"
-          autoCapitalize="none"
-        />
-      </Dialog>
+        <SheetBody>
+          <Input
+            value={deletePassword}
+            onChangeText={setDeletePassword}
+            secureTextEntry
+            placeholder="Confirm your password"
+            autoCapitalize="none"
+          />
+        </SheetBody>
+      </Sheet>
 
       {/* App-lock PIN setup dialog (two-step) */}
-      <Dialog
+      <Sheet
+        scroll
         visible={pinDialog}
         onClose={closePinDialog}
         title={pinStep === "enter" ? "Set App Lock PIN" : "Confirm PIN"}
@@ -821,28 +829,30 @@ export default function Settings() {
           </>
         }
       >
-        {pinStep === "enter" ? (
-          <Input
-            key="pin-enter"
-            value={pin}
-            onChangeText={(v) => setPin(v.replace(/\D/g, "").slice(0, 4))}
-            keyboardType="number-pad"
-            secureTextEntry
-            placeholder="••••"
-            autoFocus
-          />
-        ) : (
-          <Input
-            key="pin-confirm"
-            value={confirm}
-            onChangeText={(v) => setConfirm(v.replace(/\D/g, "").slice(0, 4))}
-            keyboardType="number-pad"
-            secureTextEntry
-            placeholder="••••"
-            autoFocus
-          />
-        )}
-      </Dialog>
+        <SheetBody>
+          {pinStep === "enter" ? (
+            <Input
+              key="pin-enter"
+              value={pin}
+              onChangeText={(v) => setPin(v.replace(/\D/g, "").slice(0, 4))}
+              keyboardType="number-pad"
+              secureTextEntry
+              placeholder="••••"
+              autoFocus
+            />
+          ) : (
+            <Input
+              key="pin-confirm"
+              value={confirm}
+              onChangeText={(v) => setConfirm(v.replace(/\D/g, "").slice(0, 4))}
+              keyboardType="number-pad"
+              secureTextEntry
+              placeholder="••••"
+              autoFocus
+            />
+          )}
+        </SheetBody>
+      </Sheet>
 
       {/* Re-auth gate before disabling app lock */}
       {reauth === "disable" ? (

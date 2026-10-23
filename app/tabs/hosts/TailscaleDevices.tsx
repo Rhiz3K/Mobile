@@ -12,7 +12,7 @@ import { Check, Radar, RefreshCw, Search, X } from "lucide-react-native";
 import { getTailscaleDevices, isTailscaleAvailable } from "@/app/main-axios";
 import { useServerFeatures } from "@/app/contexts/ServerFeaturesContext";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
-import { BottomSheet, Button, Input, Label, Text } from "@/app/components/ui";
+import { Sheet, Button, Input, Label, Text } from "@/app/components/ui";
 import {
   filterTailscaleDevices,
   tailnetAddress,
@@ -248,7 +248,7 @@ export function TailscaleDevices({
   }, [visible]);
 
   return (
-    <BottomSheet visible={visible} onClose={onClose} onDismiss={onDismiss}>
+    <Sheet visible={visible} onClose={onClose} onDismiss={onDismiss}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
@@ -330,6 +330,6 @@ export function TailscaleDevices({
           />
         </ScrollView>
       </KeyboardAvoidingView>
-    </BottomSheet>
+    </Sheet>
   );
 }

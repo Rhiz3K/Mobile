@@ -15,9 +15,10 @@ export function setToastPalette(next: Record<ToastIntent, string>) {
 }
 
 // Same as core: success and info use the accent, errors the destructive color.
-export function toastStyle(intent: ToastIntent) {
+export function toastStyle(intent: ToastIntent, description?: string) {
   const c = palette[intent];
   return {
+    description,
     styles: {
       toast: { borderColor: c + "4d" },
       title: { color: c },
@@ -26,11 +27,15 @@ export function toastStyle(intent: ToastIntent) {
 }
 
 export const toast = {
-  success: (m: string) => sonnerToast.success(m, toastStyle("success")),
-  error: (m: string) => sonnerToast.error(m, toastStyle("error")),
-  warning: (m: string) => sonnerToast.warning(m, toastStyle("warning")),
-  info: (m: string) => sonnerToast.info(m, toastStyle("info")),
-  message: (m: string) => sonnerToast(m),
+  success: (m: string, description?: string) =>
+    sonnerToast.success(m, toastStyle("success", description)),
+  error: (m: string, description?: string) =>
+    sonnerToast.error(m, toastStyle("error", description)),
+  warning: (m: string, description?: string) =>
+    sonnerToast.warning(m, toastStyle("warning", description)),
+  info: (m: string, description?: string) =>
+    sonnerToast.info(m, toastStyle("info", description)),
+  message: (m: string, description?: string) => sonnerToast(m, { description }),
 };
 
 // Back-compat alias for existing call sites that import showToast.

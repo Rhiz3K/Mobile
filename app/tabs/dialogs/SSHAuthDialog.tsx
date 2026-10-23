@@ -1,7 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
 import { View, Platform } from "react-native";
 import { Lock } from "lucide-react-native";
-import { Dialog, Input, Button, Text, Tabs } from "@/app/components/ui";
+import {
+  Sheet,
+  SheetBody,
+  Input,
+  Button,
+  Text,
+  Tabs,
+} from "@/app/components/ui";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
 
 interface SSHAuthDialogProps {
@@ -75,7 +82,8 @@ export function SSHAuthDialog({
       : "text-yellow-400";
 
   return (
-    <Dialog
+    <Sheet
+      scroll
       visible={visible}
       onClose={onCancel}
       icon={<Lock size={18} color={color("accent-brand")} />}
@@ -97,64 +105,66 @@ export function SSHAuthDialog({
         </View>
       }
     >
-      <View className={`mb-3 border px-3 py-2.5 ${bannerBg}`}>
-        <Text className={`text-xs ${bannerText}`}>{reasonText}</Text>
-      </View>
+      <SheetBody>
+        <View className={`mb-3 border px-3 py-2.5 ${bannerBg}`}>
+          <Text className={`text-xs ${bannerText}`}>{reasonText}</Text>
+        </View>
 
-      <Tabs<"password" | "key">
-        options={[
-          { id: "password", label: "Password" },
-          { id: "key", label: "SSH Key" },
-        ]}
-        value={authMethod}
-        onChange={setAuthMethod}
-        className="mb-3"
-      />
-
-      {authMethod === "password" ? (
-        <Input
-          value={password}
-          onChangeText={setPassword}
-          placeholder="Password"
-          secureTextEntry
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete="off"
-          autoFocus
-          onSubmitEditing={handleSubmit}
+        <Tabs<"password" | "key">
+          options={[
+            { id: "password", label: "Password" },
+            { id: "key", label: "SSH Key" },
+          ]}
+          value={authMethod}
+          onChange={setAuthMethod}
+          className="mb-3"
         />
-      ) : (
-        <View className="gap-2">
+
+        {authMethod === "password" ? (
           <Input
-            value={sshKey}
-            onChangeText={setSshKey}
-            placeholder={
-              "-----BEGIN OPENSSH PRIVATE KEY-----\nPaste your private key here...\n-----END OPENSSH PRIVATE KEY-----"
-            }
-            multiline
-            numberOfLines={5}
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="off"
-            autoFocus
-            style={{
-              minHeight: 110,
-              fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
-              fontSize: 12,
-            }}
-          />
-          <Input
-            value={keyPassword}
-            onChangeText={setKeyPassword}
-            placeholder="Key passphrase (optional)"
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Password"
             secureTextEntry
             autoCapitalize="none"
             autoCorrect={false}
             autoComplete="off"
+            autoFocus
             onSubmitEditing={handleSubmit}
           />
-        </View>
-      )}
-    </Dialog>
+        ) : (
+          <View className="gap-2">
+            <Input
+              value={sshKey}
+              onChangeText={setSshKey}
+              placeholder={
+                "-----BEGIN OPENSSH PRIVATE KEY-----\nPaste your private key here...\n-----END OPENSSH PRIVATE KEY-----"
+              }
+              multiline
+              numberOfLines={5}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="off"
+              autoFocus
+              style={{
+                minHeight: 110,
+                fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+                fontSize: 12,
+              }}
+            />
+            <Input
+              value={keyPassword}
+              onChangeText={setKeyPassword}
+              placeholder="Key passphrase (optional)"
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="off"
+              onSubmitEditing={handleSubmit}
+            />
+          </View>
+        )}
+      </SheetBody>
+    </Sheet>
   );
 }

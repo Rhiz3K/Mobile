@@ -21,7 +21,7 @@ import {
   Button,
   Label,
   FakeSwitch,
-  Dialog,
+  Sheet,
   Input,
   SettingRow,
 } from "@/app/components/ui";
@@ -775,7 +775,8 @@ export default function KeyboardCustomization() {
         }
       />
 
-      <Dialog
+      <Sheet
+        scroll
         visible={showResetConfirm}
         onClose={() => setShowResetConfirm(false)}
         title="Confirm Reset"

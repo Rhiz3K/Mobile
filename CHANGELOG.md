@@ -13,6 +13,8 @@
 - The terminal, keyboard bar and tab bar follow the chosen theme instead of always being dark
 - The theme picker shows the same swatches as Termix
 - Buttons, inputs, switches, tabs, lists and toasts now look the same as in Termix
+- Popups are now sheets that slide up from the bottom, and confirmations use them instead of system alerts
+- The host, credential, file and key editors open in place with a back button instead of as popups
 
 ## 1.6.0
 

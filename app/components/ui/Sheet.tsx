@@ -1,3 +1,4 @@
+import { Fragment, isValidElement } from "react";
 import {
   KeyboardAvoidingView,
   Modal,
@@ -117,7 +118,11 @@ export function Sheet({
             )
           ) : null}
           {footer ? (
-            <View className="border-t border-border px-4 py-3">{footer}</View>
+            <View
+              className={`border-t border-border px-4 py-3 ${isValidElement(footer) && footer.type === Fragment ? "flex-row justify-end gap-2" : ""}`}
+            >
+              {footer}
+            </View>
           ) : null}
         </Animated.View>
       </KeyboardAvoidingView>

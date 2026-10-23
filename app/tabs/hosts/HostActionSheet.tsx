@@ -22,7 +22,7 @@ import type {
   RemoteDesktopProtocol,
   SessionType,
 } from "@/app/contexts/TerminalSessionsContext";
-import { BottomSheet, SheetRow, Text } from "@/app/components/ui";
+import { Sheet, SheetRow, Text } from "@/app/components/ui";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
 import { useServerFeatures } from "@/app/contexts/ServerFeaturesContext";
 import { toast } from "@/app/utils/toast";
@@ -176,7 +176,7 @@ export function HostActionSheet({
         : "#9ca3af";
 
   return (
-    <BottomSheet visible={visible} onClose={onClose}>
+    <Sheet visible={visible} onClose={onClose}>
       {/* Header */}
       <View className="flex-row items-center gap-2.5 border-b border-border px-4 pb-3 pt-1">
         <View
@@ -274,6 +274,6 @@ export function HostActionSheet({
           }}
         />
       </ScrollView>
-    </BottomSheet>
+    </Sheet>
   );
 }

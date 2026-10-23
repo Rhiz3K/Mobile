@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
-import { Modal, View, ScrollView, Pressable } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { X, Upload, Copy } from "lucide-react-native";
+import { View, ScrollView } from "react-native";
+import { Upload, Copy } from "lucide-react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as Clipboard from "expo-clipboard";
 import { Credential, CredentialData } from "@/types";
@@ -19,6 +18,7 @@ import {
   Label,
   Tabs,
   AccordionSection,
+  InlineView,
 } from "@/app/components/ui";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
 import { useServerFeatures } from "@/app/contexts/ServerFeaturesContext";
@@ -71,7 +71,6 @@ export default function CredentialForm({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const insets = useSafeAreaInsets();
   const color = useThemeColor();
   const features = useServerFeatures();
   const [form, setForm] = useState<CredentialFormState>(EMPTY);
@@ -246,134 +245,116 @@ export default function CredentialForm({
   };
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      onRequestClose={onClose}
-      presentationStyle="fullScreen"
-    >
-      <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
-        {/* Header */}
-        <View className="flex-row items-center justify-between border-b border-border px-4 py-3">
-          <Pressable
-            onPress={onClose}
-            hitSlop={8}
-            className="flex-row items-center gap-1.5"
-          >
-            <X size={18} color={color("foreground")} />
-            <Text weight="medium" className="text-sm text-foreground">
-              Cancel
-            </Text>
-          </Pressable>
-          <Text weight="bold" className="text-base text-foreground">
-            {isEdit ? "Edit Credential" : "New Credential"}
-          </Text>
+    <InlineView
+      open={visible}
+      onClose={onClose}
+      title={isEdit ? "Edit credential" : "New credential"}
+      scroll={false}
+      bare
+      footer={
+        <View className="flex-row gap-2">
+          <Button variant="muted" className="flex-1" onPress={onClose}>
+            Cancel
+          </Button>
           <Button
             variant="default"
-            size="sm"
+            className="flex-1"
             loading={saving}
             onPress={handleSave}
           >
             Save
           </Button>
         </View>
+      }
+    >
+      <Tabs options={TABS} value={activeTab} onChange={setActiveTab} />
 
-        {/* Tab strip */}
-        <View className="border-b border-border">
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{
-              paddingHorizontal: 12,
-              gap: 6,
-              paddingVertical: 8,
-            }}
-          >
-            {TABS.map((tab) => {
-              const active = tab.id === activeTab;
-              return (
-                <Pressable
-                  key={tab.id}
-                  onPress={() => setActiveTab(tab.id)}
-                  className={`border px-3.5 py-1.5 ${
-                    active
-                      ? "border-accent-brand/40 bg-accent-brand/10"
-                      : "border-border active:bg-muted/40"
-                  }`}
-                >
-                  <Text
-                    weight="bold"
-                    className={`text-[11px] uppercase tracking-wider ${
-                      active ? "text-accent-brand" : "text-muted-foreground"
-                    }`}
-                  >
-                    {tab.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
+      <ScrollView
+        contentContainerStyle={{
+          padding: 16,
+          gap: 14,
+          paddingBottom: 24,
+        }}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* General Tab */}
+        {activeTab === "general" ? (
+          <Section title="Info">
+            <Field label="Name">
+              <Input
+                value={form.name}
+                onChangeText={(v) => set("name", v)}
+                placeholder="e.g. Production SSH Key"
+              />
+            </Field>
+            <Field label="Description">
+              <Input
+                value={form.description}
+                onChangeText={(v) => set("description", v)}
+                placeholder="Optional details…"
+              />
+            </Field>
+            <Field label="Folder">
+              <Input
+                value={form.folder}
+                onChangeText={(v) => set("folder", v)}
+                placeholder="e.g. Server Keys"
+              />
+            </Field>
+            <Field label="Tags (comma separated)">
+              <Input
+                value={form.tags}
+                onChangeText={(v) => set("tags", v)}
+                placeholder="production, linux"
+                autoCapitalize="none"
+              />
+            </Field>
+          </Section>
+        ) : null}
 
-        <ScrollView
-          contentContainerStyle={{
-            padding: 16,
-            gap: 14,
-            paddingBottom: insets.bottom + 40,
-          }}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* General Tab */}
-          {activeTab === "general" ? (
-            <Section title="Info">
-              <Field label="Name">
-                <Input
-                  value={form.name}
-                  onChangeText={(v) => set("name", v)}
-                  placeholder="e.g. Production SSH Key"
-                />
-              </Field>
-              <Field label="Description">
-                <Input
-                  value={form.description}
-                  onChangeText={(v) => set("description", v)}
-                  placeholder="Optional details…"
-                />
-              </Field>
-              <Field label="Folder">
-                <Input
-                  value={form.folder}
-                  onChangeText={(v) => set("folder", v)}
-                  placeholder="e.g. Server Keys"
-                />
-              </Field>
-              <Field label="Tags (comma separated)">
-                <Input
-                  value={form.tags}
-                  onChangeText={(v) => set("tags", v)}
-                  placeholder="production, linux"
-                  autoCapitalize="none"
-                />
-              </Field>
+        {/* Auth Tab */}
+        {activeTab === "auth" ? (
+          <>
+            <Section title="Credential Type">
+              <Tabs<"password" | "key">
+                value={form.authType}
+                onChange={(v) => set("authType", v)}
+                options={[
+                  { id: "password", label: "Password" },
+                  { id: "key", label: "SSH Key" },
+                ]}
+              />
             </Section>
-          ) : null}
 
-          {/* Auth Tab */}
-          {activeTab === "auth" ? (
-            <>
-              <Section title="Credential Type">
-                <Tabs<"password" | "key">
-                  value={form.authType}
-                  onChange={(v) => set("authType", v)}
-                  options={[
-                    { id: "password", label: "Password" },
-                    { id: "key", label: "SSH Key" },
-                  ]}
-                />
+            {/* Password auth */}
+            {form.authType === "password" ? (
+              <Section title="Authentication">
+                <Field label="Username">
+                  <Input
+                    value={form.username}
+                    onChangeText={(v) => set("username", v)}
+                    placeholder="e.g. root or deploy"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </Field>
+                <Field label="Password">
+                  <Input
+                    value={form.password}
+                    onChangeText={(v) => set("password", v)}
+                    secureTextEntry
+                    placeholder={
+                      isEdit ? "•••••• (unchanged if blank)" : "Password"
+                    }
+                    autoCapitalize="none"
+                  />
+                </Field>
               </Section>
+            ) : null}
 
-              {/* Password auth */}
-              {form.authType === "password" ? (
+            {/* SSH Key auth */}
+            {form.authType === "key" ? (
+              <>
                 <Section title="Authentication">
                   <Field label="Username">
                     <Input
@@ -384,207 +365,177 @@ export default function CredentialForm({
                       autoCorrect={false}
                     />
                   </Field>
-                  <Field label="Password">
+                </Section>
+
+                {features.has("credentialTools") ? (
+                  <Section title="Key Generation">
+                    <View className="gap-2.5 border border-border bg-card px-3 py-3">
+                      <View className="gap-0.5">
+                        <Text
+                          weight="medium"
+                          className="text-sm text-foreground"
+                        >
+                          Generate new key pair
+                        </Text>
+                        <Text className="text-[10px] text-muted-foreground">
+                          Replaces current private and public key
+                        </Text>
+                      </View>
+                      <View className="flex-row flex-wrap gap-2">
+                        <Button
+                          variant="muted"
+                          size="sm"
+                          loading={generatingKey === "ed25519"}
+                          onPress={() =>
+                            handleGenerateKeyPair(
+                              "ssh-ed25519",
+                              undefined,
+                              "ed25519",
+                            )
+                          }
+                        >
+                          Ed25519
+                        </Button>
+                        <Button
+                          variant="muted"
+                          size="sm"
+                          loading={generatingKey === "ecdsa"}
+                          onPress={() =>
+                            handleGenerateKeyPair(
+                              "ecdsa-sha2-nistp256",
+                              undefined,
+                              "ecdsa",
+                            )
+                          }
+                        >
+                          ECDSA
+                        </Button>
+                        <Button
+                          variant="muted"
+                          size="sm"
+                          loading={generatingKey === "rsa"}
+                          onPress={() =>
+                            handleGenerateKeyPair("ssh-rsa", 2048, "rsa")
+                          }
+                        >
+                          RSA 2048
+                        </Button>
+                      </View>
+                    </View>
+                  </Section>
+                ) : null}
+
+                <Section title="Private Key">
+                  <View className="flex-row items-center justify-between">
+                    <Label>Private Key</Label>
+                    <Button
+                      variant="muted"
+                      size="sm"
+                      onPress={pickPrivateKeyFile}
+                      icon={<Upload size={13} color={color("foreground")} />}
+                    >
+                      Choose file
+                    </Button>
+                  </View>
+                  <Input
+                    value={form.key}
+                    onChangeText={(v) => set("key", v)}
+                    multiline
+                    placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    style={{ minHeight: 100 }}
+                  />
+                  {isEdit && keyExistsOnServer && form.key === "" ? (
+                    <Text className="text-[10px] text-muted-foreground">
+                      Key saved. Paste or upload to replace
+                    </Text>
+                  ) : null}
+                </Section>
+
+                <Section title="Public Key">
+                  <View className="flex-row items-center justify-between">
+                    <Label>Public Key (optional)</Label>
+                    <View className="flex-row gap-1.5">
+                      {features.has("credentialTools") ? (
+                        <Button
+                          variant="muted"
+                          size="sm"
+                          loading={generatingPublicKey}
+                          onPress={handleGeneratePublicKey}
+                        >
+                          Generate
+                        </Button>
+                      ) : null}
+                      <Button
+                        variant="muted"
+                        size="sm"
+                        disabled={!form.publicKey}
+                        onPress={() => {
+                          Clipboard.setStringAsync(form.publicKey);
+                          toast.success("Public key copied");
+                        }}
+                        icon={<Copy size={13} color={color("foreground")} />}
+                      >
+                        Copy
+                      </Button>
+                    </View>
+                  </View>
+                  <Input
+                    value={form.publicKey}
+                    onChangeText={(v) => set("publicKey", v)}
+                    multiline
+                    placeholder="ssh-ed25519 AAAA…"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    style={{ minHeight: 60 }}
+                  />
+                </Section>
+
+                <Section title="Passphrase">
+                  <Field label="Key Passphrase (optional)">
                     <Input
-                      value={form.password}
-                      onChangeText={(v) => set("password", v)}
+                      value={form.keyPassword}
+                      onChangeText={(v) => set("keyPassword", v)}
                       secureTextEntry
-                      placeholder={
-                        isEdit ? "•••••• (unchanged if blank)" : "Password"
-                      }
+                      placeholder="Passphrase (optional)"
                       autoCapitalize="none"
                     />
                   </Field>
                 </Section>
-              ) : null}
 
-              {/* SSH Key auth */}
-              {form.authType === "key" ? (
-                <>
-                  <Section title="Authentication">
-                    <Field label="Username">
-                      <Input
-                        value={form.username}
-                        onChangeText={(v) => set("username", v)}
-                        placeholder="e.g. root or deploy"
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                      />
-                    </Field>
-                  </Section>
-
-                  {features.has("credentialTools") ? (
-                    <Section title="Key Generation">
-                      <View className="gap-2.5 border border-border bg-card px-3 py-3">
-                        <View className="gap-0.5">
-                          <Text
-                            weight="medium"
-                            className="text-sm text-foreground"
-                          >
-                            Generate new key pair
-                          </Text>
-                          <Text className="text-[10px] text-muted-foreground">
-                            Replaces current private and public key
-                          </Text>
-                        </View>
-                        <View className="flex-row flex-wrap gap-2">
-                          <Button
-                            variant="muted"
-                            size="sm"
-                            loading={generatingKey === "ed25519"}
-                            onPress={() =>
-                              handleGenerateKeyPair(
-                                "ssh-ed25519",
-                                undefined,
-                                "ed25519",
-                              )
-                            }
-                          >
-                            Ed25519
-                          </Button>
-                          <Button
-                            variant="muted"
-                            size="sm"
-                            loading={generatingKey === "ecdsa"}
-                            onPress={() =>
-                              handleGenerateKeyPair(
-                                "ecdsa-sha2-nistp256",
-                                undefined,
-                                "ecdsa",
-                              )
-                            }
-                          >
-                            ECDSA
-                          </Button>
-                          <Button
-                            variant="muted"
-                            size="sm"
-                            loading={generatingKey === "rsa"}
-                            onPress={() =>
-                              handleGenerateKeyPair("ssh-rsa", 2048, "rsa")
-                            }
-                          >
-                            RSA 2048
-                          </Button>
-                        </View>
-                      </View>
-                    </Section>
-                  ) : null}
-
-                  <Section title="Private Key">
+                <AccordionSection label="CA Certificate" defaultOpen={false}>
+                  <View className="gap-2.5 pt-3">
                     <View className="flex-row items-center justify-between">
-                      <Label>Private Key</Label>
+                      <Text className="flex-1 pr-2 text-[10px] text-muted-foreground">
+                        Certificate signed by a CA for certificate-based auth
+                      </Text>
                       <Button
                         variant="muted"
                         size="sm"
-                        onPress={pickPrivateKeyFile}
+                        onPress={pickCertFile}
                         icon={<Upload size={13} color={color("foreground")} />}
                       >
-                        Choose file
+                        Upload
                       </Button>
                     </View>
                     <Input
-                      value={form.key}
-                      onChangeText={(v) => set("key", v)}
+                      value={form.certPublicKey}
+                      onChangeText={(v) => set("certPublicKey", v)}
                       multiline
-                      placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      style={{ minHeight: 100 }}
-                    />
-                    {isEdit && keyExistsOnServer && form.key === "" ? (
-                      <Text className="text-[10px] text-muted-foreground">
-                        Key saved. Paste or upload to replace
-                      </Text>
-                    ) : null}
-                  </Section>
-
-                  <Section title="Public Key">
-                    <View className="flex-row items-center justify-between">
-                      <Label>Public Key (optional)</Label>
-                      <View className="flex-row gap-1.5">
-                        {features.has("credentialTools") ? (
-                          <Button
-                            variant="muted"
-                            size="sm"
-                            loading={generatingPublicKey}
-                            onPress={handleGeneratePublicKey}
-                          >
-                            Generate
-                          </Button>
-                        ) : null}
-                        <Button
-                          variant="muted"
-                          size="sm"
-                          disabled={!form.publicKey}
-                          onPress={() => {
-                            Clipboard.setStringAsync(form.publicKey);
-                            toast.success("Public key copied");
-                          }}
-                          icon={<Copy size={13} color={color("foreground")} />}
-                        >
-                          Copy
-                        </Button>
-                      </View>
-                    </View>
-                    <Input
-                      value={form.publicKey}
-                      onChangeText={(v) => set("publicKey", v)}
-                      multiline
-                      placeholder="ssh-ed25519 AAAA…"
+                      placeholder="ssh-ed25519-cert-v01@openssh.com AAAA…"
                       autoCapitalize="none"
                       autoCorrect={false}
                       style={{ minHeight: 60 }}
                     />
-                  </Section>
-
-                  <Section title="Passphrase">
-                    <Field label="Key Passphrase (optional)">
-                      <Input
-                        value={form.keyPassword}
-                        onChangeText={(v) => set("keyPassword", v)}
-                        secureTextEntry
-                        placeholder="Passphrase (optional)"
-                        autoCapitalize="none"
-                      />
-                    </Field>
-                  </Section>
-
-                  <AccordionSection label="CA Certificate" defaultOpen={false}>
-                    <View className="gap-2.5 pt-3">
-                      <View className="flex-row items-center justify-between">
-                        <Text className="flex-1 pr-2 text-[10px] text-muted-foreground">
-                          Certificate signed by a CA for certificate-based auth
-                        </Text>
-                        <Button
-                          variant="muted"
-                          size="sm"
-                          onPress={pickCertFile}
-                          icon={
-                            <Upload size={13} color={color("foreground")} />
-                          }
-                        >
-                          Upload
-                        </Button>
-                      </View>
-                      <Input
-                        value={form.certPublicKey}
-                        onChangeText={(v) => set("certPublicKey", v)}
-                        multiline
-                        placeholder="ssh-ed25519-cert-v01@openssh.com AAAA…"
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                        style={{ minHeight: 60 }}
-                      />
-                    </View>
-                  </AccordionSection>
-                </>
-              ) : null}
-            </>
-          ) : null}
-        </ScrollView>
-      </View>
-    </Modal>
+                  </View>
+                </AccordionSection>
+              </>
+            ) : null}
+          </>
+        ) : null}
+      </ScrollView>
+    </InlineView>
   );
 }
 

@@ -34,7 +34,8 @@ import {
   Button,
   Input,
   Label,
-  Dialog,
+  Sheet,
+  SheetBody,
   EmptyState,
 } from "@/app/components/ui";
 import { toast } from "@/app/utils/toast";
@@ -489,7 +490,8 @@ export default function Snippets() {
       )}
 
       {/* Create / Edit dialog */}
-      <Dialog
+      <Sheet
+        scroll
         visible={editDialog}
         onClose={() => setEditDialog(false)}
         title={editingSnippet ? "Edit Snippet" : "New Snippet"}
@@ -513,100 +515,106 @@ export default function Snippets() {
           </View>
         }
       >
-        <View className="gap-3">
-          <View className="gap-1">
-            <Label>Name</Label>
-            <Input
-              value={form.name}
-              onChangeText={(v) => setForm((f) => ({ ...f, name: v }))}
-              placeholder="e.g. Update packages"
-              autoCapitalize="none"
-            />
-          </View>
-          <View className="gap-1">
-            <Label>Content</Label>
-            <Input
-              value={form.content}
-              onChangeText={(v) => setForm((f) => ({ ...f, content: v }))}
-              placeholder="e.g. sudo apt update && sudo apt upgrade -y"
-              autoCapitalize="none"
-              autoCorrect={false}
-              multiline
-              numberOfLines={3}
-              className="min-h-[72px]"
-            />
-          </View>
-          <View className="gap-1">
-            <Label>Description (optional)</Label>
-            <Input
-              value={form.description}
-              onChangeText={(v) => setForm((f) => ({ ...f, description: v }))}
-              placeholder="Short description"
-              autoCapitalize="sentences"
-            />
-          </View>
-          <View className="gap-1">
-            <Label>Folder (optional)</Label>
-            <Pressable
-              onPress={() => setFolderPickerOpen(true)}
-              className="h-10 flex-row items-center gap-2 border border-input bg-card px-2.5 active:opacity-70"
-            >
-              <FolderOpen size={14} color={color("muted-foreground")} />
-              <Text
-                className={`flex-1 text-sm ${form.folder ? "text-foreground" : "text-muted-foreground"}`}
+        <SheetBody>
+          <View className="gap-3">
+            <View className="gap-1">
+              <Label>Name</Label>
+              <Input
+                value={form.name}
+                onChangeText={(v) => setForm((f) => ({ ...f, name: v }))}
+                placeholder="e.g. Update packages"
+                autoCapitalize="none"
+              />
+            </View>
+            <View className="gap-1">
+              <Label>Content</Label>
+              <Input
+                value={form.content}
+                onChangeText={(v) => setForm((f) => ({ ...f, content: v }))}
+                placeholder="e.g. sudo apt update && sudo apt upgrade -y"
+                autoCapitalize="none"
+                autoCorrect={false}
+                multiline
+                numberOfLines={3}
+                className="min-h-[72px]"
+              />
+            </View>
+            <View className="gap-1">
+              <Label>Description (optional)</Label>
+              <Input
+                value={form.description}
+                onChangeText={(v) => setForm((f) => ({ ...f, description: v }))}
+                placeholder="Short description"
+                autoCapitalize="sentences"
+              />
+            </View>
+            <View className="gap-1">
+              <Label>Folder (optional)</Label>
+              <Pressable
+                onPress={() => setFolderPickerOpen(true)}
+                className="h-10 flex-row items-center gap-2 border border-input bg-card px-2.5 active:opacity-70"
               >
-                {form.folder || "No folder"}
-              </Text>
-              <ChevronRight size={14} color={color("muted-foreground")} />
-            </Pressable>
+                <FolderOpen size={14} color={color("muted-foreground")} />
+                <Text
+                  className={`flex-1 text-sm ${form.folder ? "text-foreground" : "text-muted-foreground"}`}
+                >
+                  {form.folder || "No folder"}
+                </Text>
+                <ChevronRight size={14} color={color("muted-foreground")} />
+              </Pressable>
+            </View>
           </View>
-        </View>
-      </Dialog>
+        </SheetBody>
+      </Sheet>
 
       {/* Folder picker */}
-      <Dialog
+      <Sheet
+        scroll
         visible={folderPickerOpen}
         onClose={() => setFolderPickerOpen(false)}
         title="Select Folder"
       >
-        <View className="-mx-4 -mb-4">
-          <Pressable
-            onPress={() => {
-              setForm((f) => ({ ...f, folder: "" }));
-              setFolderPickerOpen(false);
-            }}
-            className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-muted/30"
-          >
-            <FolderOpen size={14} color={color("muted-foreground")} />
-            <Text className="flex-1 text-sm text-foreground">No folder</Text>
-            {!form.folder && <Check size={14} color={color("primary")} />}
-          </Pressable>
-          {folders.map((folder) => (
+        <SheetBody>
+          <View className="-mx-4 -mb-4">
             <Pressable
-              key={folder.id}
               onPress={() => {
-                setForm((f) => ({ ...f, folder: folder.name }));
+                setForm((f) => ({ ...f, folder: "" }));
                 setFolderPickerOpen(false);
               }}
               className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-muted/30"
             >
-              <FolderOpen
-                size={14}
-                color={folder.color ?? color("muted-foreground")}
-              />
-              <Text className="flex-1 text-sm text-foreground">
-                {folder.name}
-              </Text>
-              {form.folder === folder.name && (
-                <Check size={14} color={color("primary")} />
-              )}
+              <FolderOpen size={14} color={color("muted-foreground")} />
+              <Text className="flex-1 text-sm text-foreground">No folder</Text>
+              {!form.folder && <Check size={14} color={color("primary")} />}
             </Pressable>
-          ))}
-        </View>
-      </Dialog>
+            {folders.map((folder) => (
+              <Pressable
+                key={folder.id}
+                onPress={() => {
+                  setForm((f) => ({ ...f, folder: folder.name }));
+                  setFolderPickerOpen(false);
+                }}
+                className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-muted/30"
+              >
+                <FolderOpen
+                  size={14}
+                  color={folder.color ?? color("muted-foreground")}
+                />
+                <Text className="flex-1 text-sm text-foreground">
+                  {folder.name}
+                </Text>
+                {form.folder === folder.name && (
+                  <Check size={14} color={color("primary")} />
+                )}
+              </Pressable>
+            ))}
+          </View>
+        </SheetBody>
+      </Sheet>
 
       {/* Delete snippet confirm */}
-      <Dialog
+      <Sheet
+        scroll
         visible={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         title="Delete Snippet"
@@ -633,7 +641,8 @@ export default function Snippets() {
       />
 
       {/* Rename folder dialog */}
-      <Dialog
+      <Sheet
+        scroll
         visible={renameFolderTarget !== null}
         onClose={() => setRenameFolderTarget(null)}
         title="Rename Folder"
@@ -657,19 +666,22 @@ export default function Snippets() {
           </View>
         }
       >
-        <View className="gap-1">
-          <Label>Folder name</Label>
-          <Input
-            value={renameFolderName}
-            onChangeText={setRenameFolderName}
-            placeholder="e.g. System"
-            autoCapitalize="words"
-          />
-        </View>
-      </Dialog>
+        <SheetBody>
+          <View className="gap-1">
+            <Label>Folder name</Label>
+            <Input
+              value={renameFolderName}
+              onChangeText={setRenameFolderName}
+              placeholder="e.g. System"
+              autoCapitalize="words"
+            />
+          </View>
+        </SheetBody>
+      </Sheet>
 
       {/* New folder dialog */}
-      <Dialog
+      <Sheet
+        scroll
         visible={folderDialog}
         onClose={() => setFolderDialog(false)}
         title="New Folder"
@@ -693,19 +705,22 @@ export default function Snippets() {
           </View>
         }
       >
-        <View className="gap-1">
-          <Label>Folder name</Label>
-          <Input
-            value={folderName}
-            onChangeText={setFolderName}
-            placeholder="e.g. System"
-            autoCapitalize="words"
-          />
-        </View>
-      </Dialog>
+        <SheetBody>
+          <View className="gap-1">
+            <Label>Folder name</Label>
+            <Input
+              value={folderName}
+              onChangeText={setFolderName}
+              placeholder="e.g. System"
+              autoCapitalize="words"
+            />
+          </View>
+        </SheetBody>
+      </Sheet>
 
       {/* Delete folder confirm */}
-      <Dialog
+      <Sheet
+        scroll
         visible={!!deleteFolderTarget}
         onClose={() => setDeleteFolderTarget(null)}
         title="Delete Folder"

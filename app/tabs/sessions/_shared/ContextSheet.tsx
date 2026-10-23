@@ -1,5 +1,5 @@
 import { View } from "react-native";
-import { BottomSheet, SheetRow, Text } from "@/app/components/ui";
+import { Sheet, SheetRow, Text } from "@/app/components/ui";
 
 export interface ContextAction {
   key: string;
@@ -32,7 +32,7 @@ export function ContextSheet({
   const items = actions.filter(Boolean) as ContextAction[];
 
   return (
-    <BottomSheet visible={visible} onClose={onClose}>
+    <Sheet visible={visible} onClose={onClose}>
       {title ? (
         <View className="border-b border-border px-4 pb-3 pt-1">
           <Text
@@ -63,6 +63,6 @@ export function ContextSheet({
           }}
         />
       ))}
-    </BottomSheet>
+    </Sheet>
   );
 }

@@ -1,8 +1,9 @@
 import { useState, useCallback } from "react";
-import { View, Platform, Modal, Pressable, ScrollView } from "react-native";
+import { View } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { Shield, AlertTriangle, Copy, Check } from "lucide-react-native";
-import { Button, Text } from "@/app/components/ui";
+import { Button, Label, Sheet, SheetBody, Text } from "@/app/components/ui";
+import { MONO_FONT } from "@/app/constants/fonts";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
 import type { HostKeyData } from "@/app/tabs/sessions/terminal/NativeWebSocketManager";
 
@@ -39,10 +40,8 @@ function FingerprintRow({
   }, [fingerprint]);
 
   return (
-    <View className="mb-3">
-      <Text className="mb-1.5 text-xs uppercase tracking-wider text-muted-foreground">
-        {label}
-      </Text>
+    <View>
+      <Label className="mb-1.5">{label}</Label>
       <View className="border border-border bg-card p-3">
         <Text className="mb-1.5 text-xs text-muted-foreground">
           {algorithm.toUpperCase()} ({keyType})
@@ -50,10 +49,7 @@ function FingerprintRow({
         <View className="flex-row items-start gap-2">
           <Text
             className="flex-1 text-xs text-foreground"
-            style={{
-              fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
-              lineHeight: 18,
-            }}
+            style={{ fontFamily: MONO_FONT, lineHeight: 18 }}
             selectable
           >
             {formatFingerprint(fingerprint)}
@@ -90,156 +86,72 @@ export function HostKeyVerificationDialog({
   const hostLabel = data ? `${data.hostname ?? data.ip}:${data.port}` : "";
 
   return (
-    <Modal
+    <Sheet
       visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onReject}
-      statusBarTranslucent
-    >
-      <Pressable
-        className="flex-1 items-center justify-center bg-black/50 px-5"
-        onPress={onReject}
-      >
-        <Pressable
-          className="w-full max-w-md"
-          onPress={(e) => e.stopPropagation()}
-        >
-          <ScrollView
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
+      onClose={onReject}
+      scroll
+      tone={isChanged ? "destructive" : "default"}
+      title={isChanged ? "Host key changed" : "Verify host key"}
+      description={hostLabel}
+      icon={
+        isChanged ? (
+          <AlertTriangle size={16} color={color("destructive")} />
+        ) : (
+          <Shield size={16} color={color("accent-brand")} />
+        )
+      }
+      footer={
+        <View className="flex-row gap-2">
+          <Button variant="muted" className="flex-1" onPress={onReject}>
+            Cancel
+          </Button>
+          <Button
+            variant={isChanged ? "destructive" : "default"}
+            className="flex-1"
+            onPress={onAccept}
           >
-            {/* Card with scenario-aware border */}
-            <View
-              className="border bg-popover"
-              style={{
-                borderColor: isChanged
-                  ? color("destructive", 0.5)
-                  : color("border"),
-              }}
-            >
-              {/* Header */}
-              <View
-                className="flex-row items-center gap-2.5 border-b px-4 pb-3 pt-4"
-                style={{
-                  borderColor: isChanged
-                    ? color("destructive", 0.3)
-                    : color("border"),
-                }}
-              >
-                <View
-                  className="h-8 w-8 shrink-0 items-center justify-center border"
-                  style={{
-                    borderColor: isChanged
-                      ? color("destructive", 0.4)
-                      : color("border"),
-                    backgroundColor: isChanged
-                      ? color("destructive", 0.1)
-                      : color("muted"),
-                  }}
-                >
-                  {isChanged ? (
-                    <AlertTriangle size={16} color={color("destructive")} />
-                  ) : (
-                    <Shield size={16} color={color("accent-brand")} />
-                  )}
-                </View>
-                <View className="min-w-0 flex-1">
-                  <Text
-                    weight="bold"
-                    className="text-base"
-                    style={{
-                      color: isChanged
-                        ? color("destructive")
-                        : color("foreground"),
-                    }}
-                  >
-                    {isChanged ? "Host Key Changed!" : "Verify Host Key"}
-                  </Text>
-                  <Text
-                    className="mt-0.5 text-xs"
-                    style={{
-                      fontFamily:
-                        Platform.OS === "ios" ? "Courier" : "monospace",
-                      color: color("muted-foreground"),
-                    }}
-                  >
-                    {hostLabel}
-                  </Text>
-                </View>
-              </View>
+            {isChanged ? "Accept new key" : "Connect and trust"}
+          </Button>
+        </View>
+      }
+    >
+      <SheetBody>
+        <View
+          className={`border px-3 py-2.5 ${isChanged ? "border-destructive/40 bg-destructive/10" : "border-accent-brand/30 bg-accent-brand/5"}`}
+        >
+          <Text
+            className={`text-xs ${isChanged ? "text-destructive" : "text-accent-brand"}`}
+          >
+            {isChanged
+              ? "The host's SSH key has changed since your last connection. This could mean someone is intercepting the connection."
+              : "You are connecting to this host for the first time. Check the fingerprint before you trust it."}
+          </Text>
+        </View>
 
-              {/* Body */}
-              <View className="px-4 py-4">
-                {/* Status banner */}
-                <View
-                  className="mb-4 border px-3 py-2.5"
-                  style={{
-                    borderColor: isChanged
-                      ? color("destructive", 0.4)
-                      : color("accent-brand", 0.3),
-                    backgroundColor: isChanged
-                      ? color("destructive", 0.08)
-                      : color("accent-brand", 0.06),
-                  }}
-                >
-                  <Text
-                    className="text-xs"
-                    style={{
-                      color: isChanged
-                        ? color("destructive")
-                        : color("accent-brand"),
-                    }}
-                  >
-                    {isChanged
-                      ? "The host's SSH key has changed since your last connection. This could indicate a security risk."
-                      : "You are connecting to this host for the first time. Verify the fingerprint before trusting."}
-                  </Text>
-                </View>
-
-                {/* Fingerprints */}
-                {data && isChanged && data.oldFingerprint ? (
-                  <>
-                    <FingerprintRow
-                      label="Previous Key"
-                      algorithm={data.algorithm}
-                      fingerprint={data.oldFingerprint}
-                      keyType={data.oldKeyType ?? data.keyType}
-                    />
-                    <FingerprintRow
-                      label="New Fingerprint"
-                      algorithm={data.algorithm}
-                      fingerprint={data.fingerprint}
-                      keyType={data.keyType}
-                    />
-                  </>
-                ) : data ? (
-                  <FingerprintRow
-                    label="Host Fingerprint"
-                    algorithm={data.algorithm}
-                    fingerprint={data.fingerprint}
-                    keyType={data.keyType}
-                  />
-                ) : null}
-              </View>
-
-              {/* Footer */}
-              <View className="flex-row justify-end gap-2 border-t border-border px-4 py-3">
-                <Button variant="muted" className="flex-1" onPress={onReject}>
-                  Cancel
-                </Button>
-                <Button
-                  variant={isChanged ? "destructive" : "default"}
-                  className="flex-1"
-                  onPress={onAccept}
-                >
-                  {isChanged ? "Accept New Key" : "Connect & Trust"}
-                </Button>
-              </View>
-            </View>
-          </ScrollView>
-        </Pressable>
-      </Pressable>
-    </Modal>
+        {data && isChanged && data.oldFingerprint ? (
+          <>
+            <FingerprintRow
+              label="Previous key"
+              algorithm={data.algorithm}
+              fingerprint={data.oldFingerprint}
+              keyType={data.oldKeyType ?? data.keyType}
+            />
+            <FingerprintRow
+              label="New fingerprint"
+              algorithm={data.algorithm}
+              fingerprint={data.fingerprint}
+              keyType={data.keyType}
+            />
+          </>
+        ) : data ? (
+          <FingerprintRow
+            label="Host fingerprint"
+            algorithm={data.algorithm}
+            fingerprint={data.fingerprint}
+            keyType={data.keyType}
+          />
+        ) : null}
+      </SheetBody>
+    </Sheet>
   );
 }

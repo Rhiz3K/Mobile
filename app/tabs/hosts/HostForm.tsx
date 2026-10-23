@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Modal, View, ScrollView, Pressable } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { X, Upload, Trash2 } from "lucide-react-native";
+import { View, ScrollView, Pressable } from "react-native";
+import { Upload, Trash2 } from "lucide-react-native";
 import * as DocumentPicker from "expo-document-picker";
 import { SSHHost, SSHHostData, Credential, TunnelConnection } from "@/types";
 import {
@@ -20,6 +19,7 @@ import {
   FakeSwitch,
   SettingRow,
   Tabs,
+  InlineView,
 } from "@/app/components/ui";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
 import { useServerFeatures } from "@/app/contexts/ServerFeaturesContext";
@@ -121,7 +121,6 @@ export default function HostForm({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const insets = useSafeAreaInsets();
   const color = useThemeColor();
   const [form, setForm] = useState<FormState>(EMPTY);
   const [credentials, setCredentials] = useState<Credential[]>([]);
@@ -414,139 +413,300 @@ export default function HostForm({
   };
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      onRequestClose={onClose}
-      presentationStyle="fullScreen"
-    >
-      <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
-        {/* Header */}
-        <View className="flex-row items-center justify-between border-b border-border px-4 py-3">
-          <Pressable
-            onPress={onClose}
-            hitSlop={8}
-            className="flex-row items-center gap-1.5"
-          >
-            <X size={18} color={color("foreground")} />
-            <Text weight="medium" className="text-sm text-foreground">
-              Cancel
-            </Text>
-          </Pressable>
-          <Text weight="bold" className="text-base text-foreground">
-            {isEdit ? "Edit Host" : "New Host"}
-          </Text>
+    <InlineView
+      open={visible}
+      onClose={onClose}
+      title={isEdit ? "Edit host" : "New host"}
+      subtitle={isEdit ? host?.name : undefined}
+      scroll={false}
+      bare
+      footer={
+        <View className="flex-row gap-2">
+          <Button variant="muted" className="flex-1" onPress={onClose}>
+            Cancel
+          </Button>
           <Button
             variant="default"
-            size="sm"
+            className="flex-1"
             loading={saving}
             onPress={handleSave}
           >
             Save
           </Button>
         </View>
+      }
+    >
+      <Tabs
+        options={tabs}
+        value={activeTab}
+        onChange={setActiveTab}
+        fill={tabs.length <= 4}
+      />
 
-        {/* Tab strip */}
-        <View className="border-b border-border">
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{
-              paddingHorizontal: 12,
-              gap: 6,
-              paddingVertical: 8,
-            }}
-          >
-            {tabs.map((tab) => {
-              const active = tab.id === activeTab;
-              return (
-                <Pressable
-                  key={tab.id}
-                  onPress={() => setActiveTab(tab.id)}
-                  className={`border px-3.5 py-1.5 ${
-                    active
-                      ? "border-accent-brand/40 bg-accent-brand/10"
-                      : "border-border active:bg-muted/40"
-                  }`}
-                >
-                  <Text
-                    weight="bold"
-                    className={`text-[11px] uppercase tracking-wider ${
-                      active ? "text-accent-brand" : "text-muted-foreground"
-                    }`}
-                  >
-                    {tab.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
-
-        <ScrollView
-          contentContainerStyle={{
-            padding: 16,
-            gap: 14,
-            paddingBottom: insets.bottom + 40,
-          }}
-          keyboardShouldPersistTaps="handled"
-        >
-          {activeTab === "general" ? (
-            <>
-              {/* Connection */}
-              <Section title="Connection">
-                <Field label="Name">
-                  <Input
-                    value={form.name}
-                    onChangeText={(v) => set("name", v)}
-                    placeholder="My Server"
-                  />
-                </Field>
-                <View className="flex-row gap-2.5">
-                  <View className="flex-[3]">
-                    <Field label="Host / IP">
-                      <Input
-                        value={form.ip}
-                        onChangeText={(v) => set("ip", v)}
-                        placeholder="192.168.1.10"
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                      />
-                    </Field>
-                  </View>
-                  <View className="flex-1">
-                    <Field label="SSH Port">
-                      <Input
-                        value={form.port}
-                        onChangeText={(v) => set("port", v.replace(/\D/g, ""))}
-                        keyboardType="number-pad"
-                        placeholder="22"
-                      />
-                    </Field>
-                  </View>
-                </View>
-                {has("wakeOnLan") ? (
-                  <Field label="MAC Address (for Wake-on-LAN)">
+      <ScrollView
+        contentContainerStyle={{
+          padding: 16,
+          gap: 14,
+          paddingBottom: 24,
+        }}
+        keyboardShouldPersistTaps="handled"
+      >
+        {activeTab === "general" ? (
+          <>
+            {/* Connection */}
+            <Section title="Connection">
+              <Field label="Name">
+                <Input
+                  value={form.name}
+                  onChangeText={(v) => set("name", v)}
+                  placeholder="My Server"
+                />
+              </Field>
+              <View className="flex-row gap-2.5">
+                <View className="flex-[3]">
+                  <Field label="Host / IP">
                     <Input
-                      value={form.macAddress}
-                      onChangeText={(v) => set("macAddress", v)}
-                      placeholder="00:1A:2B:3C:4D:5E"
-                      autoCapitalize="characters"
+                      value={form.ip}
+                      onChangeText={(v) => set("ip", v)}
+                      placeholder="192.168.1.10"
+                      autoCapitalize="none"
                       autoCorrect={false}
                     />
                   </Field>
-                ) : null}
-              </Section>
+                </View>
+                <View className="flex-1">
+                  <Field label="SSH Port">
+                    <Input
+                      value={form.port}
+                      onChangeText={(v) => set("port", v.replace(/\D/g, ""))}
+                      keyboardType="number-pad"
+                      placeholder="22"
+                    />
+                  </Field>
+                </View>
+              </View>
+              {has("wakeOnLan") ? (
+                <Field label="MAC Address (for Wake-on-LAN)">
+                  <Input
+                    value={form.macAddress}
+                    onChangeText={(v) => set("macAddress", v)}
+                    placeholder="00:1A:2B:3C:4D:5E"
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                  />
+                </Field>
+              ) : null}
+            </Section>
 
-              {/* Protocols */}
-              <Section title="Protocols">
+            {/* Protocols */}
+            <Section title="Protocols">
+              <View>
+                {protocolToggles.map((row, i) => (
+                  <SettingRow
+                    key={row.key}
+                    label={row.label}
+                    description={row.description}
+                    last={i === protocolToggles.length - 1}
+                  >
+                    <FakeSwitch
+                      checked={form[row.key]}
+                      onChange={(v) => set(row.key, v)}
+                    />
+                  </SettingRow>
+                ))}
+              </View>
+              <Text className="text-[11px] text-muted-foreground">
+                Enable a protocol to configure it in its own tab above.
+              </Text>
+            </Section>
+
+            {/* Organization */}
+            <Section title="Organization">
+              <Field label="Folder">
+                <Input
+                  value={form.folder}
+                  onChangeText={(v) => set("folder", v)}
+                  placeholder="Production"
+                />
+              </Field>
+              <Field label="Tags (comma separated)">
+                <Input
+                  value={form.tags}
+                  onChangeText={(v) => set("tags", v)}
+                  placeholder="web, nginx"
+                  autoCapitalize="none"
+                />
+              </Field>
+              <SettingRow label="Pin to top" last>
+                <FakeSwitch
+                  checked={form.pin}
+                  onChange={(v) => set("pin", v)}
+                />
+              </SettingRow>
+            </Section>
+
+            {/* Notes */}
+            <Section title="Notes">
+              <Input
+                value={form.notes}
+                onChangeText={(v) => set("notes", v)}
+                multiline
+                placeholder="Notes about this host…"
+                style={{ minHeight: 70 }}
+              />
+            </Section>
+          </>
+        ) : null}
+
+        {activeTab === "ssh" ? (
+          <>
+            <Section title="Authentication">
+              <Field label="Username">
+                <Input
+                  value={form.username}
+                  onChangeText={(v) => set("username", v)}
+                  placeholder="root"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </Field>
+              <Tabs<AuthType>
+                value={form.authType}
+                onChange={(v) => set("authType", v)}
+                options={[
+                  { id: "password", label: "Pass" },
+                  { id: "key", label: "Key" },
+                  { id: "credential", label: "Cred" },
+                  { id: "none", label: "None" },
+                  ...(tailscaleAvailable || form.authType === "tailscale"
+                    ? [{ id: "tailscale" as const, label: "Tailscale" }]
+                    : []),
+                ]}
+              />
+
+              {form.authType === "tailscale" ? (
+                <>
+                  <Text className="text-xs text-muted-foreground">
+                    Connects with Tailscale SSH; no password or key is stored.
+                  </Text>
+                  {tailscaleAvailable ? (
+                    <TailscaleDevicePicker
+                      address={form.ip}
+                      onSelect={(device) =>
+                        setForm((current) => {
+                          const ip = tailnetAddress(device);
+                          const typed = current.name.trim();
+                          if (typed && typed !== autoNameRef.current) {
+                            return { ...current, ip };
+                          }
+                          const name = device.hostname || device.name || ip;
+                          autoNameRef.current = name;
+                          return { ...current, ip, name };
+                        })
+                      }
+                    />
+                  ) : (
+                    <Text className="text-xs text-muted-foreground">
+                      Tailscale is unavailable on this server. This host keeps
+                      its Tailscale authentication setting.
+                    </Text>
+                  )}
+                </>
+              ) : null}
+
+              {form.authType === "password" ? (
+                <Field label="Password">
+                  <Input
+                    value={form.password}
+                    onChangeText={(v) => set("password", v)}
+                    secureTextEntry
+                    placeholder={
+                      isEdit ? "•••••• (unchanged if blank)" : "Password"
+                    }
+                    autoCapitalize="none"
+                  />
+                </Field>
+              ) : null}
+
+              {form.authType === "key" ? (
+                <>
+                  <View className="flex-row items-center justify-between">
+                    <Label>Private Key</Label>
+                    <Button
+                      variant="muted"
+                      size="sm"
+                      onPress={pickKeyFile}
+                      icon={<Upload size={13} color={color("foreground")} />}
+                    >
+                      Choose file
+                    </Button>
+                  </View>
+                  <Input
+                    value={form.key}
+                    onChangeText={(v) => set("key", v)}
+                    multiline
+                    placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    style={{ minHeight: 100 }}
+                  />
+                  <Field label="Key Passphrase (optional)">
+                    <Input
+                      value={form.keyPassword}
+                      onChangeText={(v) => set("keyPassword", v)}
+                      secureTextEntry
+                      placeholder="Passphrase"
+                      autoCapitalize="none"
+                    />
+                  </Field>
+                </>
+              ) : null}
+
+              {form.authType === "credential" ? (
+                <Field label="Credential">
+                  {credentials.length === 0 ? (
+                    <Text className="py-2 text-xs text-muted-foreground">
+                      No saved credentials. Tap the key icon in Hosts to add
+                      one.
+                    </Text>
+                  ) : (
+                    <View className="gap-1.5">
+                      {credentials.map((c) => {
+                        const selected = form.credentialId === c.id;
+                        return (
+                          <Pressable
+                            key={c.id}
+                            onPress={() => set("credentialId", c.id)}
+                            className={`border px-3 py-2.5 ${selected ? "border-accent-brand/40 bg-accent-brand/10" : "border-border bg-card"}`}
+                          >
+                            <Text
+                              weight="medium"
+                              className={`text-sm ${selected ? "text-accent-brand" : "text-foreground"}`}
+                            >
+                              {c.name}
+                            </Text>
+                            {c.username ? (
+                              <Text className="text-[11px] text-muted-foreground">
+                                {c.username}
+                              </Text>
+                            ) : null}
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  )}
+                </Field>
+              ) : null}
+            </Section>
+
+            {featureToggles.length > 0 ? (
+              <Section title="Features">
                 <View>
-                  {protocolToggles.map((row, i) => (
+                  {featureToggles.map((row, i) => (
                     <SettingRow
                       key={row.key}
                       label={row.label}
-                      description={row.description}
-                      last={i === protocolToggles.length - 1}
+                      last={i === featureToggles.length - 1}
                     >
                       <FakeSwitch
                         checked={form[row.key]}
@@ -555,463 +715,262 @@ export default function HostForm({
                     </SettingRow>
                   ))}
                 </View>
-                <Text className="text-[11px] text-muted-foreground">
-                  Enable a protocol to configure it in its own tab above.
-                </Text>
+                {form.enableFileManager && has("fileManager") ? (
+                  <Field label="Default Path">
+                    <Input
+                      value={form.defaultPath}
+                      onChangeText={(v) => set("defaultPath", v)}
+                      placeholder="/"
+                      autoCapitalize="none"
+                    />
+                  </Field>
+                ) : null}
               </Section>
+            ) : null}
+          </>
+        ) : null}
 
-              {/* Organization */}
-              <Section title="Organization">
-                <Field label="Folder">
-                  <Input
-                    value={form.folder}
-                    onChangeText={(v) => set("folder", v)}
-                    placeholder="Production"
+        {activeTab === "tunnels" ? (
+          <Section title="Tunnels">
+            {tunnels.length === 0 ? (
+              <Text className="text-[11px] text-muted-foreground">
+                No tunnels yet. Add one to forward a port from the endpoint host
+                to this host.
+              </Text>
+            ) : null}
+
+            {tunnels.map((tunnel, idx) => (
+              <View key={idx} className="gap-2.5 border border-border p-3">
+                <View className="flex-row items-center justify-between">
+                  <Text weight="bold" className="text-xs">
+                    Tunnel {idx + 1}
+                  </Text>
+                  <Pressable
+                    onPress={() => removeTunnel(idx)}
+                    hitSlop={8}
+                    className="border border-destructive/40 p-1.5 active:bg-destructive/10"
+                  >
+                    <Trash2 size={14} color={color("destructive")} />
+                  </Pressable>
+                </View>
+
+                <Field label="Endpoint Host">
+                  <Tabs<string>
+                    value={tunnel.endpointHost ?? ""}
+                    onChange={(v) => setTunnel(idx, { endpointHost: v })}
+                    options={endpointOptions}
+                    fill={false}
                   />
                 </Field>
-                <Field label="Tags (comma separated)">
-                  <Input
-                    value={form.tags}
-                    onChangeText={(v) => set("tags", v)}
-                    placeholder="web, nginx"
-                    autoCapitalize="none"
-                  />
-                </Field>
-                <SettingRow label="Pin to top" last>
-                  <FakeSwitch
-                    checked={form.pin}
-                    onChange={(v) => set("pin", v)}
-                  />
-                </SettingRow>
-              </Section>
 
-              {/* Notes */}
-              <Section title="Notes">
-                <Input
-                  value={form.notes}
-                  onChangeText={(v) => set("notes", v)}
-                  multiline
-                  placeholder="Notes about this host…"
-                  style={{ minHeight: 70 }}
-                />
-              </Section>
-            </>
-          ) : null}
-
-          {activeTab === "ssh" ? (
-            <>
-              <Section title="Authentication">
-                <Field label="Username">
-                  <Input
-                    value={form.username}
-                    onChangeText={(v) => set("username", v)}
-                    placeholder="root"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                </Field>
-                <Tabs<AuthType>
-                  value={form.authType}
-                  onChange={(v) => set("authType", v)}
-                  options={[
-                    { id: "password", label: "Pass" },
-                    { id: "key", label: "Key" },
-                    { id: "credential", label: "Cred" },
-                    { id: "none", label: "None" },
-                    ...(tailscaleAvailable || form.authType === "tailscale"
-                      ? [{ id: "tailscale" as const, label: "Tailscale" }]
-                      : []),
-                  ]}
-                />
-
-                {form.authType === "tailscale" ? (
-                  <>
-                    <Text className="text-xs text-muted-foreground">
-                      Connects with Tailscale SSH; no password or key is stored.
-                    </Text>
-                    {tailscaleAvailable ? (
-                      <TailscaleDevicePicker
-                        address={form.ip}
-                        onSelect={(device) =>
-                          setForm((current) => {
-                            const ip = tailnetAddress(device);
-                            const typed = current.name.trim();
-                            if (typed && typed !== autoNameRef.current) {
-                              return { ...current, ip };
-                            }
-                            const name = device.hostname || device.name || ip;
-                            autoNameRef.current = name;
-                            return { ...current, ip, name };
+                <View className="flex-row gap-2.5">
+                  <View className="flex-1">
+                    <Field label="Source Port">
+                      <Input
+                        value={String(tunnel.sourcePort ?? "")}
+                        onChangeText={(v) =>
+                          setTunnel(idx, {
+                            sourcePort: Number(v.replace(/\D/g, "")) || 0,
                           })
                         }
-                      />
-                    ) : (
-                      <Text className="text-xs text-muted-foreground">
-                        Tailscale is unavailable on this server. This host keeps
-                        its Tailscale authentication setting.
-                      </Text>
-                    )}
-                  </>
-                ) : null}
-
-                {form.authType === "password" ? (
-                  <Field label="Password">
-                    <Input
-                      value={form.password}
-                      onChangeText={(v) => set("password", v)}
-                      secureTextEntry
-                      placeholder={
-                        isEdit ? "•••••• (unchanged if blank)" : "Password"
-                      }
-                      autoCapitalize="none"
-                    />
-                  </Field>
-                ) : null}
-
-                {form.authType === "key" ? (
-                  <>
-                    <View className="flex-row items-center justify-between">
-                      <Label>Private Key</Label>
-                      <Button
-                        variant="muted"
-                        size="sm"
-                        onPress={pickKeyFile}
-                        icon={<Upload size={13} color={color("foreground")} />}
-                      >
-                        Choose file
-                      </Button>
-                    </View>
-                    <Input
-                      value={form.key}
-                      onChangeText={(v) => set("key", v)}
-                      multiline
-                      placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      style={{ minHeight: 100 }}
-                    />
-                    <Field label="Key Passphrase (optional)">
-                      <Input
-                        value={form.keyPassword}
-                        onChangeText={(v) => set("keyPassword", v)}
-                        secureTextEntry
-                        placeholder="Passphrase"
-                        autoCapitalize="none"
+                        keyboardType="number-pad"
+                        placeholder="8080"
                       />
                     </Field>
-                  </>
-                ) : null}
-
-                {form.authType === "credential" ? (
-                  <Field label="Credential">
-                    {credentials.length === 0 ? (
-                      <Text className="py-2 text-xs text-muted-foreground">
-                        No saved credentials. Tap the key icon in Hosts to add
-                        one.
-                      </Text>
-                    ) : (
-                      <View className="gap-1.5">
-                        {credentials.map((c) => {
-                          const selected = form.credentialId === c.id;
-                          return (
-                            <Pressable
-                              key={c.id}
-                              onPress={() => set("credentialId", c.id)}
-                              className={`border px-3 py-2.5 ${selected ? "border-accent-brand/40 bg-accent-brand/10" : "border-border bg-card"}`}
-                            >
-                              <Text
-                                weight="medium"
-                                className={`text-sm ${selected ? "text-accent-brand" : "text-foreground"}`}
-                              >
-                                {c.name}
-                              </Text>
-                              {c.username ? (
-                                <Text className="text-[11px] text-muted-foreground">
-                                  {c.username}
-                                </Text>
-                              ) : null}
-                            </Pressable>
-                          );
-                        })}
-                      </View>
-                    )}
-                  </Field>
-                ) : null}
-              </Section>
-
-              {featureToggles.length > 0 ? (
-                <Section title="Features">
-                  <View>
-                    {featureToggles.map((row, i) => (
-                      <SettingRow
-                        key={row.key}
-                        label={row.label}
-                        last={i === featureToggles.length - 1}
-                      >
-                        <FakeSwitch
-                          checked={form[row.key]}
-                          onChange={(v) => set(row.key, v)}
-                        />
-                      </SettingRow>
-                    ))}
                   </View>
-                  {form.enableFileManager && has("fileManager") ? (
-                    <Field label="Default Path">
+                  <View className="flex-1">
+                    <Field label="Endpoint Port">
                       <Input
-                        value={form.defaultPath}
-                        onChangeText={(v) => set("defaultPath", v)}
-                        placeholder="/"
-                        autoCapitalize="none"
+                        value={String(tunnel.endpointPort ?? "")}
+                        onChangeText={(v) =>
+                          setTunnel(idx, {
+                            endpointPort: Number(v.replace(/\D/g, "")) || 0,
+                          })
+                        }
+                        keyboardType="number-pad"
+                        placeholder="80"
                       />
                     </Field>
-                  ) : null}
-                </Section>
-              ) : null}
-            </>
-          ) : null}
-
-          {activeTab === "tunnels" ? (
-            <Section title="Tunnels">
-              {tunnels.length === 0 ? (
-                <Text className="text-[11px] text-muted-foreground">
-                  No tunnels yet. Add one to forward a port from the endpoint
-                  host to this host.
-                </Text>
-              ) : null}
-
-              {tunnels.map((tunnel, idx) => (
-                <View key={idx} className="gap-2.5 border border-border p-3">
-                  <View className="flex-row items-center justify-between">
-                    <Text weight="bold" className="text-xs">
-                      Tunnel {idx + 1}
-                    </Text>
-                    <Pressable
-                      onPress={() => removeTunnel(idx)}
-                      hitSlop={8}
-                      className="border border-destructive/40 p-1.5 active:bg-destructive/10"
-                    >
-                      <Trash2 size={14} color={color("destructive")} />
-                    </Pressable>
                   </View>
+                </View>
 
-                  <Field label="Endpoint Host">
-                    <Tabs<string>
-                      value={tunnel.endpointHost ?? ""}
-                      onChange={(v) => setTunnel(idx, { endpointHost: v })}
-                      options={endpointOptions}
-                      fill={false}
-                    />
-                  </Field>
-
-                  <View className="flex-row gap-2.5">
-                    <View className="flex-1">
-                      <Field label="Source Port">
-                        <Input
-                          value={String(tunnel.sourcePort ?? "")}
-                          onChangeText={(v) =>
-                            setTunnel(idx, {
-                              sourcePort: Number(v.replace(/\D/g, "")) || 0,
-                            })
-                          }
-                          keyboardType="number-pad"
-                          placeholder="8080"
-                        />
-                      </Field>
-                    </View>
-                    <View className="flex-1">
-                      <Field label="Endpoint Port">
-                        <Input
-                          value={String(tunnel.endpointPort ?? "")}
-                          onChangeText={(v) =>
-                            setTunnel(idx, {
-                              endpointPort: Number(v.replace(/\D/g, "")) || 0,
-                            })
-                          }
-                          keyboardType="number-pad"
-                          placeholder="80"
-                        />
-                      </Field>
-                    </View>
+                <View className="flex-row gap-2.5">
+                  <View className="flex-1">
+                    <Field label="Max Retries">
+                      <Input
+                        value={String(tunnel.maxRetries ?? "")}
+                        onChangeText={(v) =>
+                          setTunnel(idx, {
+                            maxRetries: Number(v.replace(/\D/g, "")) || 0,
+                          })
+                        }
+                        keyboardType="number-pad"
+                        placeholder="3"
+                      />
+                    </Field>
                   </View>
-
-                  <View className="flex-row gap-2.5">
-                    <View className="flex-1">
-                      <Field label="Max Retries">
-                        <Input
-                          value={String(tunnel.maxRetries ?? "")}
-                          onChangeText={(v) =>
-                            setTunnel(idx, {
-                              maxRetries: Number(v.replace(/\D/g, "")) || 0,
-                            })
-                          }
-                          keyboardType="number-pad"
-                          placeholder="3"
-                        />
-                      </Field>
-                    </View>
-                    <View className="flex-1">
-                      <Field label="Retry Interval (s)">
-                        <Input
-                          value={String(tunnel.retryInterval ?? "")}
-                          onChangeText={(v) =>
-                            setTunnel(idx, {
-                              retryInterval: Number(v.replace(/\D/g, "")) || 0,
-                            })
-                          }
-                          keyboardType="number-pad"
-                          placeholder="10"
-                        />
-                      </Field>
-                    </View>
+                  <View className="flex-1">
+                    <Field label="Retry Interval (s)">
+                      <Input
+                        value={String(tunnel.retryInterval ?? "")}
+                        onChangeText={(v) =>
+                          setTunnel(idx, {
+                            retryInterval: Number(v.replace(/\D/g, "")) || 0,
+                          })
+                        }
+                        keyboardType="number-pad"
+                        placeholder="10"
+                      />
+                    </Field>
                   </View>
-
-                  <SettingRow label="Auto start" last>
-                    <FakeSwitch
-                      checked={!!tunnel.autoStart}
-                      onChange={(v) => setTunnel(idx, { autoStart: v })}
-                    />
-                  </SettingRow>
                 </View>
-              ))}
 
-              <Button variant="muted" size="sm" onPress={addTunnel}>
-                Add Tunnel
-              </Button>
-            </Section>
-          ) : null}
-
-          {activeTab === "rdp" ? (
-            <Section title="RDP">
-              <Field label="Username">
-                <Input
-                  value={form.rdpUser}
-                  onChangeText={(v) => set("rdpUser", v)}
-                  placeholder="Administrator"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </Field>
-              <Field label="Password">
-                <Input
-                  value={form.rdpPassword}
-                  onChangeText={(v) => set("rdpPassword", v)}
-                  secureTextEntry
-                  placeholder={
-                    isEdit ? "•••••• (unchanged if blank)" : "Password"
-                  }
-                  autoCapitalize="none"
-                />
-              </Field>
-              <View className="flex-row gap-2.5">
-                <View className="flex-[2]">
-                  <Field label="Domain">
-                    <Input
-                      value={form.rdpDomain}
-                      onChangeText={(v) => set("rdpDomain", v)}
-                      placeholder="WORKGROUP"
-                      autoCapitalize="none"
-                    />
-                  </Field>
-                </View>
-                <View className="flex-1">
-                  <Field label="Port">
-                    <Input
-                      value={form.rdpPort}
-                      onChangeText={(v) => set("rdpPort", v.replace(/\D/g, ""))}
-                      keyboardType="number-pad"
-                      placeholder="3389"
-                    />
-                  </Field>
-                </View>
+                <SettingRow label="Auto start" last>
+                  <FakeSwitch
+                    checked={!!tunnel.autoStart}
+                    onChange={(v) => setTunnel(idx, { autoStart: v })}
+                  />
+                </SettingRow>
               </View>
-              <AdvancedNote />
-            </Section>
-          ) : null}
+            ))}
 
-          {activeTab === "vnc" ? (
-            <Section title="VNC">
-              <Field label="Username (optional)">
-                <Input
-                  value={form.vncUser}
-                  onChangeText={(v) => set("vncUser", v)}
-                  placeholder="vnc"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </Field>
-              <View className="flex-row gap-2.5">
-                <View className="flex-[2]">
-                  <Field label="Password">
-                    <Input
-                      value={form.vncPassword}
-                      onChangeText={(v) => set("vncPassword", v)}
-                      secureTextEntry
-                      placeholder={
-                        isEdit ? "•••••• (unchanged if blank)" : "Password"
-                      }
-                      autoCapitalize="none"
-                    />
-                  </Field>
-                </View>
-                <View className="flex-1">
-                  <Field label="Port">
-                    <Input
-                      value={form.vncPort}
-                      onChangeText={(v) => set("vncPort", v.replace(/\D/g, ""))}
-                      keyboardType="number-pad"
-                      placeholder="5900"
-                    />
-                  </Field>
-                </View>
-              </View>
-              <AdvancedNote />
-            </Section>
-          ) : null}
+            <Button variant="muted" size="sm" onPress={addTunnel}>
+              Add Tunnel
+            </Button>
+          </Section>
+        ) : null}
 
-          {activeTab === "telnet" ? (
-            <Section title="Telnet">
-              <Field label="Username">
-                <Input
-                  value={form.telnetUser}
-                  onChangeText={(v) => set("telnetUser", v)}
-                  placeholder="admin"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </Field>
-              <View className="flex-row gap-2.5">
-                <View className="flex-[2]">
-                  <Field label="Password">
-                    <Input
-                      value={form.telnetPassword}
-                      onChangeText={(v) => set("telnetPassword", v)}
-                      secureTextEntry
-                      placeholder={
-                        isEdit ? "•••••• (unchanged if blank)" : "Password"
-                      }
-                      autoCapitalize="none"
-                    />
-                  </Field>
-                </View>
-                <View className="flex-1">
-                  <Field label="Port">
-                    <Input
-                      value={form.telnetPort}
-                      onChangeText={(v) =>
-                        set("telnetPort", v.replace(/\D/g, ""))
-                      }
-                      keyboardType="number-pad"
-                      placeholder="23"
-                    />
-                  </Field>
-                </View>
+        {activeTab === "rdp" ? (
+          <Section title="RDP">
+            <Field label="Username">
+              <Input
+                value={form.rdpUser}
+                onChangeText={(v) => set("rdpUser", v)}
+                placeholder="Administrator"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </Field>
+            <Field label="Password">
+              <Input
+                value={form.rdpPassword}
+                onChangeText={(v) => set("rdpPassword", v)}
+                secureTextEntry
+                placeholder={
+                  isEdit ? "•••••• (unchanged if blank)" : "Password"
+                }
+                autoCapitalize="none"
+              />
+            </Field>
+            <View className="flex-row gap-2.5">
+              <View className="flex-[2]">
+                <Field label="Domain">
+                  <Input
+                    value={form.rdpDomain}
+                    onChangeText={(v) => set("rdpDomain", v)}
+                    placeholder="WORKGROUP"
+                    autoCapitalize="none"
+                  />
+                </Field>
               </View>
-              <AdvancedNote />
-            </Section>
-          ) : null}
-        </ScrollView>
-      </View>
-    </Modal>
+              <View className="flex-1">
+                <Field label="Port">
+                  <Input
+                    value={form.rdpPort}
+                    onChangeText={(v) => set("rdpPort", v.replace(/\D/g, ""))}
+                    keyboardType="number-pad"
+                    placeholder="3389"
+                  />
+                </Field>
+              </View>
+            </View>
+            <AdvancedNote />
+          </Section>
+        ) : null}
+
+        {activeTab === "vnc" ? (
+          <Section title="VNC">
+            <Field label="Username (optional)">
+              <Input
+                value={form.vncUser}
+                onChangeText={(v) => set("vncUser", v)}
+                placeholder="vnc"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </Field>
+            <View className="flex-row gap-2.5">
+              <View className="flex-[2]">
+                <Field label="Password">
+                  <Input
+                    value={form.vncPassword}
+                    onChangeText={(v) => set("vncPassword", v)}
+                    secureTextEntry
+                    placeholder={
+                      isEdit ? "•••••• (unchanged if blank)" : "Password"
+                    }
+                    autoCapitalize="none"
+                  />
+                </Field>
+              </View>
+              <View className="flex-1">
+                <Field label="Port">
+                  <Input
+                    value={form.vncPort}
+                    onChangeText={(v) => set("vncPort", v.replace(/\D/g, ""))}
+                    keyboardType="number-pad"
+                    placeholder="5900"
+                  />
+                </Field>
+              </View>
+            </View>
+            <AdvancedNote />
+          </Section>
+        ) : null}
+
+        {activeTab === "telnet" ? (
+          <Section title="Telnet">
+            <Field label="Username">
+              <Input
+                value={form.telnetUser}
+                onChangeText={(v) => set("telnetUser", v)}
+                placeholder="admin"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </Field>
+            <View className="flex-row gap-2.5">
+              <View className="flex-[2]">
+                <Field label="Password">
+                  <Input
+                    value={form.telnetPassword}
+                    onChangeText={(v) => set("telnetPassword", v)}
+                    secureTextEntry
+                    placeholder={
+                      isEdit ? "•••••• (unchanged if blank)" : "Password"
+                    }
+                    autoCapitalize="none"
+                  />
+                </Field>
+              </View>
+              <View className="flex-1">
+                <Field label="Port">
+                  <Input
+                    value={form.telnetPort}
+                    onChangeText={(v) =>
+                      set("telnetPort", v.replace(/\D/g, ""))
+                    }
+                    keyboardType="number-pad"
+                    placeholder="23"
+                  />
+                </Field>
+              </View>
+            </View>
+            <AdvancedNote />
+          </Section>
+        ) : null}
+      </ScrollView>
+    </InlineView>
   );
 }
 

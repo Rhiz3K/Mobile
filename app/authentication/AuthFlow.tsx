@@ -6,7 +6,6 @@ import {
   Platform,
   Linking,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
 } from "react-native";
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -1143,7 +1142,7 @@ function OidcStep({
         await setCookie("jwt", token);
         const saved = await AsyncStorage.getItem("jwt");
         if (!saved) {
-          Alert.alert("Error", "Failed to save authentication token.");
+          toast.error("Failed to save the sign in token");
           authStartedRef.current = false;
           return;
         }
@@ -1167,7 +1166,7 @@ function OidcStep({
           } catch (e: any) {
             if (e?.response?.status === 401) {
               await AsyncStorage.removeItem("jwt");
-              Alert.alert(
+              toast.error(
                 "Sign in failed",
                 "The server rejected the session token. Please try again.",
               );
@@ -1181,7 +1180,7 @@ function OidcStep({
 
         if (!confirmed) {
           await AsyncStorage.removeItem("jwt");
-          Alert.alert(
+          toast.error(
             "Sign in failed",
             "Signed in, but the app couldn't reach Termix's API (a reverse proxy may be blocking the request). Please try again.",
           );
@@ -1193,7 +1192,7 @@ function OidcStep({
         // valid as far as we know; the app's startup will verify it again.
         await onAuthenticated();
       } catch {
-        Alert.alert("Error", "Could not complete sign-in.");
+        toast.error("Could not finish signing in");
         authStartedRef.current = false;
       } finally {
         setAuthenticating(false);
@@ -1226,7 +1225,7 @@ function OidcStep({
 
       const error = params["error"];
       if (error) {
-        Alert.alert("Sign in failed", error);
+        toast.error("Sign in failed", error);
         return;
       }
 
@@ -1235,7 +1234,7 @@ function OidcStep({
       if (params["second_factor"] === "1") {
         const tempToken = params["temp_token"];
         if (!tempToken) {
-          Alert.alert("Sign in failed", "The server did not return a token.");
+          toast.error("Sign in failed", "The server did not return a token.");
           return;
         }
         onSecondFactor(tempToken);
@@ -1244,7 +1243,7 @@ function OidcStep({
 
       const token = params["token"];
       if (!token) {
-        Alert.alert("Sign in failed", "The server did not return a token.");
+        toast.error("Sign in failed", "The server did not return a token.");
         return;
       }
 
@@ -1283,7 +1282,7 @@ function OidcStep({
         }
         // result.type === "cancel" means user dismissed - no error needed
       } catch {
-        Alert.alert("Error", "Could not open the authentication browser.");
+        toast.error("Could not open the sign in browser");
       } finally {
         setOpeningBrowser(false);
       }
@@ -1394,11 +1393,10 @@ function OidcStep({
       nativeEvent.description?.includes("certificate") ||
       nativeEvent.description?.includes("ERR_CERT")
     ) {
-      Alert.alert(
-        "SSL Certificate Error",
+      toast.error(
+        "SSL certificate error",
         "Unable to verify the server's SSL certificate. Install your self-signed certificate's root CA on the device (as a CA certificate) and rebuild the app.\n\nError: " +
           (nativeEvent.description || "Unknown SSL error"),
-        [{ text: "OK" }],
       );
     }
   };
@@ -1412,7 +1410,7 @@ function OidcStep({
         // The web page signalled success but couldn't hand us a usable token
         // (e.g. an older server build, or the JWT cookie wasn't readable). Don't
         // leave the user stuck on the web "Redirecting…" screen with no feedback.
-        Alert.alert(
+        toast.error(
           "Sign in failed",
           "Signed in on the web page but the app didn't receive a session token. Make sure the server is up to date, then try again.",
         );

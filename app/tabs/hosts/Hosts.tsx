@@ -55,7 +55,7 @@ import {
   Text,
   Input,
   Button,
-  BottomSheet,
+  Sheet,
   SheetRow,
   Checkbox,
   EmptyState,
@@ -552,6 +552,26 @@ export default function Hosts() {
   return (
     <Screen
       title="Hosts"
+      overlay={
+        <>
+          {/* Create / edit form */}
+          <HostForm
+            visible={formOpen}
+            host={formHost}
+            draft={formDraft}
+            onClose={() => setFormOpen(false)}
+            onSaved={() => {
+              setFormOpen(false);
+              fetchData(true);
+            }}
+          />
+          {/* Credential manager */}
+          <CredentialListModal
+            visible={credentialListOpen}
+            onClose={() => setCredentialListOpen(false)}
+          />
+        </>
+      }
       headerRight={
         <View className="flex-row items-center gap-1.5">
           <Button
@@ -765,7 +785,7 @@ export default function Hosts() {
       />
 
       {/* Sort menu */}
-      <BottomSheet
+      <Sheet
         visible={showSort}
         onClose={() => setShowSort(false)}
         title="Sort hosts"
@@ -783,10 +803,10 @@ export default function Hosts() {
             }
           />
         ))}
-      </BottomSheet>
+      </Sheet>
 
       {/* Filter menu */}
-      <BottomSheet
+      <Sheet
         visible={showFilter}
         onClose={() => setShowFilter(false)}
         title="Filter hosts"
@@ -864,19 +884,7 @@ export default function Hosts() {
             })}
           </View>
         ) : null}
-      </BottomSheet>
-
-      {/* Create / edit form */}
-      <HostForm
-        visible={formOpen}
-        host={formHost}
-        draft={formDraft}
-        onClose={() => setFormOpen(false)}
-        onSaved={() => {
-          setFormOpen(false);
-          fetchData(true);
-        }}
-      />
+      </Sheet>
 
       {/* Quick connect (ad-hoc, unsaved) */}
       <QuickConnect
@@ -889,12 +897,6 @@ export default function Hosts() {
         onClose={() => setTailscaleDevicesOpen(false)}
         onDismiss={handleTailscaleDismiss}
         onAddHost={addTailscaleHost}
-      />
-
-      {/* Credential manager */}
-      <CredentialListModal
-        visible={credentialListOpen}
-        onClose={() => setCredentialListOpen(false)}
       />
     </Screen>
   );

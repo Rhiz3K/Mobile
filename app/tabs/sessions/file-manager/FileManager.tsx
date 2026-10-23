@@ -11,15 +11,10 @@ import {
   ScrollView,
   Pressable,
   RefreshControl,
-  Alert,
-  Modal,
-  KeyboardAvoidingView,
-  Platform,
   Animated,
   ActivityIndicator,
 } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
@@ -83,7 +78,14 @@ import {
   addFolderShortcut,
   removeFolderShortcut,
 } from "@/app/main-axios";
-import { Text, Input, Button } from "@/app/components/ui";
+import {
+  Text,
+  Input,
+  Button,
+  Sheet,
+  SheetBody,
+  useConfirm,
+} from "@/app/components/ui";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
 import { toast } from "@/app/utils/toast";
 import {
@@ -135,7 +137,7 @@ type SortBy = "name" | "size" | "modified";
 export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
   ({ host, isVisible }, ref) => {
     const color = useThemeColor();
-    const insets = useSafeAreaInsets();
+    const confirm = useConfirm();
 
     const [currentPath, setCurrentPath] = useState("/");
     const [files, setFiles] = useState<FileItem[]>([]);
@@ -416,64 +418,52 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
       }
     };
 
-    const doDelete = (file: FileItem) => {
-      Alert.alert("Delete", `Delete "${file.name}"?`, [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              setBusy(true);
-              await deleteSSHItem(
-                conn.sessionId.current,
-                file.path,
-                file.type === "directory",
-                host.id,
-              );
-              toast.success("Deleted");
-              await loadDirectory(currentPath);
-            } catch (e: any) {
-              toast.error(e?.message || "Failed to delete");
-            } finally {
-              setBusy(false);
-            }
-          },
-        },
-      ]);
+    const doDelete = async (file: FileItem) => {
+      const ok = await confirm({ title: `Delete "${file.name}"?` });
+      if (!ok) return;
+      try {
+        setBusy(true);
+        await deleteSSHItem(
+          conn.sessionId.current,
+          file.path,
+          file.type === "directory",
+          host.id,
+        );
+        toast.success("Deleted");
+        await loadDirectory(currentPath);
+      } catch (e: any) {
+        toast.error(e?.message || "Failed to delete");
+      } finally {
+        setBusy(false);
+      }
     };
 
-    const doDeleteSelected = () => {
+    const doDeleteSelected = async () => {
       const count = selectedFiles.size;
-      Alert.alert("Delete", `Delete ${count} item${count !== 1 ? "s" : ""}?`, [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              setBusy(true);
-              for (const path of selectedFiles) {
-                const file = files.find((f) => f.path === path);
-                await deleteSSHItem(
-                  conn.sessionId.current,
-                  path,
-                  file?.type === "directory",
-                  host.id,
-                );
-              }
-              toast.success(`${count} item${count !== 1 ? "s" : ""} deleted`);
-              setSelectionMode(false);
-              setSelectedFiles(new Set());
-              await loadDirectory(currentPath);
-            } catch (e: any) {
-              toast.error(e?.message || "Failed to delete");
-            } finally {
-              setBusy(false);
-            }
-          },
-        },
-      ]);
+      const ok = await confirm({
+        title: `Delete ${count} item${count !== 1 ? "s" : ""}?`,
+      });
+      if (!ok) return;
+      try {
+        setBusy(true);
+        for (const path of selectedFiles) {
+          const file = files.find((f) => f.path === path);
+          await deleteSSHItem(
+            conn.sessionId.current,
+            path,
+            file?.type === "directory",
+            host.id,
+          );
+        }
+        toast.success(`${count} item${count !== 1 ? "s" : ""} deleted`);
+        setSelectionMode(false);
+        setSelectedFiles(new Set());
+        await loadDirectory(currentPath);
+      } catch (e: any) {
+        toast.error(e?.message || "Failed to delete");
+      } finally {
+        setBusy(false);
+      }
     };
 
     const doPaste = async () => {
@@ -1143,7 +1133,6 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
           }}
           onConfirm={confirmCreate}
           confirmLabel="Create"
-          insetBottom={insets.bottom}
         />
         <NameDialog
           visible={renameTarget !== null}
@@ -1156,7 +1145,6 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
           }}
           onConfirm={confirmRename}
           confirmLabel="Rename"
-          insetBottom={insets.bottom}
         />
         <NameDialog
           visible={compressVisible}
@@ -1169,13 +1157,12 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
           }}
           onConfirm={confirmCompress}
           confirmLabel="Compress"
-          insetBottom={insets.bottom}
         />
 
         {/* Text/code viewer + editor */}
         {viewer ? (
           <FileViewer
-            visible
+            visible={isVisible}
             onClose={() => setViewer(null)}
             fileName={viewer.file.name}
             filePath={viewer.file.path}
@@ -1474,7 +1461,6 @@ function NameDialog({
   onClose,
   onConfirm,
   confirmLabel,
-  insetBottom,
 }: {
   visible: boolean;
   title: string;
@@ -1483,55 +1469,42 @@ function NameDialog({
   onClose: () => void;
   onConfirm: () => void;
   confirmLabel: string;
-  insetBottom: number;
 }) {
   return (
-    <Modal
+    <Sheet
       visible={visible}
-      transparent
-      animationType="fade"
-      statusBarTranslucent
-    >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        className="flex-1"
-      >
-        <Pressable
-          className="flex-1 items-center justify-center bg-black/50 px-5"
-          onPress={onClose}
-        >
-          <Pressable
-            className="w-full max-w-md border border-border bg-popover p-4"
-            style={{ marginBottom: insetBottom }}
-            onPress={(e) => e.stopPropagation()}
+      onClose={onClose}
+      title={title}
+      footer={
+        <View className="flex-row gap-2">
+          <Button variant="muted" className="flex-1" onPress={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant="default"
+            className="flex-1"
+            onPress={onConfirm}
+            disabled={!value.trim()}
           >
-            <Text weight="bold" className="mb-3 text-base text-foreground">
-              {title}
-            </Text>
-            <Input
-              value={value}
-              onChangeText={onChange}
-              placeholder="Name"
-              autoFocus
-              autoCapitalize="none"
-              containerClassName="mb-3"
-            />
-            <View className="flex-row gap-2">
-              <Button variant="muted" className="flex-1" onPress={onClose}>
-                Cancel
-              </Button>
-              <Button
-                variant="default"
-                className="flex-1"
-                onPress={onConfirm}
-                disabled={!value.trim()}
-              >
-                {confirmLabel}
-              </Button>
-            </View>
-          </Pressable>
-        </Pressable>
-      </KeyboardAvoidingView>
-    </Modal>
+            {confirmLabel}
+          </Button>
+        </View>
+      }
+    >
+      <SheetBody>
+        <Input
+          value={value}
+          onChangeText={onChange}
+          placeholder="Name"
+          autoFocus
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="done"
+          onSubmitEditing={() => {
+            if (value.trim()) onConfirm();
+          }}
+        />
+      </SheetBody>
+    </Sheet>
   );
 }

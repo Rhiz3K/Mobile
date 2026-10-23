@@ -4,7 +4,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Play, Server as ServerIcon } from "lucide-react-native";
 import { executeSnippet, getSSHHosts } from "@/app/main-axios";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
-import { BottomSheet, SheetRow, Text } from "@/app/components/ui";
+import { Sheet, SheetRow, Text } from "@/app/components/ui";
 import { toast } from "@/app/utils/toast";
 import { systemLogger } from "@/lib/frontend-logger";
 import type { SSHHost, Snippet } from "@/types";
@@ -113,7 +113,7 @@ export function RunSnippetSheet({ snippet, onClose }: RunSnippetSheetProps) {
   });
 
   return (
-    <BottomSheet
+    <Sheet
       visible={visible}
       onClose={runningHostId === null ? onClose : () => {}}
       title={snippet ? `Run "${snippet.name}" on` : "Run snippet"}
@@ -172,6 +172,6 @@ export function RunSnippetSheet({ snippet, onClose }: RunSnippetSheetProps) {
           ))}
         </ScrollView>
       )}
-    </BottomSheet>
+    </Sheet>
   );
 }

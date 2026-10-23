@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { View, Pressable } from "react-native";
-import { Dialog, Button, Text } from "@/app/components/ui";
+import { Sheet, SheetBody, Button, Text } from "@/app/components/ui";
 
 type Bit = "r" | "w" | "x";
 const CLASSES = ["owner", "group", "other"] as const;
@@ -64,7 +64,8 @@ export function PermissionsDialog({
   const octal = digits.join("");
 
   return (
-    <Dialog
+    <Sheet
+      scroll
       visible={visible}
       onClose={onClose}
       title="Permissions"
@@ -82,38 +83,40 @@ export function PermissionsDialog({
         </View>
       }
     >
-      <View className="gap-2.5">
-        {CLASSES.map((cls, idx) => (
-          <View key={cls} className="flex-row items-center gap-2">
-            <Text className="w-14 text-xs capitalize text-muted-foreground">
-              {cls}
-            </Text>
-            <View className="flex-1 flex-row gap-1.5">
-              {BITS.map((bit) => {
-                const active = has(idx, bit);
-                return (
-                  <Pressable
-                    key={bit}
-                    onPress={() => toggle(idx, bit)}
-                    className={`flex-1 items-center border py-2 ${
-                      active
-                        ? "border-accent-brand/40 bg-accent-brand/10"
-                        : "border-border active:bg-muted/40"
-                    }`}
-                  >
-                    <Text
-                      weight="bold"
-                      className={`text-xs uppercase ${active ? "text-accent-brand" : "text-muted-foreground"}`}
+      <SheetBody>
+        <View className="gap-2.5">
+          {CLASSES.map((cls, idx) => (
+            <View key={cls} className="flex-row items-center gap-2">
+              <Text className="w-14 text-xs capitalize text-muted-foreground">
+                {cls}
+              </Text>
+              <View className="flex-1 flex-row gap-1.5">
+                {BITS.map((bit) => {
+                  const active = has(idx, bit);
+                  return (
+                    <Pressable
+                      key={bit}
+                      onPress={() => toggle(idx, bit)}
+                      className={`flex-1 items-center border py-2 ${
+                        active
+                          ? "border-accent-brand/40 bg-accent-brand/10"
+                          : "border-border active:bg-muted/40"
+                      }`}
                     >
-                      {bit}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+                      <Text
+                        weight="bold"
+                        className={`text-xs uppercase ${active ? "text-accent-brand" : "text-muted-foreground"}`}
+                      >
+                        {bit}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
             </View>
-          </View>
-        ))}
-      </View>
-    </Dialog>
+          ))}
+        </View>
+      </SheetBody>
+    </Sheet>
   );
 }

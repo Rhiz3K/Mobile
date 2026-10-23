@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import { View, Pressable, ScrollView, ActivityIndicator } from "react-native";
+import { View, Pressable, ActivityIndicator } from "react-native";
 import {
   Trash2,
   RotateCcw,
   Folder as FolderIcon,
   File as FileIcon,
 } from "lucide-react-native";
-import { Dialog, Button, Text } from "@/app/components/ui";
+import { Sheet, SheetBody, Button, Text } from "@/app/components/ui";
 import { useThemeColor } from "@/app/contexts/ThemeContext";
 import { toast } from "@/app/utils/toast";
 import {
@@ -100,7 +100,8 @@ export function TrashView({
   };
 
   return (
-    <Dialog
+    <Sheet
+      scroll
       visible={visible}
       onClose={onClose}
       title="Trash"
@@ -126,72 +127,74 @@ export function TrashView({
         </View>
       }
     >
-      {loading ? (
-        <View style={{ paddingVertical: 24, alignItems: "center" }}>
-          <ActivityIndicator color={color("muted-foreground")} />
-        </View>
-      ) : items.length === 0 ? (
-        <Text className="py-6 text-center text-sm text-muted-foreground">
-          Trash is empty
-        </Text>
-      ) : (
-        <ScrollView style={{ maxHeight: 360 }}>
-          {items.map((item) => (
-            <View
-              key={item.id}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 10,
-                paddingVertical: 10,
-              }}
-            >
-              {item.isDirectory ? (
-                <FolderIcon
-                  size={18}
-                  color={getFileIconColor(item.name, "directory")}
-                />
-              ) : (
-                <FileIcon
-                  size={18}
-                  color={getFileIconColor(item.name, "file")}
-                />
-              )}
-              <View style={{ flex: 1 }}>
-                <Text className="text-sm" numberOfLines={1}>
-                  {item.name}
-                </Text>
-                <Text
-                  className="text-xs text-muted-foreground"
-                  numberOfLines={1}
+      <SheetBody>
+        {loading ? (
+          <View style={{ paddingVertical: 24, alignItems: "center" }}>
+            <ActivityIndicator color={color("muted-foreground")} />
+          </View>
+        ) : items.length === 0 ? (
+          <Text className="py-6 text-center text-sm text-muted-foreground">
+            Trash is empty
+          </Text>
+        ) : (
+          <View>
+            {items.map((item) => (
+              <View
+                key={item.id}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 10,
+                  paddingVertical: 10,
+                }}
+              >
+                {item.isDirectory ? (
+                  <FolderIcon
+                    size={18}
+                    color={getFileIconColor(item.name, "directory")}
+                  />
+                ) : (
+                  <FileIcon
+                    size={18}
+                    color={getFileIconColor(item.name, "file")}
+                  />
+                )}
+                <View style={{ flex: 1 }}>
+                  <Text className="text-sm" numberOfLines={1}>
+                    {item.name}
+                  </Text>
+                  <Text
+                    className="text-xs text-muted-foreground"
+                    numberOfLines={1}
+                  >
+                    {item.originalPath}
+                  </Text>
+                  <Text className="text-xs text-muted-foreground">
+                    {formatDate(item.deletedAt)}
+                    {item.isDirectory ? "" : ` | ${formatFileSize(item.size)}`}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => restore(item)}
+                  disabled={busyId === item.id}
+                  hitSlop={6}
+                  className="border border-border p-2 active:bg-muted/40"
                 >
-                  {item.originalPath}
-                </Text>
-                <Text className="text-xs text-muted-foreground">
-                  {formatDate(item.deletedAt)}
-                  {item.isDirectory ? "" : ` · ${formatFileSize(item.size)}`}
-                </Text>
+                  <RotateCcw size={15} color={color("foreground")} />
+                </Pressable>
+                <Pressable
+                  onPress={() => purge(item)}
+                  disabled={busyId === item.id}
+                  hitSlop={6}
+                  className="border border-destructive/40 p-2 active:bg-destructive/10"
+                >
+                  <Trash2 size={15} color={color("destructive")} />
+                </Pressable>
               </View>
-              <Pressable
-                onPress={() => restore(item)}
-                disabled={busyId === item.id}
-                hitSlop={6}
-                className="border border-border p-2 active:bg-muted/40"
-              >
-                <RotateCcw size={15} color={color("foreground")} />
-              </Pressable>
-              <Pressable
-                onPress={() => purge(item)}
-                disabled={busyId === item.id}
-                hitSlop={6}
-                className="border border-destructive/40 p-2 active:bg-destructive/10"
-              >
-                <Trash2 size={15} color={color("destructive")} />
-              </Pressable>
-            </View>
-          ))}
-        </ScrollView>
-      )}
-    </Dialog>
+            ))}
+          </View>
+        )}
+      </SheetBody>
+    </Sheet>
   );
 }
