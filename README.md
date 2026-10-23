@@ -24,7 +24,7 @@
 
 ## Overview
 
-Termix Mobile connects to your [Termix](https://github.com/Termix-SSH/Termix) server from a phone or tablet. You need a Termix server to use it, see the [install docs](https://docs.termix.site/install).
+Termix Mobile is an SSH client for phones and tablets that works on its own: keep hosts on This device and connect straight from the phone. Link a [Termix](https://github.com/Termix-SSH/Termix) server to sync your hosts, logins and snippets with it, see the [install docs](https://docs.termix.site/install).
 
 Features like the file manager, Docker, tunnels and metrics show up when the matching plugin is on in your server.
 
@@ -43,6 +43,8 @@ Try Termix at [demo.termix.site](https://demo.termix.site/). Any username and pa
 - Home screen widgets on iOS and Android: open a host, run a snippet or check metrics without opening the app.
 - Hosts: folders, saved credentials and keys, Quick Connect and Wake-on-LAN.
 - Accounts: link more than one Termix server and switch between them. Open tabs keep running.
+- Sync: each linked server keeps its own encrypted copy on the phone, synced both ways and in the background, so its hosts work offline too. Pick what syncs, merge This device's hosts in on first link, and keep a copy when you unlink. Needs the Sync plugin on the server.
+- Reverse proxies: extra headers, Cloudflare service tokens, basic auth, client certificates and proxy sign in pages (Cloudflare Access, Authelia, Authentik).
 - Local data: hosts, logins and snippets on This device are saved on the phone in an encrypted database. Export a backup locked with a passphrase, or delete it in Settings.
 - Settings: terminal look, keyboard, API keys, active sessions, two-factor, password and account deletion.
 - App lock: Face ID, Touch ID or fingerprint, with a PIN as backup.

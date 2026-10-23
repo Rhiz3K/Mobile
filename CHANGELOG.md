@@ -18,10 +18,19 @@
 - Pick per host whether a linked server's host connects from the phone, through the server, or automatically
 - A failed connection says what went wrong and what to try, with buttons to try again or connect the other way
 - Features that need a Termix server say so, with a button to connect the host through the server
+- A linked server keeps its own copy on the phone and syncs hosts, logins, snippets and settings both ways, also in the background
+- Hosts of a linked server work offline and can connect from the phone
+- The first time you link a server, merge This device's hosts into it or start with only the server's data
+- Unlink a server and keep a copy of your own hosts, logins and snippets on This device, or delete them from the phone
+- Pick what syncs for each server, and see changes the server kept over yours with a button to keep yours
+- Sign in through the browser, which works with passkeys and security keys (needs Termix 26.10.6 or newer)
+- Servers behind a reverse proxy: extra headers, Cloudflare service tokens, basic auth, client certificates and the proxy's own sign in page
+- When a server signs you out, the Hosts screen says why and offers the quickest fix
 
 ### Changed
 
 - Your server sign in is now kept in the phone's secure storage
+- You stay signed in to a linked server and the app renews the session on its own, so you are not asked for your second factor again
 - Secrets in the phone's secure storage stay on this device and are left out of iCloud and phone backups
 - Android system backups no longer include app data
 - Theme colors now match Termix on the web and desktop exactly
@@ -35,6 +44,8 @@
 - A terminal that fails to connect stays open with the error instead of closing
 
 ### Fixed
+
+- A reverse proxy asking you to sign in again no longer signs you out of Termix
 
 - The Android app icon is no longer cut off and now uses the same logo and color as Termix on the web and desktop
 - The splash screen uses the same logo and color as the app icon
