@@ -32,7 +32,8 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "monochromeImage": "./assets/images/adaptive-monochrome.png",
         "backgroundColor": "#141513"
-      }
+      },
+      "allowBackup": false
     },
     "web": {
       "output": "static",
