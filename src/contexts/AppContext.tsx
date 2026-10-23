@@ -150,6 +150,7 @@ async function validateSession(
   client: AccountClient,
 ): Promise<boolean> {
   if (!client.isAuthenticated()) return false;
+  const token = client.token();
   try {
     const me = await client.api.auth.getUserInfo();
     if (!me?.username) return false;
@@ -171,6 +172,8 @@ async function validateSession(
       });
       return true;
     }
+    // Linking for sync may have swapped the token while this ran.
+    if (getErrorStatus(e) === 401 && client.token() !== token) return true;
     if (getErrorStatus(e) === 401) {
       await client.clearToken();
       await accounts.update(account.id, { status: "signed_out" });
@@ -228,7 +231,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         await moveServerSecretsForBackground({ accountIds }).catch(() => {});
         sync.start();
         void updateBackgroundSync();
-        void upgradeLogins();
 
         setShowUpdateScreen(await checkShouldShowUpdateScreen());
 
@@ -242,6 +244,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
           // Brand new install: guide the user, but the flow is dismissible.
           openAuthFlow("server");
         }
+        // After the check above, so its request never races the token swap.
+        void upgradeLogins();
       } catch {
         setAuthenticatedState(false);
       } finally {

@@ -374,11 +374,30 @@ export class AccountClient implements HttpOwner {
     return fetch(input, { ...init, headers });
   }
 
+  /**
+   * Whether a failed request carried the session this client holds now. A
+   * request sent with a token that was swapped meanwhile (linking for sync,
+   * a refresh) must not end the new session.
+   */
+  sentCurrentSession(error: unknown): boolean {
+    const token = this.sessionToken;
+    if (!token) return true;
+    const headers = (
+      error as { config?: { headers?: Record<string, unknown> } }
+    )?.config?.headers;
+    const auth = String(headers?.Authorization ?? headers?.authorization ?? "");
+    const cookie = String(headers?.Cookie ?? headers?.cookie ?? "");
+    if (!auth && !cookie) return true;
+    return auth.includes(token) || cookie.includes(token);
+  }
+
   /** Turns a failed request into an ApiError and reacts to auth loss. */
   fail(error: unknown, operation: string): never {
     return handleApiError(
       {
-        onAuthLost: () => this.notifyAuthLost(),
+        onAuthLost: () => {
+          if (this.sentCurrentSession(error)) this.notifyAuthLost();
+        },
         refreshEnabledPlugins: () => this.refreshEnabledPlugins(),
       },
       error,

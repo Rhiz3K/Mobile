@@ -223,3 +223,31 @@ test("wipe removes every saved secret and the certificate", async () => {
   expect(again.clientCert()).toBeNull();
   expect(net.certs.size).toBe(0);
 });
+
+test("a 401 for a token that was swapped meanwhile keeps the new session", async () => {
+  let release: () => void = () => {};
+  let sent: () => void = () => {};
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  const reached = new Promise<void>((resolve) => (sent = resolve));
+  fakeServer(async () => {
+    sent();
+    await gate;
+    return { status: 401, data: { error: "Session not found" } };
+  });
+  const c = client();
+  await c.setToken("login-token");
+  const lost = jest.fn();
+  c.onAuthLost(lost);
+  const pending = c.api.auth.getUserInfo().catch(() => null);
+  await reached;
+  await c.setToken("device-token");
+  release();
+  await pending;
+  expect(lost).not.toHaveBeenCalled();
+  expect(c.token()).toBe("device-token");
+
+  // The same failure with the current token does end it.
+  await c.api.auth.getUserInfo().catch(() => null);
+  expect(lost).toHaveBeenCalledTimes(1);
+  expect(c.token()).toBeNull();
+});
