@@ -39,6 +39,23 @@ test("locking closes files and refuses reads", async () => {
   });
 });
 
+test("sync opens a linked server while locked, but never This device", async () => {
+  const driver = testDriver();
+  const stores = new LocalStores(driver);
+  await expect(stores.openForSync("local")).rejects.toMatchObject({
+    code: "NO_LOCAL_STORE",
+  });
+  const { db } = await stores.openForSync("acct1");
+  db.insert(hosts).values(host("h1")).run();
+  // Screens still wait for App Lock.
+  await expect(stores.get("acct1")).rejects.toMatchObject({
+    code: "APP_LOCKED",
+  });
+  stores.unlock();
+  const opened = await stores.get("acct1");
+  expect(opened.db.select().from(hosts).all()).toHaveLength(1);
+});
+
 test("each account has its own file and key", async () => {
   const { stores, driver } = testStores();
   const a = await stores.get("local");

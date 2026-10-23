@@ -55,6 +55,14 @@ test("a 401 on a critical endpoint ends the session, others do not", () => {
   expect(h.onAuthLost).toHaveBeenCalledTimes(1);
 });
 
+test("a proxy login page on a 401 never ends the session", () => {
+  const h = hooks();
+  expect(() =>
+    handleApiError(h, httpError(401, "<html>sign in</html>", "/users/me"), "x"),
+  ).toThrow(expect.objectContaining({ code: "PROXY_LOGIN" }));
+  expect(h.onAuthLost).not.toHaveBeenCalled();
+});
+
 test("a plugin that is off refreshes the feature list", () => {
   const h = hooks();
   try {

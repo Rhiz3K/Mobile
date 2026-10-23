@@ -32,6 +32,10 @@ export function extractConnectionLogs(
   return Array.isArray(logs) ? logs : [];
 }
 
+function isJsonBody(data: unknown): boolean {
+  return !!data && typeof data === "object";
+}
+
 export function handleApiError(
   hooks: ErrorHooks,
   error: unknown,
@@ -58,7 +62,16 @@ export function handleApiError(
       errorMessage: message,
     };
 
-    if (status === 401) {
+    if (status === 401 && !isJsonBody(error.response?.data)) {
+      // A proxy in front of the server answered, not Termix. The session is
+      // fine, so never sign out over it.
+      authLogger.warn(`Proxy asked to sign in: ${method} ${url}`, errorContext);
+      throw new ApiError(
+        "The proxy in front of this server wants you to sign in again.",
+        401,
+        "PROXY_LOGIN",
+      );
+    } else if (status === 401) {
       authLogger.warn(
         `Auth failed: ${method} ${url} - ${message}`,
         errorContext,

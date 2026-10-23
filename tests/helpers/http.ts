@@ -10,9 +10,11 @@ export interface SeenRequest {
   url: string;
   headers: Record<string, unknown>;
   data: unknown;
+  params?: Record<string, unknown>;
 }
 
-type Reply = { status?: number; data?: unknown } | Error;
+type Reply =
+  { status?: number; data?: unknown; headers?: Record<string, string> } | Error;
 type Handler = (req: SeenRequest) => Reply | Promise<Reply>;
 
 /** Routes every axios request in the test through `handler`. */
@@ -26,6 +28,7 @@ export function fakeServer(handler: Handler) {
       headers: { ...(config.headers as object) },
       data:
         typeof config.data === "string" ? JSON.parse(config.data) : config.data,
+      params: config.params,
     };
     seen.push(req);
     const reply = await handler(req);
@@ -35,7 +38,7 @@ export function fakeServer(handler: Handler) {
       data: reply.data,
       status,
       statusText: String(status),
-      headers: {},
+      headers: reply.headers ?? {},
       config,
     };
     if (status >= 400) {

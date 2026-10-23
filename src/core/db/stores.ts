@@ -84,12 +84,34 @@ export class LocalStores {
     return this.opened.has(accountId);
   }
 
-  async get(accountId: string): Promise<OpenedDb> {
+  get(accountId: string): Promise<OpenedDb> {
+    return this.open(accountId, true);
+  }
+
+  /**
+   * Opens a linked server's copy for sync, also while App Lock is locked.
+   * It only holds what is on that server anyway. This device is never opened
+   * this way.
+   */
+  openForSync(accountId: string): Promise<OpenedDb> {
+    if (accountId === "local") {
+      return Promise.reject(
+        new AppError("This device does not sync.", "NO_LOCAL_STORE"),
+      );
+    }
+    return this.open(accountId, false);
+  }
+
+  private async open(
+    accountId: string,
+    needsUnlock: boolean,
+  ): Promise<OpenedDb> {
     const driver = this.driver;
     if (!driver) {
       throw new AppError("Local data is not available here.", "NO_LOCAL_STORE");
     }
-    if (!this.state.unlocked) {
+    const locked = () => needsUnlock && !this.state.unlocked;
+    if (locked()) {
       throw new AppError("Unlock Termix first.", "APP_LOCKED");
     }
     const open = this.opened.get(accountId);
@@ -99,7 +121,7 @@ export class LocalStores {
 
     const task = (async () => {
       const key = await getDbKey(accountId);
-      if (!this.state.unlocked || this.driver !== driver) {
+      if (locked() || this.driver !== driver) {
         throw new AppError("Unlock Termix first.", "APP_LOCKED");
       }
       const db = driver.open(LocalStores.fileName(accountId), key);

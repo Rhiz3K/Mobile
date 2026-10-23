@@ -137,6 +137,8 @@ export const hosts = sqliteTable(
     defaultOverrides: text("default_overrides"),
     pluginSettings: text("plugin_settings"),
     protocolAuth: text("protocol_auth"),
+    /** Device only: the linked server's own id for this host, for server actions. */
+    serverId: integer("server_id"),
     ...timestamps,
   },
   (table) => [
@@ -257,6 +259,8 @@ export const syncRecords = sqliteTable(
     deleted: bool("deleted").notNull().default(false),
     error: text("error"),
     errorHash: text("error_hash"),
+    /** Wire fields of the last server row the phone has no column for. */
+    extra: text("extra"),
     updatedAt: timestamps.updatedAt,
   },
   (table) => [
