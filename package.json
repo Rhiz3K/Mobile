@@ -20,6 +20,8 @@
     "verify:rdp-login": "node scripts/rdp-login.test.cjs",
     "verify:oidc-callback-intent-filter": "node scripts/verify-oidc-callback-intent-filter.cjs",
     "verify:theme": "node scripts/theme.test.cjs",
+    "verify:app-icons": "node scripts/verify-app-icons.cjs",
+    "icons": "node scripts/generate-icons.mjs",
     "build-all": "eas build --platform all --profile development",
     "build-android": "eas build --platform android --profile development",
     "build-ios": "eas build --platform ios --profile development",
@@ -77,12 +79,14 @@
   "devDependencies": {
     "@commitlint/cli": "^21.2.3",
     "@commitlint/config-conventional": "^21.2.3",
+    "@resvg/resvg-js": "^2.6.2",
     "@types/react": "~19.1.0",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
     "eslint-plugin-unused-imports": "^4.4.1",
     "husky": "^9.1.7",
     "lint-staged": "^17.6.0",
+    "pngjs": "^7.0.0",
     "prettier": "^3.9.9",
     "prettier-plugin-tailwindcss": "^0.7.3",
     "typescript": "~5.9.2"

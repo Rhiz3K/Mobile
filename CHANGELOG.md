@@ -6,6 +6,7 @@
 
 - Add hosts from your Tailscale device list when the Tailscale plugin is on
 - Answer the Tailscale SSH check from the terminal
+- Themed app icon on Android 13 and newer
 
 ### Changed
 
@@ -15,6 +16,12 @@
 - Buttons, inputs, switches, tabs, lists and toasts now look the same as in Termix
 - Popups are now sheets that slide up from the bottom, and confirmations use them instead of system alerts
 - The host, credential, file and key editors open in place with a back button instead of as popups
+- The iOS app icon, including the dark and tinted versions, now uses the same logo as Termix on the web and desktop
+
+### Fixed
+
+- The Android app icon is no longer cut off and now uses the same logo and color as Termix on the web and desktop
+- The splash screen uses the same logo and color as the app icon
 
 ## 1.6.0
 

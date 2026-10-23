@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "termix-mobile",
     "githubUrl": "https://github.com/Termix-SSH/Mobile",
-    "backgroundColor": "#0c0d0b",
+    "backgroundColor": "#141513",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -30,7 +30,8 @@
       "package": "com.karmaa.termix",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#0c0d0b"
+        "monochromeImage": "./assets/images/adaptive-monochrome.png",
+        "backgroundColor": "#141513"
       }
     },
     "web": {
@@ -49,12 +50,12 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0c0d0b",
+          "backgroundColor": "#141513",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "dark": {
             "image": "./assets/images/splash-icon.png",
-            "backgroundColor": "#0c0d0b"
+            "backgroundColor": "#141513"
           }
         }
       ],
@@ -75,6 +76,7 @@
       "./plugins/withAndroidLocalNetworkSsl.js",
       "./plugins/withTermixWidgets.js",
       "./plugins/withPodDeploymentTarget.js",
+      "./plugins/withNotificationIcon.js",
       "expo-dev-client",
       "expo-secure-store",
       "expo-web-browser"

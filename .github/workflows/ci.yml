@@ -52,6 +52,9 @@ jobs:
       - name: Verify theme tokens
         run: npm run verify:theme
 
+      - name: Verify app icons
+        run: npm run verify:app-icons
+
       - name: Verify remote desktop resolution
         run: node scripts/verify-remote-resolution.cjs
 
