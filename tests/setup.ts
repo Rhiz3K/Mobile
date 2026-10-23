@@ -15,3 +15,18 @@ jest.mock("expo-secure-store", () => {
     __reset: () => store.clear(),
   };
 });
+
+// The app logger is chatty. Set TEST_LOGS=1 to see it.
+if (!process.env.TEST_LOGS) {
+  for (const level of [
+    "log",
+    "info",
+    "warn",
+    "error",
+    "debug",
+    "group",
+    "groupEnd",
+  ] as const) {
+    jest.spyOn(console, level).mockImplementation(() => {});
+  }
+}

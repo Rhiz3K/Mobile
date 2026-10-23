@@ -20,6 +20,40 @@ export interface LogContext {
   [key: string]: any;
 }
 
+const SECRET_KEY = /pass|token|secret|authorization|cookie|jwt|pfx|key$/i;
+
+/** Copies a log context with anything that looks like a secret masked. */
+export function redact<T>(value: T, depth = 0): T {
+  if (depth > 4 || value === null || typeof value !== "object") return value;
+  if (Array.isArray(value)) {
+    return value.map((v) => redact(v, depth + 1)) as unknown as T;
+  }
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    out[k] =
+      SECRET_KEY.test(k) && v != null ? "[hidden]" : redact(v, depth + 1);
+  }
+  return out as T;
+}
+
+/** Keeps request errors short and never prints request headers. */
+export function describeError(error: unknown): unknown {
+  if (error && typeof error === "object" && "isAxiosError" in error) {
+    const e = error as {
+      message?: string;
+      code?: string;
+      response?: { status?: number; data?: unknown };
+    };
+    return {
+      message: e.message,
+      code: e.code,
+      status: e.response?.status,
+      data: redact(e.response?.data),
+    };
+  }
+  return error;
+}
+
 class FrontendLogger {
   private serviceName: string;
   private serviceIcon: string;
@@ -97,7 +131,11 @@ class FrontendLogger {
   ): void {
     if (!this.shouldLog(level)) return;
 
-    const formattedMessage = this.formatMessage(level, message, context);
+    const formattedMessage = this.formatMessage(
+      level,
+      message,
+      redact(context),
+    );
 
     switch (level) {
       case "debug":
@@ -112,7 +150,7 @@ class FrontendLogger {
       case "error":
         console.error(formattedMessage);
         if (error) {
-          console.error("Error details:", error);
+          console.error("Error details:", describeError(error));
         }
         break;
       case "success":
@@ -386,3 +424,10 @@ export const statsLogger = new FrontendLogger("STATS", "📊", "#22c55e");
 export const systemLogger = new FrontendLogger("SYSTEM", "🚀", "#1e3a8a");
 
 export const logger = systemLogger;
+
+export type Logger = FrontendLogger;
+
+/** A logger for one area of the app, shown as its tag in the console. */
+export function createLogger(scope: string, icon = "•"): Logger {
+  return new FrontendLogger(scope.toUpperCase(), icon, "#1e3a8a");
+}

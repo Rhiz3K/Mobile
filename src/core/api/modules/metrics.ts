@@ -1,0 +1,257 @@
+import type { AccountClient } from "../AccountClient";
+import { statsLogger } from "@/core/log/logger";
+import type {
+  ServerStatus,
+  ServerMetrics,
+  LoginStatsMetrics,
+} from "@/types/index";
+
+export function createMetricsApi(c: AccountClient) {
+  // 2.9 adds "reachable" (port answers, login failed). The UI only knows
+  // online/offline, so it counts as online and keeps the raw value.
+  function normalizeStatus(entry: any): ServerStatus {
+    if (!entry || typeof entry !== "object") return entry;
+    if (entry.status === "reachable") {
+      return { ...entry, status: "online", rawStatus: "reachable" };
+    }
+    return entry;
+  }
+
+  function normalizeStatusMap(data: any): Record<number, ServerStatus> {
+    const out: Record<number, ServerStatus> = {};
+    if (!data || typeof data !== "object") return out;
+    for (const [id, entry] of Object.entries(data)) {
+      out[Number(id)] = normalizeStatus(entry);
+    }
+    return out;
+  }
+
+  async function getAllServerStatuses(): Promise<Record<number, ServerStatus>> {
+    try {
+      const response = await c.http.stats.get("/status");
+      return normalizeStatusMap(response.data);
+    } catch (error: any) {
+      if (error?.response?.status === 404 && c.apiGeneration === "legacy") {
+        try {
+          const alt = c.rawAxios({
+            baseURL: c.rootBase(),
+            headers: { "Content-Type": "application/json" },
+          });
+          const response = await alt.get("/status");
+          return response.data || {};
+        } catch (e) {
+          c.fail(e, "fetch server statuses");
+        }
+      }
+      c.fail(error, "fetch server statuses");
+    }
+  }
+
+  async function getServerStatusById(id: number): Promise<ServerStatus> {
+    try {
+      const response = await c.http.stats.get(`/status/${id}`);
+      return normalizeStatus(response.data);
+    } catch (error: any) {
+      if (error?.response?.status === 404 && c.apiGeneration === "legacy") {
+        try {
+          const alt = c.rawAxios({
+            baseURL: c.rootBase(),
+            headers: { "Content-Type": "application/json" },
+          });
+          const response = await alt.get(`/status/${id}`);
+          return response.data;
+        } catch (e) {
+          c.fail(e, "fetch server status");
+        }
+      }
+      c.fail(error, "fetch server status");
+    }
+  }
+
+  function normalizeMetrics(raw: any): ServerMetrics {
+    // Processes: coerce cpu/mem strings → numbers (backend sends "2.5" not 2.5)
+    let processes = raw.processes;
+    if (processes?.top) {
+      processes = {
+        ...processes,
+        top: processes.top.map((p: any) => ({
+          ...p,
+          cpu: Number(p.cpu) || 0,
+          mem: Number(p.mem) || 0,
+        })),
+      };
+    }
+
+    // Network: map rxBytes/txBytes → rx/tx
+    let network = raw.network;
+    if (network?.interfaces) {
+      network = {
+        ...network,
+        interfaces: network.interfaces.map((iface: any) => ({
+          ...iface,
+          rx: iface.rx ?? iface.rxBytes ?? null,
+          tx: iface.tx ?? iface.txBytes ?? null,
+        })),
+      };
+    }
+
+    // Login stats: snake_case backend key → camelCase, map to correct shape
+    const rawLogin = raw.login_stats ?? raw.loginStats;
+    const loginStats: LoginStatsMetrics | undefined = rawLogin
+      ? {
+          recentLogins: Array.isArray(rawLogin.recentLogins)
+            ? rawLogin.recentLogins
+            : [],
+          failedLogins: Array.isArray(rawLogin.failedLogins)
+            ? rawLogin.failedLogins
+            : [],
+          totalLogins: rawLogin.totalLogins ?? 0,
+          uniqueIPs: rawLogin.uniqueIPs ?? 0,
+        }
+      : undefined;
+
+    return { ...raw, processes, network, loginStats } as ServerMetrics;
+  }
+
+  async function getServerMetricsById(
+    id: number,
+  ): Promise<ServerMetrics | null> {
+    if (!c.isPluginEnabled("host-metrics")) return null;
+    try {
+      const response = await c.http.stats.get(`/metrics/${id}`);
+      return response.data ? normalizeMetrics(response.data) : null;
+    } catch (error: any) {
+      if (error?.response?.status === 404) {
+        // Metrics not ready yet - backend is still starting collection.
+        return null;
+      }
+      c.fail(error, "fetch server metrics");
+    }
+  }
+
+  /**
+   * Start metrics collection for a host. Returns a viewerSessionId that must be
+   * passed to heartbeat/stop/unregister calls. May return requiresTOTP for 2FA hosts.
+   */
+  async function startMetricsPolling(id: number): Promise<{
+    success?: boolean;
+    requiresTOTP?: boolean;
+    sessionId?: string;
+    viewerSessionId?: string;
+  }> {
+    try {
+      const response = await c.http.stats.post(`/metrics/start/${id}`);
+      const data = response.data || {};
+      return { ...data, requiresTOTP: data.requiresTOTP ?? data.requires_totp };
+    } catch (error) {
+      c.fail(error, "start metrics polling");
+    }
+  }
+
+  async function stopMetricsPolling(
+    id: number,
+    viewerSessionId?: string,
+  ): Promise<void> {
+    try {
+      await c.http.stats.post(
+        `/metrics/stop/${id}`,
+        viewerSessionId ? { viewerSessionId } : undefined,
+      );
+    } catch {
+      // Best-effort on teardown.
+    }
+  }
+
+  async function submitMetricsTOTP(
+    sessionId: string,
+    totpCode: string,
+  ): Promise<any> {
+    try {
+      const response = await c.http.stats.post("/metrics/connect-totp", {
+        sessionId,
+        totpCode,
+      });
+      return response.data;
+    } catch (error) {
+      c.fail(error, "submit metrics TOTP");
+    }
+  }
+
+  /** Register this viewer so the backend keeps polling while the screen is open. Returns a viewerSessionId. */
+  async function registerMetricsViewer(id: number): Promise<{
+    success?: boolean;
+    viewerSessionId?: string;
+    skipped?: boolean;
+  }> {
+    try {
+      const response = await c.http.stats.post("/metrics/register-viewer", {
+        hostId: id,
+      });
+      return response.data || {};
+    } catch {
+      // Best-effort.
+      return {};
+    }
+  }
+
+  async function unregisterMetricsViewer(
+    id: number,
+    viewerSessionId: string,
+  ): Promise<void> {
+    try {
+      await c.http.stats.post("/metrics/unregister-viewer", {
+        hostId: id,
+        viewerSessionId,
+      });
+    } catch {
+      // Best-effort on teardown.
+    }
+  }
+
+  /** Heartbeat so the backend knows a viewer is still watching this host. */
+  async function sendMetricsHeartbeat(viewerSessionId: string): Promise<void> {
+    try {
+      await c.http.stats.post("/metrics/heartbeat", { viewerSessionId });
+    } catch {
+      // Best-effort.
+    }
+  }
+
+  async function refreshServerPolling(): Promise<void> {
+    try {
+      await c.http.stats.post("/refresh");
+    } catch (error) {
+      statsLogger.warn("Failed to refresh server polling", {
+        operation: "refresh_polling",
+      });
+    }
+  }
+
+  async function notifyHostCreatedOrUpdated(hostId: number): Promise<void> {
+    // 2.9 picks up host changes on its own.
+    if (c.apiGeneration === "plugin") return;
+    try {
+      await c.http.stats.post("/host-updated", { hostId });
+    } catch (error) {
+      statsLogger.warn("Failed to notify stats server of host update", {
+        operation: "notify_host_updated",
+      });
+    }
+  }
+
+  return {
+    getAllServerStatuses,
+    getServerStatusById,
+    getServerMetricsById,
+    startMetricsPolling,
+    stopMetricsPolling,
+    submitMetricsTOTP,
+    registerMetricsViewer,
+    unregisterMetricsViewer,
+    sendMetricsHeartbeat,
+    refreshServerPolling,
+    notifyHostCreatedOrUpdated,
+  };
+}
+
+export type MetricsApi = ReturnType<typeof createMetricsApi>;

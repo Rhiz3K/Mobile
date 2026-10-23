@@ -7,20 +7,13 @@ import {
 } from "react";
 import { ScrollView, RefreshControl } from "react-native";
 import { Network } from "lucide-react-native";
-import {
-  getTunnelStatuses,
-  connectTunnel,
-  disconnectTunnel,
-  cancelTunnel,
-  getSSHHosts,
-  isPluginApi,
-} from "@/core/api/main-axios";
 import { pluginTunnelName } from "@/core/api/compat/api-compat";
 import type { TunnelStatus, SSHHost, TunnelSessionProps } from "@/types";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { toast } from "@/utils/toast";
 import { SessionFrame, usePolling } from "@/screens/sessions/shared";
 import TunnelCard from "./TunnelCard";
+import { useSessionClient } from "@/core/accounts/session";
 
 export type TunnelManagerHandle = {
   refresh: () => void;
@@ -35,8 +28,9 @@ function tunnelKey(
   host: TunnelSessionProps["hostConfig"],
   idx: number,
   t: { sourcePort: number; endpointHost?: string; endpointPort: number },
+  pluginApi: boolean,
 ): string {
-  if (isPluginApi()) return pluginTunnelName(host, idx, t);
+  if (pluginApi) return pluginTunnelName(host, idx, t);
   return `${host.name || host.id}_${t.sourcePort}_${t.endpointHost}_${t.endpointPort}`;
 }
 
@@ -44,6 +38,7 @@ export const TunnelManager = forwardRef<
   TunnelManagerHandle,
   TunnelSessionProps
 >(({ hostConfig, isVisible }, ref) => {
+  const client = useSessionClient();
   const color = useThemeColor();
   const [statuses, setStatuses] = useState<Record<string, TunnelStatus>>({});
   const [loadingKeys, setLoadingKeys] = useState<Set<string>>(new Set());
@@ -58,7 +53,7 @@ export const TunnelManager = forwardRef<
 
   const fetchStatuses = useCallback(async () => {
     try {
-      const data = await getTunnelStatuses();
+      const data = await client.api.tunnels.getTunnelStatuses();
       setStatuses(data);
       setStatus("ready");
       setError("");
@@ -70,7 +65,7 @@ export const TunnelManager = forwardRef<
 
   const fetchHosts = useCallback(async () => {
     try {
-      setAllHosts(await getSSHHosts());
+      setAllHosts(await client.api.hosts.getSSHHosts());
     } catch {
       // Endpoint lookup is best-effort; connect will surface a clear error.
     }
@@ -93,12 +88,12 @@ export const TunnelManager = forwardRef<
       tunnel: (typeof tunnels)[number],
       idx: number,
     ) => {
-      const key = tunnelKey(hostConfig, idx, tunnel);
+      const key = tunnelKey(hostConfig, idx, tunnel, client.isPluginApi());
       setLoadingKeys((prev) => new Set(prev).add(key));
       try {
-        if (action === "connect" && isPluginApi()) {
+        if (action === "connect" && client.isPluginApi()) {
           // 2.9 resolves both hosts and their secrets on the server.
-          await connectTunnel({
+          await client.api.tunnels.connectTunnel({
             name: key,
             sourceHostId: hostConfig.id,
             tunnelIndex: idx,
@@ -123,7 +118,7 @@ export const TunnelManager = forwardRef<
           if (!endpointHost)
             throw new Error(`Endpoint host not found: ${tunnel.endpointHost}`);
 
-          await connectTunnel({
+          await client.api.tunnels.connectTunnel({
             name: key,
             scope: tunnel.scope,
             mode: tunnel.mode,
@@ -181,10 +176,10 @@ export const TunnelManager = forwardRef<
           });
           toast.success(`Connecting tunnel on port ${tunnel.sourcePort}`);
         } else if (action === "disconnect") {
-          await disconnectTunnel(key);
+          await client.api.tunnels.disconnectTunnel(key);
           toast.success(`Disconnecting port ${tunnel.sourcePort}`);
         } else {
-          await cancelTunnel(key);
+          await client.api.tunnels.cancelTunnel(key);
           toast.success(`Cancelling port ${tunnel.sourcePort}`);
         }
         await fetchStatuses();
@@ -244,7 +239,7 @@ export const TunnelManager = forwardRef<
         }
       >
         {tunnels.map((tunnel, idx) => {
-          const key = tunnelKey(hostConfig, idx, tunnel);
+          const key = tunnelKey(hostConfig, idx, tunnel, client.isPluginApi());
           return (
             <TunnelCard
               key={`${key}-${idx}`}

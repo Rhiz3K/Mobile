@@ -4,14 +4,6 @@ import { Upload, Trash2 } from "lucide-react-native";
 import * as DocumentPicker from "expo-document-picker";
 import { SSHHost, SSHHostData, Credential, TunnelConnection } from "@/types";
 import {
-  createSSHHost,
-  updateSSHHost,
-  getSSHHostWithCredentials,
-  getCredentials,
-  getSSHHosts,
-  isTailscaleAvailable,
-} from "@/core/api/main-axios";
-import {
   Text,
   Input,
   Button,
@@ -26,6 +18,7 @@ import { useServerFeatures } from "@/contexts/ServerFeaturesContext";
 import { toast } from "@/utils/toast";
 import { TailscaleDevicePicker } from "@/features/tailscale/TailscaleDevices";
 import { tailnetAddress } from "@/features/tailscale/tailscale";
+import { api } from "@/core/accounts";
 
 type AuthType = "password" | "key" | "credential" | "none" | "tailscale";
 type TabId = "general" | "ssh" | "tunnels" | "rdp" | "vnc" | "telnet";
@@ -130,7 +123,7 @@ export default function HostForm({
   const [activeTab, setActiveTab] = useState<TabId>("general");
   const isEdit = !!host;
   const { has } = useServerFeatures();
-  const tailscaleAvailable = isTailscaleAvailable();
+  const tailscaleAvailable = api().tailscale.isTailscaleAvailable();
   // The name a Tailscale draft or device pick filled in, so picking another
   // device can replace it without overwriting a name the user typed.
   const autoNameRef = useRef("");
@@ -141,13 +134,15 @@ export default function HostForm({
   // Load credentials list for the credential picker.
   useEffect(() => {
     if (!visible) return;
-    getCredentials()
+    api()
+      .credentials.getCredentials()
       .then((res) => {
         const list = Array.isArray(res) ? res : (res?.credentials ?? []);
         setCredentials(list);
       })
       .catch(() => {});
-    getSSHHosts()
+    api()
+      .hosts.getSSHHosts()
       .then(setAllHosts)
       .catch(() => {});
   }, [visible]);
@@ -199,7 +194,8 @@ export default function HostForm({
     });
     if (!host) return;
     let cancelled = false;
-    getSSHHostWithCredentials(host.id)
+    api()
+      .credentials.getSSHHostWithCredentials(host.id)
       .then((full) => {
         if (!full || cancelled) return;
         setForm((f) => ({
@@ -398,10 +394,10 @@ export default function HostForm({
     setSaving(true);
     try {
       if (isEdit && host) {
-        await updateSSHHost(host.id, payload);
+        await api().hosts.updateSSHHost(host.id, payload);
         toast.success("Host updated");
       } else {
-        await createSSHHost(payload);
+        await api().hosts.createSSHHost(payload);
         toast.success("Host created");
       }
       onSaved();

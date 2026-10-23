@@ -5,8 +5,8 @@ import { WebView } from "react-native-webview";
 import { RotateCcw } from "lucide-react-native";
 import { Text } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
-import { getCookie, getDockerConsoleWebSocketUrl } from "@/core/api/main-axios";
 import type { SSHHost, DockerContainer } from "@/types";
+import { useSessionClient } from "@/core/accounts/session";
 
 /**
  * Interactive `docker exec` console. Renders a minimal xterm.js inside a WebView
@@ -26,6 +26,7 @@ export function DockerConsole({
   container: DockerContainer;
   isVisible: boolean;
 }) {
+  const client = useSessionClient();
   const color = useThemeColor();
   const webViewRef = useRef<WebView>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -45,7 +46,7 @@ export function DockerConsole({
   const connect = useCallback(async () => {
     setStatus("connecting");
     setErrorMessage("");
-    const token = await getCookie("jwt");
+    const token = await client.token();
     if (!token) {
       setStatus("error");
       setErrorMessage("Not authenticated");
@@ -55,7 +56,7 @@ export function DockerConsole({
       wsRef.current?.close();
     } catch {}
 
-    const ws = new WebSocket(getDockerConsoleWebSocketUrl(token), [
+    const ws = new WebSocket(client.dockerConsoleWebSocketUrl(token), [
       `termix.jwt.${token}`,
     ]);
     wsRef.current = ws;

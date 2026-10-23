@@ -34,20 +34,6 @@ import HostForm from "@/screens/hosts/HostForm";
 import { QuickConnect } from "@/screens/hosts/QuickConnect";
 import { TailscaleDevices } from "@/features/tailscale/TailscaleDevices";
 import CredentialListModal from "@/screens/hosts/CredentialListModal";
-import {
-  getSSHHosts,
-  getFoldersWithStats,
-  getAllServerStatuses,
-  getServerMetricsById,
-  initializeServerConfig,
-  getCurrentServerUrl,
-  deleteSSHHost,
-  createSSHHost,
-  getSnippets,
-  getUserAlerts,
-  dismissAlert,
-  isTailscaleAvailable,
-} from "@/core/api/main-axios";
 import { SSHHost, ServerStatus, Snippet } from "@/types";
 import { publishHostSnapshot } from "@/widgets";
 import { Screen } from "@/components/Screen";
@@ -76,6 +62,7 @@ import {
   collectAllTags,
   filtersActive,
 } from "@/screens/hosts/navigation/hostTree";
+import { api, activeClient } from "@/core/accounts";
 
 const SORT_OPTIONS: { id: SortKey; label: string }[] = [
   { id: "default", label: "Default" },
@@ -131,7 +118,7 @@ const STORAGE_EXPANDED = "hostExpandedFolders";
 export default function Hosts() {
   const color = useThemeColor();
   const { has, refresh: refreshFeatures } = useServerFeatures();
-  const tailscaleAvailable = isTailscaleAvailable();
+  const tailscaleAvailable = api().tailscale.isTailscaleAvailable();
   const router = useRouter();
   const [hosts, setHosts] = useState<SSHHost[]>([]);
   const [folderColors, setFolderColors] = useState<
@@ -215,7 +202,7 @@ export default function Hosts() {
         return;
       }
       const results = await Promise.allSettled(
-        onlineIds.map((id) => getServerMetricsById(id)),
+        onlineIds.map((id) => api().metrics.getServerMetricsById(id)),
       );
       setMetrics((previous) => {
         const next: Record<number, HostMetrics> = {};
@@ -246,17 +233,16 @@ export default function Hosts() {
         if (isRefresh) setRefreshing(true);
         else setLoading(true);
 
-        await initializeServerConfig();
-        if (!getCurrentServerUrl()) {
+        if (!activeClient()) {
           toast.error("No server configured. Set one up in Settings.");
           return;
         }
 
         const [hostsResult, statusesResult, snippetsResult] =
           await Promise.allSettled([
-            getSSHHosts(),
-            getAllServerStatuses(),
-            getSnippets(),
+            api().hosts.getSSHHosts(),
+            api().metrics.getAllServerStatuses(),
+            api().snippets.getSnippets(),
           ]);
 
         if (hostsResult.status !== "fulfilled") throw hostsResult.reason;
@@ -272,7 +258,7 @@ export default function Hosts() {
 
         let foldersData: any = null;
         try {
-          foldersData = await getFoldersWithStats();
+          foldersData = await api().folders.getFoldersWithStats();
         } catch {
           // folders are optional
         }
@@ -322,7 +308,7 @@ export default function Hosts() {
   // Server-side notices (maintenance, warnings) shown until dismissed.
   const loadAlerts = useCallback(async () => {
     try {
-      const res = await getUserAlerts();
+      const res = await api().alerts.getUserAlerts();
       setAlerts(Array.isArray(res?.alerts) ? res.alerts : []);
     } catch {
       setAlerts([]);
@@ -332,7 +318,7 @@ export default function Hosts() {
   const handleDismissAlert = async (id: string) => {
     setAlerts((prev) => prev.filter((a) => a.id !== id));
     try {
-      await dismissAlert(id);
+      await api().alerts.dismissAlert(id);
     } catch {
       // Dismissal is best-effort; it reappears on the next fetch if it fails.
     }
@@ -355,7 +341,7 @@ export default function Hosts() {
       statuses: serverStatuses,
       metrics,
       snippets: snippets ?? undefined,
-      serverUrl: getCurrentServerUrl(),
+      serverUrl: activeClient()?.serverUrl ?? null,
       authenticated: true,
     });
   }, [loading, hosts, serverStatuses, metrics, snippets]);
@@ -464,7 +450,7 @@ export default function Hosts() {
 
   const handleDelete = async (host: SSHHost) => {
     try {
-      await deleteSSHHost(host.id);
+      await api().hosts.deleteSSHHost(host.id);
       toast.success(`Deleted ${host.name}`);
       fetchData(true);
     } catch (e: any) {
@@ -474,7 +460,7 @@ export default function Hosts() {
 
   const handleClone = async (host: SSHHost) => {
     try {
-      await createSSHHost({
+      await api().hosts.createSSHHost({
         name: `${host.name} (copy)`,
         ip: host.ip,
         port: host.port,

@@ -49,35 +49,6 @@ import {
   X,
 } from "lucide-react-native";
 import { SSHHost, SessionAuthOverrides } from "@/types";
-import {
-  connectSSH,
-  verifySSHTOTP,
-  verifySSHWarpgate,
-  keepSSHAlive,
-  disconnectSSH,
-  listSSHFiles,
-  readSSHFile,
-  writeSSHFile,
-  createSSHFile,
-  createSSHFolder,
-  deleteSSHItem,
-  renameSSHItem,
-  copySSHItem,
-  moveSSHItem,
-  changeSSHPermissions,
-  identifySSHSymlink,
-  uploadSSHFile,
-  extractSSHArchive,
-  compressSSHFiles,
-  downloadSSHFile,
-  getPinnedFiles,
-  addRecentFile,
-  addPinnedFile,
-  removePinnedFile,
-  getFolderShortcuts,
-  addFolderShortcut,
-  removeFolderShortcut,
-} from "@/core/api/main-axios";
 import { Text, Input, Button, Sheet, SheetBody, useConfirm } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { toast } from "@/utils/toast";
@@ -103,6 +74,7 @@ import {
   getParentPath,
   sortFiles,
 } from "./utils/fileUtils";
+import { useSessionClient } from "@/core/accounts/session";
 
 interface FileManagerProps {
   host: SSHHost;
@@ -129,6 +101,7 @@ type SortBy = "name" | "size" | "modified";
 
 export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
   ({ host, isVisible }, ref) => {
+    const client = useSessionClient();
     const color = useThemeColor();
     const confirm = useConfirm();
 
@@ -182,7 +155,7 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
           userId: string | undefined,
           overrides: SessionAuthOverrides,
         ) =>
-          connectSSH(sid, {
+          client.api.files.connectSSH(sid, {
             hostId: h.id,
             ip: h.ip,
             port: h.port,
@@ -201,11 +174,12 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
             overrideCredentialUsername: h.overrideCredentialUsername,
             jumpHosts: h.jumpHosts,
           }),
-        submitTotp: (sid: string, code: string) => verifySSHTOTP(sid, code),
+        submitTotp: (sid: string, code: string) =>
+          client.api.files.verifySSHTOTP(sid, code),
         submitWarpgate: (sid: string, url: string, key?: string) =>
-          verifySSHWarpgate(sid, url, key),
-        keepAlive: (sid: string) => keepSSHAlive(sid),
-        disconnect: (sid: string) => disconnectSSH(sid),
+          client.api.files.verifySSHWarpgate(sid, url, key),
+        keepAlive: (sid: string) => client.api.files.keepSSHAlive(sid),
+        disconnect: (sid: string) => client.api.files.disconnectSSH(sid),
       }),
       [],
     );
@@ -217,7 +191,7 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
         setBusy(true);
         setLoadingDir(true);
         try {
-          const response = await listSSHFiles(session, path);
+          const response = await client.api.files.listSSHFiles(session, path);
           setFiles((response.files as FileItem[]) || []);
           setCurrentPath(response.path || path);
           setSelectedFiles(new Set());
@@ -235,8 +209,8 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
 
     const loadBookmarks = useCallback(async () => {
       const [p, sc] = await Promise.all([
-        getPinnedFiles(host.id).catch(() => []),
-        getFolderShortcuts(host.id).catch(() => []),
+        client.api.files.getPinnedFiles(host.id).catch(() => []),
+        client.api.files.getFolderShortcuts(host.id).catch(() => []),
       ]);
       setPinned(Array.isArray(p) ? p : []);
       setShortcuts(Array.isArray(sc) ? sc : []);
@@ -248,10 +222,10 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
       try {
         if (isPinned(file.path)) {
           setPinned((prev) => prev.filter((i) => i.path !== file.path));
-          await removePinnedFile(host.id, file.path);
+          await client.api.files.removePinnedFile(host.id, file.path);
         } else {
           setPinned((prev) => [...prev, { name: file.name, path: file.path }]);
-          await addPinnedFile(host.id, file.path, file.name);
+          await client.api.files.addPinnedFile(host.id, file.path, file.name);
         }
       } catch (e: any) {
         toast.error(e?.message || "Failed to update pin");
@@ -265,13 +239,17 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
       try {
         if (isShortcut(file.path)) {
           setShortcuts((prev) => prev.filter((i) => i.path !== file.path));
-          await removeFolderShortcut(host.id, file.path);
+          await client.api.files.removeFolderShortcut(host.id, file.path);
         } else {
           setShortcuts((prev) => [
             ...prev,
             { name: file.name, path: file.path },
           ]);
-          await addFolderShortcut(host.id, file.path, file.name);
+          await client.api.files.addFolderShortcut(
+            host.id,
+            file.path,
+            file.name,
+          );
         }
       } catch (e: any) {
         toast.error(e?.message || "Failed to update shortcut");
@@ -307,7 +285,7 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
       if (file.type === "link") {
         try {
           setBusy(true);
-          const info = await identifySSHSymlink(
+          const info = await client.api.files.identifySSHSymlink(
             conn.sessionId.current,
             file.path,
           );
@@ -335,9 +313,14 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
     const viewFile = async (file: FileItem) => {
       try {
         setBusy(true);
-        const response = await readSSHFile(conn.sessionId.current, file.path);
+        const response = await client.api.files.readSSHFile(
+          conn.sessionId.current,
+          file.path,
+        );
         setViewer({ file, content: response.content });
-        addRecentFile(host.id, file.path, file.name).catch(() => {});
+        client.api.files
+          .addRecentFile(host.id, file.path, file.name)
+          .catch(() => {});
       } catch (e: any) {
         toast.error(e?.message || "Failed to read file");
       } finally {
@@ -347,7 +330,7 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
 
     const saveFile = async (content: string) => {
       if (!viewer) return;
-      await writeSSHFile(
+      await client.api.files.writeSSHFile(
         conn.sessionId.current,
         viewer.file.path,
         content,
@@ -362,14 +345,14 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
       try {
         setBusy(true);
         if (createDialog === "folder") {
-          await createSSHFolder(
+          await client.api.files.createSSHFolder(
             conn.sessionId.current,
             currentPath,
             createName,
             host.id,
           );
         } else {
-          await createSSHFile(
+          await client.api.files.createSSHFile(
             conn.sessionId.current,
             currentPath,
             createName,
@@ -394,7 +377,7 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
       if (!renameTarget || !renameName.trim()) return;
       try {
         setBusy(true);
-        await renameSSHItem(
+        await client.api.files.renameSSHItem(
           conn.sessionId.current,
           renameTarget.path,
           renameName,
@@ -416,7 +399,7 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
       if (!ok) return;
       try {
         setBusy(true);
-        await deleteSSHItem(
+        await client.api.files.deleteSSHItem(
           conn.sessionId.current,
           file.path,
           file.type === "directory",
@@ -441,7 +424,7 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
         setBusy(true);
         for (const path of selectedFiles) {
           const file = files.find((f) => f.path === path);
-          await deleteSSHItem(
+          await client.api.files.deleteSSHItem(
             conn.sessionId.current,
             path,
             file?.type === "directory",
@@ -465,9 +448,14 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
         setBusy(true);
         for (const p of clipboard.files) {
           if (clipboard.operation === "copy") {
-            await copySSHItem(conn.sessionId.current, p, currentPath, host.id);
+            await client.api.files.copySSHItem(
+              conn.sessionId.current,
+              p,
+              currentPath,
+              host.id,
+            );
           } else {
-            await moveSSHItem(
+            await client.api.files.moveSSHItem(
               conn.sessionId.current,
               p,
               joinPath(currentPath, p.split("/").pop()!),
@@ -488,7 +476,7 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
     const applyPermissions = async (octal: string) => {
       if (!permsFile) return;
       try {
-        await changeSSHPermissions(
+        await client.api.files.changeSSHPermissions(
           conn.sessionId.current,
           permsFile.path,
           octal,
@@ -514,7 +502,7 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
         const response = await fetch(asset.uri);
         const buffer = await response.arrayBuffer();
         const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
-        await uploadSSHFile(
+        await client.api.files.uploadSSHFile(
           conn.sessionId.current,
           currentPath,
           asset.name,
@@ -535,7 +523,7 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
       if (!name) return;
       try {
         setBusy(true);
-        await compressSSHFiles(
+        await client.api.files.compressSSHFiles(
           conn.sessionId.current,
           Array.from(selectedFiles),
           name,
@@ -557,7 +545,7 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
     const doDownload = async (file: FileItem) => {
       try {
         setBusy(true);
-        const res = await downloadSSHFile(
+        const res = await client.api.files.downloadSSHFile(
           conn.sessionId.current,
           file.path,
           host.id,
@@ -588,7 +576,7 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
     const doExtract = async (file: FileItem) => {
       try {
         setBusy(true);
-        await extractSSHArchive(
+        await client.api.files.extractSSHArchive(
           conn.sessionId.current,
           file.path,
           currentPath,

@@ -14,23 +14,13 @@ import {
   Check,
 } from "lucide-react-native";
 import { useRouter } from "expo-router";
-import {
-  getSnippets,
-  getSnippetFolders,
-  createSnippet,
-  updateSnippet,
-  deleteSnippet,
-  createSnippetFolder,
-  deleteSnippetFolder,
-  reorderSnippets,
-  renameSnippetFolder,
-} from "@/core/api/main-axios";
 import { Snippet, SnippetFolder } from "@/types";
 import { publishSnippetSnapshot } from "@/widgets";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { Screen } from "@/components/Screen";
 import { Text, Button, Input, Label, Sheet, SheetBody, EmptyState } from "@/ui";
 import { toast } from "@/utils/toast";
+import { api } from "@/core/accounts";
 
 type SnippetFormData = {
   name: string;
@@ -87,8 +77,12 @@ export default function Snippets() {
   const load = useCallback(async () => {
     try {
       const [s, f] = await Promise.all([
-        getSnippets().catch(() => []),
-        getSnippetFolders().catch(() => []),
+        api()
+          .snippets.getSnippets()
+          .catch(() => []),
+        api()
+          .snippets.getSnippetFolders()
+          .catch(() => []),
       ]);
       const ordered = Array.isArray(s)
         ? s.sort((a: Snippet, b: Snippet) => (a.order ?? 0) - (b.order ?? 0))
@@ -167,10 +161,10 @@ export default function Snippets() {
         folder: form.folder.trim() || undefined,
       };
       if (editingSnippet) {
-        await updateSnippet(editingSnippet.id, payload);
+        await api().snippets.updateSnippet(editingSnippet.id, payload);
         toast.success("Snippet updated");
       } else {
-        await createSnippet(payload);
+        await api().snippets.createSnippet(payload);
         toast.success("Snippet created");
       }
       await load();
@@ -186,7 +180,7 @@ export default function Snippets() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      await deleteSnippet(deleteTarget.id);
+      await api().snippets.deleteSnippet(deleteTarget.id);
       toast.success("Snippet deleted");
       setDeleteTarget(null);
       await load();
@@ -204,7 +198,7 @@ export default function Snippets() {
     }
     setCreatingFolder(true);
     try {
-      await createSnippetFolder({ name: folderName.trim() });
+      await api().snippets.createSnippetFolder({ name: folderName.trim() });
       toast.success("Folder created");
       setFolderDialog(false);
       setFolderName("");
@@ -220,7 +214,7 @@ export default function Snippets() {
     if (!deleteFolderTarget) return;
     setDeletingFolder(true);
     try {
-      await deleteSnippetFolder(deleteFolderTarget.name);
+      await api().snippets.deleteSnippetFolder(deleteFolderTarget.name);
       toast.success("Folder deleted");
       setDeleteFolderTarget(null);
       await load();
@@ -242,7 +236,7 @@ export default function Snippets() {
     }
     setRenamingFolder(true);
     try {
-      await renameSnippetFolder(oldName, newName);
+      await api().snippets.renameSnippetFolder(oldName, newName);
       setRenameFolderTarget(null);
       setRenameFolderName("");
       await load();
@@ -275,7 +269,7 @@ export default function Snippets() {
     );
 
     try {
-      await reorderSnippets(
+      await api().snippets.reorderSnippets(
         reordered.map((sn, i) => ({
           id: sn.id,
           order: i,

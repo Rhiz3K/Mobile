@@ -7,9 +7,9 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { TerminalHandle } from "@/features/terminal/Terminal";
-import { getSnippets, getSnippetFolders } from "@/core/api/main-axios";
 import { showToast } from "@/utils/toast";
 import { useUiColors } from "@/contexts/ThemeContext";
+import { useSessionClient } from "@/core/accounts/session";
 
 interface Snippet {
   id: number;
@@ -44,6 +44,7 @@ export default function SnippetsBar({
   terminalRef,
   isVisible,
 }: SnippetsBarProps) {
+  const client = useSessionClient();
   const ui = useUiColors();
   const [snippets, setSnippets] = useState<Snippet[]>([]);
   const [folders, setFolders] = useState<SnippetFolder[]>([]);
@@ -60,8 +61,8 @@ export default function SnippetsBar({
     try {
       setLoading(true);
       const [snippetsData, foldersData] = await Promise.all([
-        getSnippets().catch(() => []),
-        getSnippetFolders().catch(() => []),
+        client.api.snippets.getSnippets().catch(() => []),
+        client.api.snippets.getSnippetFolders().catch(() => []),
       ]);
       const snippetsArray = Array.isArray(snippetsData) ? snippetsData : [];
       const foldersArray = Array.isArray(foldersData) ? foldersData : [];

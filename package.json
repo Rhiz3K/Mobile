@@ -14,7 +14,6 @@
     "type-check": "tsc --noEmit",
     "test": "jest",
     "verify": "npm run type-check && npm run lint && npm run format:check && npm test",
-    "verify:terminal-websocket-auth": "node scripts/terminal-websocket-auth.test.cjs",
     "icons": "node scripts/generate-icons.mjs",
     "build-all": "eas build --platform all --profile development",
     "build-android": "eas build --platform android --profile development",

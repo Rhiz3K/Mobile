@@ -17,7 +17,6 @@ import {
   ChevronRight,
 } from "lucide-react-native";
 import { Credential } from "@/types";
-import { getCredentials, deleteCredential } from "@/core/api/main-axios";
 import {
   Text,
   Input,
@@ -30,6 +29,7 @@ import {
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { toast } from "@/utils/toast";
 import CredentialForm from "@/screens/hosts/CredentialForm";
+import { api } from "@/core/accounts";
 
 export default function CredentialListModal({
   visible,
@@ -56,7 +56,7 @@ export default function CredentialListModal({
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     try {
-      const res = await getCredentials();
+      const res = await api().credentials.getCredentials();
       const list: Credential[] = Array.isArray(res)
         ? res
         : (res?.credentials ?? []);
@@ -101,7 +101,7 @@ export default function CredentialListModal({
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      await deleteCredential(deleteTarget.id);
+      await api().credentials.deleteCredential(deleteTarget.id);
       toast.success(`Deleted "${deleteTarget.name}"`);
       setDeleteTarget(null);
       load(true);

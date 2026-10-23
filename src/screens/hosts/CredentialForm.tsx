@@ -5,13 +5,6 @@ import * as DocumentPicker from "expo-document-picker";
 import * as Clipboard from "expo-clipboard";
 import { Credential, CredentialData } from "@/types";
 import {
-  getCredentialDetails,
-  createCredential,
-  updateCredential,
-  generateKeyPair,
-  generatePublicKeyFromPrivate,
-} from "@/core/api/main-axios";
-import {
   Text,
   Input,
   Button,
@@ -23,6 +16,7 @@ import {
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { useServerFeatures } from "@/contexts/ServerFeaturesContext";
 import { toast } from "@/utils/toast";
+import { api } from "@/core/accounts";
 
 type TabId = "general" | "auth";
 type GeneratingKey = "ed25519" | "ecdsa" | "rsa" | null;
@@ -104,7 +98,8 @@ export default function CredentialForm({
       username: credential.username ?? "",
       publicKey: credential.publicKey ?? "",
     });
-    getCredentialDetails(credential.id)
+    api()
+      .credentials.getCredentialDetails(credential.id)
       .then((details: any) => {
         if (!details) return;
         setForm((f) => ({
@@ -158,7 +153,7 @@ export default function CredentialForm({
     const id = label ?? "ed25519";
     setGeneratingKey(id);
     try {
-      const result = await generateKeyPair(
+      const result = await api().keys.generateKeyPair(
         keyType,
         keySize,
         form.keyPassword || undefined,
@@ -186,7 +181,7 @@ export default function CredentialForm({
     }
     setGeneratingPublicKey(true);
     try {
-      const result = await generatePublicKeyFromPrivate(
+      const result = await api().keys.generatePublicKeyFromPrivate(
         form.key,
         form.keyPassword || undefined,
       );
@@ -230,10 +225,10 @@ export default function CredentialForm({
     setSaving(true);
     try {
       if (isEdit && credential) {
-        await updateCredential(credential.id, payload);
+        await api().credentials.updateCredential(credential.id, payload);
         toast.success("Credential updated");
       } else {
-        await createCredential(payload);
+        await api().credentials.createCredential(payload);
         toast.success("Credential created");
       }
       onSaved();

@@ -2,12 +2,12 @@ import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, ScrollView, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Play, Server as ServerIcon } from "lucide-react-native";
-import { executeSnippet, getSSHHosts } from "@/core/api/main-axios";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { Sheet, SheetRow, Text } from "@/ui";
 import { toast } from "@/utils/toast";
 import { systemLogger } from "@/core/log/logger";
 import type { SSHHost, Snippet } from "@/types";
+import { api } from "@/core/accounts";
 
 /** Remembers the host a widget-run snippet last targeted. */
 const LAST_HOST_KEY = "widgetSnippetLastHostId";
@@ -46,7 +46,7 @@ export function RunSnippetSheet({ snippet, onClose }: RunSnippetSheetProps) {
     (async () => {
       try {
         const [list, storedHostId] = await Promise.all([
-          getSSHHosts(),
+          api().hosts.getSSHHosts(),
           AsyncStorage.getItem(LAST_HOST_KEY).catch(() => null),
         ]);
         if (cancelled) return;
@@ -78,7 +78,7 @@ export function RunSnippetSheet({ snippet, onClose }: RunSnippetSheetProps) {
 
       setRunningHostId(host.id);
       try {
-        const result = await executeSnippet(snippet.id, host.id);
+        const result = await api().snippets.executeSnippet(snippet.id, host.id);
         AsyncStorage.setItem(LAST_HOST_KEY, String(host.id)).catch(() => {});
 
         if (result?.success === false) {

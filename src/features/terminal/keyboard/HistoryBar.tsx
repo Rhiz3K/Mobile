@@ -8,14 +8,10 @@ import {
 } from "react-native";
 import { Trash2 } from "lucide-react-native";
 import { TerminalHandle } from "@/features/terminal/Terminal";
-import {
-  getCommandHistory,
-  deleteCommandFromHistory,
-  clearCommandHistory,
-} from "@/core/api/main-axios";
 import { showToast } from "@/utils/toast";
 import { MONO_FONT } from "@/constants/fonts";
 import { useUiColors } from "@/contexts/ThemeContext";
+import { useSessionClient } from "@/core/accounts/session";
 
 interface HistoryBarProps {
   terminalRef: React.RefObject<TerminalHandle | null>;
@@ -32,6 +28,7 @@ export default function HistoryBar({
   hostId,
   isVisible,
 }: HistoryBarProps) {
+  const client = useSessionClient();
   const ui = useUiColors();
   const [commands, setCommands] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,7 +40,7 @@ export default function HistoryBar({
       return;
     }
     setLoading(true);
-    setCommands(await getCommandHistory(hostId));
+    setCommands(await client.api.terminal.getCommandHistory(hostId));
     setLoading(false);
   }, [hostId]);
 
@@ -58,13 +55,13 @@ export default function HistoryBar({
   const remove = async (command: string) => {
     if (!hostId) return;
     setCommands((prev) => prev.filter((c) => c !== command));
-    await deleteCommandFromHistory(hostId, command);
+    await client.api.terminal.deleteCommandFromHistory(hostId, command);
   };
 
   const clearAll = async () => {
     if (!hostId) return;
     setCommands([]);
-    await clearCommandHistory(hostId);
+    await client.api.terminal.clearCommandHistory(hostId);
     showToast.success("History cleared");
   };
 

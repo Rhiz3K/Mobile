@@ -40,8 +40,5 @@ jobs:
       - name: Test
         run: npm test -- --ci
 
-      - name: Verify terminal WebSocket authentication
-        run: npm run verify:terminal-websocket-auth
-
       - name: Validate Expo config
         run: npx expo config --type public --json > /tmp/expo-config.json

@@ -10,15 +10,10 @@ import {
   Trash2,
   LogOut,
 } from "lucide-react-native";
-import {
-  getSessions,
-  revokeSession,
-  revokeAllUserSessions,
-  getUserInfo,
-} from "@/core/api/main-axios";
 import { Text, Button, Sheet, useConfirm } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { toast } from "@/utils/toast";
+import { api } from "@/core/accounts";
 
 interface Session {
   id: string;
@@ -73,8 +68,8 @@ export default function ActiveSessions() {
   const load = useCallback(async () => {
     try {
       const [sessRes, userRes] = await Promise.all([
-        getSessions(),
-        getUserInfo(),
+        api().users.getSessions(),
+        api().auth.getUserInfo(),
       ]);
       setSessions(sessRes?.sessions ?? []);
       setUserId(userRes?.userId ?? null);
@@ -89,7 +84,7 @@ export default function ActiveSessions() {
 
   const handleRevoke = async (sessionId: string) => {
     try {
-      await revokeSession(sessionId);
+      await api().users.revokeSession(sessionId);
       setSessions((prev) => prev.filter((s) => s.id !== sessionId));
       toast.success("Session revoked");
     } catch {
@@ -101,7 +96,7 @@ export default function ActiveSessions() {
     if (!userId) return;
     setRevokeAllBusy(true);
     try {
-      await revokeAllUserSessions(userId);
+      await api().users.revokeAllUserSessions(userId);
       setSessions([]);
       setRevokeAllDialog(false);
       toast.success("All sessions revoked");

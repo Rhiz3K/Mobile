@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 import { SSHHost, SessionAuthOverrides } from "@/types";
 import { getCurrentUserId } from "@/utils/user";
-import { extractConnectionLogs } from "@/core/api/main-axios";
 import { useConnectionLog } from "./useConnectionLog";
+import { extractConnectionLogs } from "@/core/api/errors";
 
 export type SessionConnectState =
   "idle" | "connecting" | "connected" | "totp" | "warpgate" | "auth" | "error";

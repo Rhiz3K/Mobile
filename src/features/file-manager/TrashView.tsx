@@ -10,17 +10,12 @@ import { Sheet, SheetBody, Button, Text } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { toast } from "@/utils/toast";
 import {
-  listSSHTrash,
-  restoreSSHTrashItem,
-  deleteSSHTrashItem,
-  emptySSHTrash,
-  type TrashItem,
-} from "@/core/api/main-axios";
-import {
   formatFileSize,
   formatDate,
   getFileIconColor,
 } from "./utils/fileUtils";
+import { useSessionClient } from "@/core/accounts/session";
+import type { TrashItem } from "@/core/api/types";
 
 /**
  * Deleted files are moved to a server-side trash rather than removed, so this
@@ -37,6 +32,7 @@ export function TrashView({
   onClose: () => void;
   onRestored: () => void;
 }) {
+  const client = useSessionClient();
   const color = useThemeColor();
   const [items, setItems] = useState<TrashItem[]>([]);
   const [retentionDays, setRetentionDays] = useState(0);
@@ -46,7 +42,7 @@ export function TrashView({
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await listSSHTrash(sessionId);
+      const res = await client.api.files.listSSHTrash(sessionId);
       setItems(res.items);
       setRetentionDays(res.retentionDays);
     } catch (e: any) {
@@ -63,7 +59,7 @@ export function TrashView({
   const restore = async (item: TrashItem) => {
     setBusyId(item.id);
     try {
-      await restoreSSHTrashItem(sessionId, item.id);
+      await client.api.files.restoreSSHTrashItem(sessionId, item.id);
       toast.success(`Restored ${item.name}`);
       setItems((prev) => prev.filter((i) => i.id !== item.id));
       onRestored();
@@ -77,7 +73,7 @@ export function TrashView({
   const purge = async (item: TrashItem) => {
     setBusyId(item.id);
     try {
-      await deleteSSHTrashItem(sessionId, item.id);
+      await client.api.files.deleteSSHTrashItem(sessionId, item.id);
       setItems((prev) => prev.filter((i) => i.id !== item.id));
     } catch (e: any) {
       toast.error(e?.message || "Failed to delete");
@@ -89,7 +85,7 @@ export function TrashView({
   const empty = async () => {
     setLoading(true);
     try {
-      await emptySSHTrash(sessionId);
+      await client.api.files.emptySSHTrash(sessionId);
       setItems([]);
       toast.success("Trash emptied");
     } catch (e: any) {

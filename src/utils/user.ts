@@ -1,4 +1,4 @@
-import { getUserInfo } from "@/core/api/main-axios";
+import { api } from "@/core/accounts";
 
 let cachedUserId: string | null = null;
 
@@ -10,7 +10,7 @@ let cachedUserId: string | null = null;
 export async function getCurrentUserId(): Promise<string | null> {
   if (cachedUserId) return cachedUserId;
   try {
-    const info = await getUserInfo();
+    const info = await api().auth.getUserInfo();
     cachedUserId = info?.userId || null;
     return cachedUserId;
   } catch {

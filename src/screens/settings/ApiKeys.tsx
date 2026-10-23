@@ -11,13 +11,6 @@ import {
   KeyRound,
 } from "lucide-react-native";
 import * as Clipboard from "expo-clipboard";
-import {
-  getApiKeys,
-  createApiKey,
-  deleteApiKey,
-  getUserList,
-  type ApiKey,
-} from "@/core/api/main-axios";
 import { UserInfo } from "@/types";
 import {
   Text,
@@ -31,6 +24,8 @@ import {
 } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { toast } from "@/utils/toast";
+import { api } from "@/core/accounts";
+import type { ApiKey } from "@/core/api/types";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "Never";
@@ -75,8 +70,8 @@ export default function ApiKeys() {
   const load = useCallback(async () => {
     try {
       const [keysRes, usersRes] = await Promise.all([
-        getApiKeys(),
-        getUserList(),
+        api().apiKeys.getApiKeys(),
+        api().users.getUserList(),
       ]);
       setKeys(keysRes?.apiKeys ?? []);
       const userList = usersRes?.users ?? [];
@@ -140,7 +135,7 @@ export default function ApiKeys() {
     if (!keyName.trim() || !keyUserId) return;
     setCreateBusy(true);
     try {
-      const res = await createApiKey(
+      const res = await api().apiKeys.createApiKey(
         keyName.trim(),
         keyUserId,
         buildExpiresAt(),
@@ -171,7 +166,7 @@ export default function ApiKeys() {
     });
     if (!ok) return;
     try {
-      await deleteApiKey(keyId);
+      await api().apiKeys.deleteApiKey(keyId);
       setKeys((prev) => prev.filter((k) => k.id !== keyId));
       toast.success("API key deleted");
     } catch {

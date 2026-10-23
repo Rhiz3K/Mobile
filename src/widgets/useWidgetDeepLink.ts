@@ -22,11 +22,11 @@ import {
   useTerminalSessions,
   type SessionType,
 } from "@/contexts/TerminalSessionsContext";
-import { getSSHHosts, getSnippets } from "@/core/api/main-axios";
 import { systemLogger } from "@/core/log/logger";
 import { toast } from "@/utils/toast";
 import type { Snippet } from "@/types";
 import { WIDGET_LINK_PREFIX } from "./types";
+import { api } from "@/core/accounts";
 
 /** Session types a widget link is allowed to open. */
 const ALLOWED_SESSION_TYPES: SessionType[] = [
@@ -127,7 +127,7 @@ export function useWidgetDeepLink(): {
    */
   const runSnippetLink = useCallback(async (snippetId: number) => {
     try {
-      const snippets = await getSnippets();
+      const snippets = await api().snippets.getSnippets();
       const snippet = Array.isArray(snippets)
         ? snippets.find((candidate: Snippet) => candidate.id === snippetId)
         : undefined;
@@ -173,7 +173,7 @@ export function useWidgetDeepLink(): {
       }
 
       try {
-        const hosts = await getSSHHosts();
+        const hosts = await api().hosts.getSSHHosts();
         const host = Array.isArray(hosts)
           ? hosts.find((candidate) => candidate.id === link.hostId)
           : undefined;

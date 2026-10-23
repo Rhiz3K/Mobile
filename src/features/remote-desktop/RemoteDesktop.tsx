@@ -36,12 +36,9 @@ import {
 } from "lucide-react-native";
 import type { SSHHost } from "@/types";
 import type { RemoteDesktopProtocol } from "@/contexts/TerminalSessionsContext";
-import {
-  getGuacamoleTokenFromHost,
-  getGuacamoleWebSocketUrl,
-} from "@/core/api/main-axios";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { Sheet, Tabs, Button, SheetBody, Input } from "@/ui";
+import { useSessionClient } from "@/core/accounts/session";
 
 // Height of the always-visible key strip at the bottom.
 // The parent session area already accounts for the tab bar + safe-area insets,
@@ -79,6 +76,7 @@ export function RemoteDesktop({
   title,
   protocol,
 }: RemoteDesktopProps) {
+  const client = useSessionClient();
   const color = useThemeColor();
   const { bottom: safeBottom } = useSafeAreaInsets();
 
@@ -175,11 +173,12 @@ export function RemoteDesktop({
       try {
         setConnectionState("connecting");
         setErrorMessage(null);
-        const { token } = await getGuacamoleTokenFromHost(
-          Number(host.id),
-          protocol,
-          credentials,
-        );
+        const { token } =
+          await client.api.remoteDesktop.getGuacamoleTokenFromHost(
+            Number(host.id),
+            protocol,
+            credentials,
+          );
         // Use measured layout size; fall back to ref if layout fired already
         const measured = availableSizeRef.current;
         const { width: remW, height: remH } = resolveRemoteDesktopSize(
@@ -189,7 +188,7 @@ export function RemoteDesktop({
           (protocol ?? host.connectionType) === "rdp" ? PixelRatio.get() : 1,
         );
         initialSizeRef.current = { width: remW, height: remH };
-        setWebSocketUrl(getGuacamoleWebSocketUrl(token, remW, remH));
+        setWebSocketUrl(client.remoteDesktopWebSocketUrl(token, remW, remH));
       } catch (error) {
         setConnectionState("failed");
         setErrorMessage(

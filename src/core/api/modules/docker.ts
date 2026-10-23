@@ -1,0 +1,214 @@
+import { type AxiosInstance } from "axios";
+import type { AccountClient } from "../AccountClient";
+import type {
+  DockerContainer,
+  DockerContainerStats,
+  DockerContainerAction as DockerActionType,
+  SessionAuthOverrides,
+} from "@/types/index";
+
+export function createDockerApi(c: AccountClient) {
+  // nginx routes /docker/* from the server root, without the /ssh prefix.
+  function getDockerBase(): string {
+    return c.rootBase().replace(/\/$/, "");
+  }
+
+  function dockerApi(): AxiosInstance {
+    return c.createHttp(getDockerBase(), "DOCKER");
+  }
+
+  /** Establish (or reuse) an SSH session for Docker operations on a host. */
+  async function dockerConnect(
+    sessionId: string,
+    hostId: number,
+    overrides?: SessionAuthOverrides,
+  ): Promise<any> {
+    try {
+      const response = await dockerApi().post("/docker/ssh/connect", {
+        sessionId,
+        hostId,
+        userProvidedPassword: overrides?.userProvidedPassword,
+        userProvidedSshKey: overrides?.userProvidedSshKey,
+        userProvidedKeyPassword: overrides?.userProvidedKeyPassword,
+      });
+      return response.data;
+    } catch (error) {
+      c.fail(error, "connect Docker session");
+    }
+  }
+
+  async function dockerConnectTOTP(
+    sessionId: string,
+    totpCode: string,
+  ): Promise<any> {
+    try {
+      const response = await dockerApi().post("/docker/ssh/connect-totp", {
+        sessionId,
+        totpCode,
+      });
+      return response.data;
+    } catch (error) {
+      c.fail(error, "submit Docker TOTP");
+    }
+  }
+
+  /** Continues a browser sign-in (Warpgate and the like) for a Docker session. */
+  async function dockerConnectBrowserSignIn(
+    sessionId: string,
+    warpgateUrl?: string,
+    securityKey?: string,
+  ): Promise<any> {
+    try {
+      const response = await dockerApi().post("/docker/ssh/connect-warpgate", {
+        sessionId,
+        warpgateUrl,
+        securityKey,
+      });
+      return response.data;
+    } catch (error) {
+      c.fail(error, "continue Docker sign-in");
+    }
+  }
+
+  async function dockerKeepAlive(sessionId: string): Promise<void> {
+    try {
+      await dockerApi().post("/docker/ssh/keepalive", { sessionId });
+    } catch {
+      // Best-effort heartbeat.
+    }
+  }
+
+  async function dockerDisconnect(sessionId: string): Promise<void> {
+    try {
+      await dockerApi().post("/docker/ssh/disconnect", { sessionId });
+    } catch {
+      // Best-effort on teardown.
+    }
+  }
+
+  async function dockerStatus(
+    sessionId: string,
+  ): Promise<{ connected: boolean }> {
+    try {
+      const response = await dockerApi().get("/docker/ssh/status", {
+        params: { sessionId },
+      });
+      return response.data || { connected: false };
+    } catch {
+      return { connected: false };
+    }
+  }
+
+  /** Whether Docker is actually available on the connected host. */
+  async function dockerValidate(
+    sessionId: string,
+  ): Promise<{ available: boolean; version?: string; error?: string }> {
+    try {
+      const response = await dockerApi().get(`/docker/validate/${sessionId}`);
+      return response.data;
+    } catch (error) {
+      c.fail(error, "validate Docker");
+    }
+  }
+
+  async function getDockerContainers(
+    sessionId: string,
+    all = true,
+  ): Promise<DockerContainer[]> {
+    try {
+      const response = await dockerApi().get(
+        `/docker/containers/${sessionId}`,
+        {
+          params: { all },
+        },
+      );
+      const data = response.data;
+      return Array.isArray(data) ? data : (data?.containers ?? []);
+    } catch (error) {
+      c.fail(error, "list Docker containers");
+    }
+  }
+
+  async function getDockerContainerDetail(
+    sessionId: string,
+    containerId: string,
+  ): Promise<any> {
+    try {
+      const response = await dockerApi().get(
+        `/docker/containers/${sessionId}/${containerId}`,
+      );
+      return response.data;
+    } catch (error) {
+      c.fail(error, "inspect Docker container");
+    }
+  }
+
+  async function getDockerContainerStats(
+    sessionId: string,
+    containerId: string,
+  ): Promise<DockerContainerStats> {
+    try {
+      const response = await dockerApi().get(
+        `/docker/containers/${sessionId}/${containerId}/stats`,
+      );
+      return response.data;
+    } catch (error) {
+      c.fail(error, "fetch Docker stats");
+    }
+  }
+
+  async function dockerContainerAction(
+    sessionId: string,
+    containerId: string,
+    action: DockerActionType,
+  ): Promise<void> {
+    try {
+      if (action === "remove") {
+        await dockerApi().delete(
+          `/docker/containers/${sessionId}/${containerId}`,
+        );
+      } else {
+        await dockerApi().post(
+          `/docker/containers/${sessionId}/${containerId}/${action}`,
+        );
+      }
+    } catch (error) {
+      c.fail(error, `docker ${action}`);
+    }
+  }
+
+  async function getDockerContainerLogs(
+    sessionId: string,
+    containerId: string,
+    tail = 200,
+  ): Promise<string> {
+    try {
+      const response = await dockerApi().get(
+        `/docker/containers/${sessionId}/${containerId}/logs`,
+        { params: { tail } },
+      );
+      const data = response.data;
+      if (typeof data === "string") return data;
+      return data?.logs ?? "";
+    } catch (error) {
+      c.fail(error, "fetch Docker logs");
+    }
+  }
+
+  return {
+    dockerConnect,
+    dockerConnectTOTP,
+    dockerConnectBrowserSignIn,
+    dockerKeepAlive,
+    dockerDisconnect,
+    dockerStatus,
+    dockerValidate,
+    getDockerContainers,
+    getDockerContainerDetail,
+    getDockerContainerStats,
+    dockerContainerAction,
+    getDockerContainerLogs,
+  };
+}
+
+export type DockerApi = ReturnType<typeof createDockerApi>;

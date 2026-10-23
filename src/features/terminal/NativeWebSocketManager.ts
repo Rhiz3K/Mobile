@@ -1,8 +1,4 @@
-import {
-  getCurrentServerUrl,
-  getCookie,
-  getTerminalWebSocketUrl,
-} from "@/core/api/main-axios";
+import type { AccountClient } from "@/core/api/AccountClient";
 
 export interface TerminalHostConfig {
   id: number;
@@ -40,6 +36,8 @@ export interface HostKeyData {
 }
 
 export interface NativeWSConfig {
+  /** Account the terminal session belongs to. */
+  client: Pick<AccountClient, "serverUrl" | "token" | "terminalWebSocketUrl">;
   hostConfig: TerminalHostConfig;
   /** Stable tab instance id for cross-device session tracking (open-tabs). */
   tabInstanceId?: string;
@@ -115,7 +113,8 @@ export class NativeWebSocketManager {
     this.cols = cols;
     this.rows = rows;
 
-    const serverUrl = getCurrentServerUrl();
+    const { client } = this.config;
+    const serverUrl = client.serverUrl;
     if (!serverUrl) {
       this.config.onConnectionFailed(
         "No server URL found - please configure a server first",
@@ -123,7 +122,7 @@ export class NativeWebSocketManager {
       return;
     }
 
-    const jwtToken = await getCookie("jwt");
+    const jwtToken = client.token();
     if (!jwtToken || jwtToken.trim() === "") {
       this.config.onConnectionFailed(
         "Authentication required - please log in again",
@@ -131,7 +130,7 @@ export class NativeWebSocketManager {
       return;
     }
 
-    this.wsUrl = getTerminalWebSocketUrl(jwtToken) ?? "";
+    this.wsUrl = client.terminalWebSocketUrl(jwtToken);
     this.wsProtocols = [`termix.jwt.${jwtToken}`];
 
     this.connectWebSocket();

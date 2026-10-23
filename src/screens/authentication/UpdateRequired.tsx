@@ -3,11 +3,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AlertTriangle, Download } from "lucide-react-native";
 import { useAppContext } from "@/contexts/AppContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getVersionInfo, getLatestGitHubRelease } from "@/core/api/main-axios";
 import { useState, useEffect } from "react";
 import Constants from "expo-constants";
 import { Text, Button, Label } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
+import { getLatestGitHubRelease } from "@/core/updates";
 
 export default function UpdateRequired() {
   const insets = useSafeAreaInsets();
@@ -25,11 +25,7 @@ export default function UpdateRequired() {
   useEffect(() => {
     const fetchVersionInfo = async () => {
       try {
-        const [, release] = await Promise.all([
-          getVersionInfo(),
-          getLatestGitHubRelease(),
-        ]);
-        setLatestRelease(release);
+        setLatestRelease(await getLatestGitHubRelease());
       } catch {
         // best-effort
       } finally {

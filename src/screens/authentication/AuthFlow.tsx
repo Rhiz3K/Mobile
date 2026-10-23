@@ -24,7 +24,6 @@ import {
   X,
 } from "lucide-react-native";
 import { WebView, WebViewNavigation } from "react-native-webview";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Text, Input, Button, Label } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { toast } from "@/utils/toast";
@@ -34,28 +33,8 @@ import {
   isOidcCallbackHandled,
   markOidcCallbackHandled,
 } from "@/utils/oidc-callback";
-import {
-  saveServerConfig,
-  getCurrentServerUrl,
-  initializeServerConfig,
-  setCookie,
-  getUserInfo,
-  loginUser,
-  registerUser,
-  verifyTOTPLogin,
-  initiatePasswordReset,
-  verifyPasswordResetCode,
-  completePasswordReset,
-  getSetupRequired,
-  getRegistrationAllowed,
-  getPasswordLoginAllowed,
-  getOIDCConfig,
-  getOIDCAuthorizeUrl,
-  isReverseProxyAuthGate,
-  clearSession,
-  consumeFreshWebSession,
-  logoutUser,
-} from "@/core/api/main-axios";
+import { api, activeClient, requireActiveClient } from "@/core/accounts";
+import { clearSession, consumeFreshWebSession } from "@/core/api/webSession";
 
 type Step = "server" | "login" | "totp" | "signup" | "reset" | "oidc";
 
@@ -105,12 +84,8 @@ function useKeyboardVisible(): boolean {
 }
 
 export default function AuthFlow() {
-  const {
-    authFlowInitialStep,
-    closeAuthFlow,
-    setAuthenticated,
-    setSelectedServer,
-  } = useAppContext();
+  const { authFlowInitialStep, closeAuthFlow, linkServer, finishSignIn } =
+    useAppContext();
   const insets = useSafeAreaInsets();
   const keyboardVisible = useKeyboardVisible();
   const color = useThemeColor();
@@ -126,25 +101,22 @@ export default function AuthFlow() {
   const totpTempTokenRef = useRef<string>("");
 
   // Hostname shown in the shared header.
-  const activeHost = (getCurrentServerUrl() ?? serverUrl).replace(
+  const activeHost = (activeClient()?.serverUrl ?? serverUrl).replace(
     /^https?:\/\//,
     "",
   );
 
   useEffect(() => {
-    const current = getCurrentServerUrl();
+    const current = activeClient()?.serverUrl;
     if (current) setServerUrl(current);
   }, []);
 
   const finishAuthenticated = useCallback(async () => {
     try {
-      await initializeServerConfig();
+      await finishSignIn();
     } catch {}
-    const url = getCurrentServerUrl();
-    if (url) setSelectedServer({ name: "Server", ip: url });
-    setAuthenticated(true);
     closeAuthFlow();
-  }, [closeAuthFlow, setAuthenticated, setSelectedServer]);
+  }, [closeAuthFlow, finishSignIn]);
 
   // ── Step: server ────────────────────────────────────────────────────────
 
@@ -163,7 +135,7 @@ export default function AuthFlow() {
     // Authelia, …), API endpoints return the proxy's HTML login page rather
     // than JSON - a native form can't work. Send the user to the browser-based
     // external sign-in instead.
-    if (await isReverseProxyAuthGate()) {
+    if (await api().auth.isReverseProxyAuthGate()) {
       setCaps({
         setupRequired: false,
         passwordLoginAllowed: false,
@@ -175,10 +147,10 @@ export default function AuthFlow() {
     }
 
     const [setupRes, pwRes, regRes, oidcRes] = await Promise.allSettled([
-      getSetupRequired(),
-      getPasswordLoginAllowed(),
-      getRegistrationAllowed(),
-      getOIDCConfig(),
+      api().auth.getSetupRequired(),
+      api().auth.getPasswordLoginAllowed(),
+      api().auth.getRegistrationAllowed(),
+      api().auth.getOIDCConfig(),
     ]);
 
     // If every probe failed, the server is unreachable - surface that rather
@@ -228,13 +200,8 @@ export default function AuthFlow() {
       // Reset the session before connecting to a (possibly different) server:
       // clears the JWT and the reverse-proxy cookie/session so a fresh proxy
       // login is shown and a subsequent sign-in can't resolve to the old account.
-      await clearSession();
-
-      await saveServerConfig({
-        serverUrl: url,
-        lastUpdated: new Date().toISOString(),
-      });
-      setSelectedServer({ name: "Server", ip: url });
+      const client = await linkServer(url);
+      await clearSession(client);
 
       const ok = await probeServer();
       if (!ok) {
@@ -253,7 +220,7 @@ export default function AuthFlow() {
   useEffect(() => {
     if (
       (authFlowInitialStep === "login" || authFlowInitialStep === "signup") &&
-      getCurrentServerUrl()
+      activeClient()?.serverUrl
     ) {
       setBusy(true);
       probeServer()
@@ -277,11 +244,11 @@ export default function AuthFlow() {
     // old account.
     void (async () => {
       try {
-        await logoutUser();
+        await api().auth.logoutUser();
       } catch {
         // best-effort
       }
-      await clearSession();
+      await clearSession(activeClient());
     })();
     setCaps(null);
     setStep("server");
@@ -613,7 +580,7 @@ function LoginStep({
     }
     setBusy(true);
     try {
-      const res = await loginUser(username.trim(), password);
+      const res = await api().auth.loginUser(username.trim(), password);
       if (res?.requires_totp) {
         onTotp(res.temp_token || res.token || "");
         return;
@@ -753,7 +720,7 @@ function TotpStep({
     }
     setBusy(true);
     try {
-      await verifyTOTPLogin(getTempToken(), c);
+      await api().totp.verifyTOTPLogin(getTempToken(), c);
       await onAuthenticated();
     } catch (e: any) {
       toast.error(errMessage(e, "Invalid code"));
@@ -835,9 +802,9 @@ function SignupStep({
     }
     setBusy(true);
     try {
-      await registerUser(username.trim(), password);
+      await api().auth.registerUser(username.trim(), password);
       // Auto sign-in after creating the account.
-      await loginUser(username.trim(), password);
+      await api().auth.loginUser(username.trim(), password);
       await onAuthenticated();
     } catch (e: any) {
       toast.error(errMessage(e, "Could not create account"));
@@ -936,7 +903,7 @@ function ResetStep({
     }
     setBusy(true);
     try {
-      await initiatePasswordReset(username.trim());
+      await api().auth.initiatePasswordReset(username.trim());
       toast.success("Reset code generated. Check the server logs");
       setPhase("code");
     } catch (e: any) {
@@ -953,7 +920,7 @@ function ResetStep({
     }
     setBusy(true);
     try {
-      const res = await verifyPasswordResetCode(
+      const res = await api().auth.verifyPasswordResetCode(
         username.trim(),
         resetCode.trim(),
       );
@@ -973,7 +940,11 @@ function ResetStep({
     }
     setBusy(true);
     try {
-      await completePasswordReset(username.trim(), tempToken, newPassword);
+      await api().auth.completePasswordReset(
+        username.trim(),
+        tempToken,
+        newPassword,
+      );
       toast.success("Password reset. You can sign in now");
       onDone();
     } catch (e: any) {
@@ -1139,14 +1110,13 @@ function OidcStep({
       authStartedRef.current = true;
       setAuthenticating(true);
       try {
-        await setCookie("jwt", token);
-        const saved = await AsyncStorage.getItem("jwt");
-        if (!saved) {
+        const client = requireActiveClient();
+        await client.setToken(token);
+        if (!client.token()) {
           toast.error("Failed to save the sign in token");
           authStartedRef.current = false;
           return;
         }
-        await initializeServerConfig();
 
         // Confirm the token, tolerating transient gateway hiccups (502 / brief
         // network blips from the reverse proxy). A real 401 means the token is
@@ -1156,7 +1126,7 @@ function OidcStep({
         let confirmed = false;
         for (let attempt = 0; attempt < 3 && !confirmed; attempt++) {
           try {
-            const me = await getUserInfo();
+            const me = await api().auth.getUserInfo();
             if (me?.username) {
               confirmed = true;
               break;
@@ -1165,7 +1135,7 @@ function OidcStep({
             await new Promise((r) => setTimeout(r, 600));
           } catch (e: any) {
             if (e?.response?.status === 401) {
-              await AsyncStorage.removeItem("jwt");
+              await activeClient()?.clearToken();
               toast.error(
                 "Sign in failed",
                 "The server rejected the session token. Please try again.",
@@ -1179,7 +1149,7 @@ function OidcStep({
         }
 
         if (!confirmed) {
-          await AsyncStorage.removeItem("jwt");
+          await activeClient()?.clearToken();
           toast.error(
             "Sign in failed",
             "Signed in, but the app couldn't reach Termix's API (a reverse proxy may be blocking the request). Please try again.",
@@ -1328,7 +1298,7 @@ function OidcStep({
 
       // Start every sign-in attempt from a clean slate: a leftover token would
       // let confirmation pass as the previous account.
-      await AsyncStorage.removeItem("jwt");
+      await activeClient()?.clearToken();
       // If a reset (logout / change-server) requested it, force a fresh login so
       // the proxy/IdP login is shown instead of resuming the previous account.
       const fresh = await consumeFreshWebSession();
@@ -1348,7 +1318,7 @@ function OidcStep({
       if (!useEmbeddedForFresh) {
         const callbackUrl = OIDC_CALLBACK_URL;
         try {
-          const res = await getOIDCAuthorizeUrl(callbackUrl);
+          const res = await api().auth.getOIDCAuthorizeUrl(callbackUrl);
           if (res?.auth_url) {
             setBrowserAuthUrl(res.auth_url);
             setUrl(res.auth_url);
@@ -1361,7 +1331,7 @@ function OidcStep({
         }
       }
 
-      const fallbackUrl = getCurrentServerUrl();
+      const fallbackUrl = activeClient()?.serverUrl;
       if (fallbackUrl) {
         setSource({ uri: fallbackUrl });
         setUrl(fallbackUrl);

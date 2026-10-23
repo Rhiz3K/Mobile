@@ -9,10 +9,6 @@ import {
   View,
 } from "react-native";
 import { Check, Radar, RefreshCw, Search, X } from "lucide-react-native";
-import {
-  getTailscaleDevices,
-  isTailscaleAvailable,
-} from "@/core/api/main-axios";
 import { useServerFeatures } from "@/contexts/ServerFeaturesContext";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { Sheet, Button, Input, Label, Text } from "@/ui";
@@ -23,6 +19,7 @@ import {
   type TailscaleDevice,
 } from "@/features/tailscale/tailscale";
 import type { SSHHost } from "@/types";
+import { api } from "@/core/accounts";
 
 type DeviceStatus =
   "loading" | "ready" | "noApiKey" | "forbidden" | "failed" | "unavailable";
@@ -37,7 +34,8 @@ function useDevices(active: boolean) {
     let cancelled = false;
     setStatus("loading");
     setDevices([]);
-    getTailscaleDevices()
+    api()
+      .tailscale.getTailscaleDevices()
       .then((result) => {
         if (cancelled) return;
         if (!result) {
@@ -239,7 +237,7 @@ export function TailscaleDevices({
   const color = useThemeColor();
   const { height } = useWindowDimensions();
   useServerFeatures();
-  const available = isTailscaleAvailable();
+  const available = api().tailscale.isTailscaleAvailable();
   const [query, setQuery] = useState("");
   const [usernames, setUsernames] = useState<Record<string, string>>({});
   const { devices, status, refresh } = useDevices(visible && available);

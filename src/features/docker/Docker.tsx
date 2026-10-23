@@ -23,16 +23,6 @@ import {
   DockerContainerAction,
   SessionAuthOverrides,
 } from "@/types";
-import {
-  dockerConnect,
-  dockerConnectBrowserSignIn,
-  dockerConnectTOTP,
-  dockerKeepAlive,
-  dockerDisconnect,
-  dockerValidate,
-  getDockerContainers,
-  dockerContainerAction,
-} from "@/core/api/main-axios";
 import { Text, Input, Badge, Tabs } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { toast } from "@/utils/toast";
@@ -45,6 +35,7 @@ import {
   type ContextAction,
 } from "@/screens/sessions/shared";
 import { ContainerDetail } from "./ContainerDetail";
+import { useSessionClient } from "@/core/accounts/session";
 
 interface DockerProps {
   host: SSHHost;
@@ -62,6 +53,7 @@ function cleanName(name: string): string {
 }
 
 export function Docker({ host, isVisible }: DockerProps) {
+  const client = useSessionClient();
   const color = useThemeColor();
   const [containers, setContainers] = useState<DockerContainer[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -75,7 +67,7 @@ export function Docker({ host, isVisible }: DockerProps) {
 
   const loadContainers = useCallback(async (sessionId: string) => {
     try {
-      const list = await getDockerContainers(sessionId);
+      const list = await client.api.docker.getDockerContainers(sessionId);
       setContainers(list);
     } catch (e: any) {
       toast.error(e?.message || "Failed to load containers");
@@ -90,13 +82,15 @@ export function Docker({ host, isVisible }: DockerProps) {
         h: SSHHost,
         _userId: string | undefined,
         overrides: SessionAuthOverrides,
-      ) => dockerConnect(sessionId, h.id, overrides),
+      ) => client.api.docker.dockerConnect(sessionId, h.id, overrides),
       submitTotp: (sessionId: string, code: string) =>
-        dockerConnectTOTP(sessionId, code),
+        client.api.docker.dockerConnectTOTP(sessionId, code),
       submitWarpgate: (sessionId: string, url: string, key?: string) =>
-        dockerConnectBrowserSignIn(sessionId, url, key),
-      keepAlive: (sessionId: string) => dockerKeepAlive(sessionId),
-      disconnect: (sessionId: string) => dockerDisconnect(sessionId),
+        client.api.docker.dockerConnectBrowserSignIn(sessionId, url, key),
+      keepAlive: (sessionId: string) =>
+        client.api.docker.dockerKeepAlive(sessionId),
+      disconnect: (sessionId: string) =>
+        client.api.docker.dockerDisconnect(sessionId),
     }),
     [],
   );
@@ -106,7 +100,7 @@ export function Docker({ host, isVisible }: DockerProps) {
       setInitialLoadDone(false);
       // Confirm Docker is actually installed before listing.
       try {
-        const v = await dockerValidate(sessionId);
+        const v = await client.api.docker.dockerValidate(sessionId);
         setDockerAvailable(v.available);
         if (!v.available) {
           setInitialLoadDone(true);
@@ -160,7 +154,7 @@ export function Docker({ host, isVisible }: DockerProps) {
       if (!sessionId) return;
       setBusyId(c.id);
       try {
-        await dockerContainerAction(sessionId, c.id, action);
+        await client.api.docker.dockerContainerAction(sessionId, c.id, action);
         toast.success(`${action} | ${cleanName(c.name)}`);
         await loadContainers(sessionId);
       } catch (e: any) {

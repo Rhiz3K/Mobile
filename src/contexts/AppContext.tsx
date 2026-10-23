@@ -9,50 +9,30 @@ import React, {
 } from "react";
 import { AppState, AppStateStatus } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import {
-  getVersionInfo,
-  initializeServerConfig,
-  refreshEnabledPlugins,
-  refreshServerApi,
-  getLatestGitHubRelease,
-  setAuthStateCallback,
-  getCurrentServerUrl,
-} from "@/core/api/main-axios";
 import Constants from "expo-constants";
 import { publishSignedOutSnapshot } from "@/widgets";
+import {
+  accounts,
+  accountLabel,
+  isServerAccount,
+  useActiveAccount,
+  type ServerAccount,
+} from "@/core/accounts";
+import type { AccountClient } from "@/core/api/AccountClient";
+import { getLatestGitHubRelease, isNewerVersion } from "@/core/updates";
 
 interface Server {
   name: string;
   ip: string;
 }
 
-function isNewerVersion(latest: string, current: string): boolean {
-  const latestParts = latest.split(".").map(Number);
-  const currentParts = current.split(".").map(Number);
-
-  if (
-    latestParts.length !== 3 ||
-    currentParts.length !== 3 ||
-    [...latestParts, ...currentParts].some(Number.isNaN)
-  ) {
-    return false;
-  }
-
-  for (let index = 0; index < latestParts.length; index += 1) {
-    if (latestParts[index] !== currentParts[index]) {
-      return latestParts[index] > currentParts[index];
-    }
-  }
-
-  return false;
-}
-
 /** Steps the auth flow can be opened directly to. */
 export type AuthStep = "server" | "login" | "signup" | "oidc";
 
 interface AppContextType {
+  /** The active linked server, or null on This device. */
   selectedServer: Server | null;
-  setSelectedServer: (server: Server | null) => void;
+  /** Signed in to the active linked server. */
   isAuthenticated: boolean;
   setAuthenticated: (auth: boolean) => void;
   showUpdateScreen: boolean;
@@ -60,9 +40,17 @@ interface AppContextType {
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
 
-  /** Whether a server URL is currently configured (drives empty states). */
+  /** Whether the active account is a linked server (drives empty states). */
   hasServerConfigured: boolean;
-  setHasServerConfigured: (has: boolean) => void;
+
+  /**
+   * Points the sign in flow at a server: reuses the account for that URL, or
+   * the active one if it never signed in, otherwise adds a new account. The
+   * account becomes active.
+   */
+  linkServer: (serverUrl: string) => Promise<AccountClient>;
+  /** Call once the active account has a session. */
+  finishSignIn: () => Promise<void>;
 
   /** Auth flow overlay control. */
   authFlowVisible: boolean;
@@ -104,12 +92,55 @@ function getErrorStatus(error: unknown): number | undefined {
   return undefined;
 }
 
+async function checkShouldShowUpdateScreen(): Promise<boolean> {
+  try {
+    const currentAppVersion = Constants.expoConfig?.version || "1.0.0";
+    const latestRelease = await getLatestGitHubRelease();
+    if (!latestRelease) return false;
+    if (!isNewerVersion(latestRelease.version, currentAppVersion)) return false;
+    const dismissedVersion = await AsyncStorage.getItem(
+      "dismissedUpdateVersion",
+    );
+    return dismissedVersion !== latestRelease.version;
+  } catch {
+    return false;
+  }
+}
+
+/** Asks the server who we are. False means the saved session is gone. */
+async function validateSession(
+  account: ServerAccount,
+  client: AccountClient,
+): Promise<boolean> {
+  if (!client.isAuthenticated()) return false;
+  try {
+    const me = await client.api.auth.getUserInfo();
+    if (!me?.username) return false;
+    await accounts.update(account.id, {
+      username: me.username,
+      remoteUserId: me.userId ?? account.remoteUserId,
+      isAdmin: !!me.is_admin,
+      status: "idle",
+      lastError: null,
+    });
+    return true;
+  } catch (e) {
+    if (getErrorStatus(e) === 401) {
+      await client.clearToken();
+      await accounts.update(account.id, { status: "signed_out" });
+      return false;
+    }
+    // Offline is not signed out; keep the session.
+    await accounts.update(account.id, { status: "offline" });
+    return true;
+  }
+}
+
 export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
-  const [selectedServer, setSelectedServer] = useState<Server | null>(null);
-  const [isAuthenticated, setAuthenticated] = useState(false);
+  const active = useActiveAccount();
+  const [isAuthenticated, setAuthenticatedState] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showUpdateScreen, setShowUpdateScreen] = useState<boolean>(false);
-  const [hasServerConfigured, setHasServerConfigured] = useState(false);
 
   const [authFlowVisible, setAuthFlowVisible] = useState(false);
   const [authFlowInitialStep, setAuthFlowInitialStep] =
@@ -124,91 +155,34 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     setAuthFlowVisible(false);
   }, []);
 
-  const checkShouldShowUpdateScreen = async (): Promise<boolean> => {
-    try {
-      const currentAppVersion = Constants.expoConfig?.version || "1.0.0";
-
-      const latestRelease = await getLatestGitHubRelease();
-
-      if (!latestRelease) {
-        return false;
-      }
-
-      if (!isNewerVersion(latestRelease.version, currentAppVersion)) {
-        return false;
-      }
-
-      const dismissedVersion = await AsyncStorage.getItem(
-        "dismissedUpdateVersion",
-      );
-
-      if (dismissedVersion === latestRelease.version) {
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      return false;
+  const setAuthenticated = useCallback((auth: boolean) => {
+    setAuthenticatedState(auth);
+    const current = accounts.active();
+    if (!auth && isServerAccount(current)) {
+      void accounts.update(current.id, { status: "signed_out" });
     }
-  };
+  }, []);
 
   useEffect(() => {
     const initializeApp = async () => {
       try {
         setIsLoading(true);
+        await accounts.init();
 
-        await initializeServerConfig();
+        setShowUpdateScreen(await checkShouldShowUpdateScreen());
 
-        const serverConfig = await AsyncStorage.getItem("serverConfig");
-        const legacyServer = await AsyncStorage.getItem("server");
-
-        await getVersionInfo();
-
-        const shouldShowUpdateScreen = await checkShouldShowUpdateScreen();
-        setShowUpdateScreen(shouldShowUpdateScreen);
-
-        const serverConfigured = !!(serverConfig || legacyServer);
-        setHasServerConfigured(serverConfigured);
-
-        if (serverConfigured) {
-          let authStatus = false;
-
-          const jwtToken = await AsyncStorage.getItem("jwt");
-
-          if (jwtToken) {
-            authStatus = true;
-            try {
-              const { getUserInfo } = await import("@/core/api/main-axios");
-              const meRes = await getUserInfo();
-              authStatus = !!meRes?.username;
-            } catch (e) {
-              console.error("[AppContext] Auto-login failed:", e);
-              if (getErrorStatus(e) === 401) {
-                authStatus = false;
-                await AsyncStorage.removeItem("jwt");
-              }
-            }
-          }
-
-          let serverInfo: Server | null = null;
-          if (legacyServer) {
-            serverInfo = JSON.parse(legacyServer);
-          } else if (serverConfig) {
-            const config = JSON.parse(serverConfig);
-            serverInfo = { name: "Server", ip: config.serverUrl };
-          }
-          setSelectedServer(serverInfo);
-
-          setAuthenticated(authStatus);
-          // A configured-but-unauthenticated server lands the user on the
-          // empty-state shell; they re-open the auth flow themselves.
-        } else {
-          // Brand-new install: guide the user, but the flow is dismissible.
-          setAuthenticated(false);
+        const current = accounts.active();
+        const client = accounts.activeClient();
+        if (isServerAccount(current) && client) {
+          setAuthenticatedState(await validateSession(current, client));
+          // A configured but signed out server lands on the empty state shell;
+          // the user opens the auth flow themselves.
+        } else if (accounts.list().length === 1) {
+          // Brand new install: guide the user, but the flow is dismissible.
           openAuthFlow("server");
         }
-      } catch (error) {
-        setAuthenticated(false);
+      } catch {
+        setAuthenticatedState(false);
       } finally {
         setIsLoading(false);
       }
@@ -217,21 +191,46 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     initializeApp();
   }, [openAuthFlow]);
 
+  // Switching accounts re-checks the new one. Open sessions keep running.
+  const firstActive = useRef(true);
   useEffect(() => {
-    setAuthStateCallback((authed: boolean) => {
-      if (!authed) {
-        // Token expired / 401: drop to the empty-state shell. Tabs render
-        // their "no server connected" prompt; the user re-authenticates.
-        setAuthenticated(false);
-      }
+    if (firstActive.current) {
+      firstActive.current = false;
+      return;
+    }
+    let cancelled = false;
+    const client = accounts.client(active.id);
+    if (!isServerAccount(active) || !client) {
+      setAuthenticatedState(false);
+      return;
+    }
+    void (async () => {
+      await client.load();
+      const ok = await validateSession(active, client);
+      if (!cancelled) setAuthenticatedState(ok);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Only when the account itself changes, not its status fields.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active.id]);
+
+  // A 401 on a critical endpoint signs the active account out.
+  useEffect(() => {
+    const client = accounts.client(active.id);
+    if (!client) return;
+    return client.onAuthLost(() => {
+      void accounts.update(active.id, { status: "signed_out" });
+      if (accounts.active().id === active.id) setAuthenticatedState(false);
     });
-  }, []);
+  }, [active.id]);
 
   // 2.9+ servers: the plugin list needs a signed in user, so load it once
   // auth is known.
   useEffect(() => {
-    if (isAuthenticated) void refreshServerApi();
-  }, [isAuthenticated]);
+    if (isAuthenticated) void accounts.activeClient()?.refreshServerApi();
+  }, [isAuthenticated, active.id]);
 
   // Losing authentication (sign-out elsewhere, expired token, server change)
   // must also empty the home-screen widgets - they would otherwise keep showing
@@ -247,36 +246,32 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   useEffect(() => {
     const handleAppStateChange = async (nextAppState: AppStateStatus) => {
       if (
-        nextAppState === "active" &&
-        isAuthenticated &&
-        !validationInProgressRef.current
+        nextAppState !== "active" ||
+        !isAuthenticated ||
+        validationInProgressRef.current
       ) {
-        const now = Date.now();
-        const timeSinceLastValidation = now - lastValidationTimeRef.current;
+        return;
+      }
+      const now = Date.now();
+      if (now - lastValidationTimeRef.current < 2000) return;
 
-        if (timeSinceLastValidation < 2000) {
-          return;
+      validationInProgressRef.current = true;
+      lastValidationTimeRef.current = now;
+
+      try {
+        const client = accounts.activeClient();
+        const userInfo = await client?.api.auth.getUserInfo();
+        if (!userInfo?.username) {
+          setAuthenticated(false);
+        } else {
+          // Plugins may have been turned on or off while we were away.
+          void client?.refreshEnabledPlugins();
         }
-
-        validationInProgressRef.current = true;
-        lastValidationTimeRef.current = now;
-
-        try {
-          const { getUserInfo } = await import("@/core/api/main-axios");
-          const userInfo = await getUserInfo();
-
-          if (!userInfo?.username) {
-            setAuthenticated(false);
-          } else {
-            // Plugins may have been turned on or off while we were away.
-            void refreshEnabledPlugins();
-          }
-        } catch (error) {
-          // Network blips shouldn't log the user out; the 401 callback handles
-          // genuine auth failures.
-        } finally {
-          validationInProgressRef.current = false;
-        }
+      } catch {
+        // Network blips shouldn't log the user out; the 401 handler covers
+        // genuine auth failures.
+      } finally {
+        validationInProgressRef.current = false;
       }
     };
 
@@ -284,33 +279,54 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       "change",
       handleAppStateChange,
     );
+    return () => subscription.remove();
+  }, [isAuthenticated, setAuthenticated]);
 
-    return () => {
-      subscription.remove();
-    };
-  }, [isAuthenticated]);
-
-  // Keep hasServerConfigured in sync whenever the auth flow closes (the user
-  // may have just added or changed a server inside it).
-  useEffect(() => {
-    if (!authFlowVisible) {
-      setHasServerConfigured(!!getCurrentServerUrl());
+  const linkServer = useCallback(async (serverUrl: string) => {
+    const url = serverUrl.trim().replace(/\/+$/, "");
+    const current = accounts.active();
+    let account = accounts.findByUrl(url);
+    if (
+      !account &&
+      isServerAccount(current) &&
+      current.status === "signed_out"
+    ) {
+      account = await accounts.update(current.id, { serverUrl: url });
     }
-  }, [authFlowVisible]);
+    account ??= await accounts.add(url);
+    await accounts.setActive(account.id);
+    const client = accounts.client(account.id)!;
+    await client.load();
+    await client.refreshServerApi();
+    return client;
+  }, []);
+
+  const finishSignIn = useCallback(async () => {
+    const current = accounts.active();
+    const client = accounts.activeClient();
+    if (isServerAccount(current) && client) {
+      await validateSession(current, client);
+    }
+    setAuthenticatedState(true);
+  }, []);
+
+  const selectedServer: Server | null = isServerAccount(active)
+    ? { name: accountLabel(active), ip: active.serverUrl }
+    : null;
 
   return (
     <AppContext.Provider
       value={{
         selectedServer,
-        setSelectedServer,
         isAuthenticated,
         setAuthenticated,
         showUpdateScreen,
         setShowUpdateScreen,
         isLoading,
         setIsLoading,
-        hasServerConfigured,
-        setHasServerConfigured,
+        hasServerConfigured: isServerAccount(active),
+        linkServer,
+        finishSignIn,
         authFlowVisible,
         authFlowInitialStep,
         openAuthFlow,

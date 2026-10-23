@@ -27,7 +27,7 @@ import { useThemeColor } from "@/contexts/ThemeContext";
 import { useServerFeatures } from "@/contexts/ServerFeaturesContext";
 import { toast } from "@/utils/toast";
 import { StatsConfig, DEFAULT_STATS_CONFIG } from "@/constants/stats-config";
-import { wakeHost } from "@/core/api/main-axios";
+import { api } from "@/core/accounts";
 
 function parseStatsConfig(host: SSHHost): StatsConfig {
   try {
@@ -96,7 +96,7 @@ export function HostActionSheet({
   const handleWake = async () => {
     onClose();
     try {
-      await wakeHost(host.id);
+      await api().wakeOnLan.wakeHost(host.id);
       toast.success(`Wake-on-LAN sent to ${host.name}`);
     } catch {
       toast.error("Failed to send Wake-on-LAN packet");

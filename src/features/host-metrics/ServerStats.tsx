@@ -9,15 +9,6 @@ import {
 import { View, ScrollView, RefreshControl, Pressable } from "react-native";
 import { Zap } from "lucide-react-native";
 import { ServerMetrics } from "@/types";
-import {
-  getServerMetricsById,
-  startMetricsPolling,
-  stopMetricsPolling,
-  registerMetricsViewer,
-  unregisterMetricsViewer,
-  sendMetricsHeartbeat,
-  executeSnippet,
-} from "@/core/api/main-axios";
 import { Text } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { toast } from "@/utils/toast";
@@ -39,6 +30,7 @@ import {
   FirewallWidget,
   LoginStatsWidget,
 } from "./widgets";
+import { useSessionClient } from "@/core/accounts/session";
 
 interface ServerStatsProps {
   hostConfig: {
@@ -70,6 +62,7 @@ function parseConfig(raw?: string): StatsConfig {
 
 export const ServerStats = forwardRef<ServerStatsHandle, ServerStatsProps>(
   ({ hostConfig, isVisible }, ref) => {
+    const client = useSessionClient();
     const color = useThemeColor();
     const config = parseConfig(hostConfig.statsConfig);
     const enabled = config.enabledWidgets;
@@ -106,7 +99,9 @@ export const ServerStats = forwardRef<ServerStatsHandle, ServerStatsProps>(
 
     const fetchMetrics = useCallback(async () => {
       try {
-        const data = await getServerMetricsById(hostConfig.id);
+        const data = await client.api.metrics.getServerMetricsById(
+          hostConfig.id,
+        );
         if (data === null) {
           // Not ready yet. If starting the poll failed outright, the metrics
           // are never coming, so stop spinning and show why.
@@ -136,7 +131,9 @@ export const ServerStats = forwardRef<ServerStatsHandle, ServerStatsProps>(
       startedRef.current = true;
       (async () => {
         try {
-          const res = await startMetricsPolling(hostConfig.id);
+          const res = await client.api.metrics.startMetricsPolling(
+            hostConfig.id,
+          );
           if (res?.requiresTOTP) {
             // Stats TOTP is rare; surface as an error with retry for now.
             setError("Two-factor required for this host's stats.");
@@ -154,7 +151,9 @@ export const ServerStats = forwardRef<ServerStatsHandle, ServerStatsProps>(
         }
         // If start didn't return a viewerSessionId, register separately.
         if (!viewerSessionIdRef.current) {
-          const reg = await registerMetricsViewer(hostConfig.id);
+          const reg = await client.api.metrics.registerMetricsViewer(
+            hostConfig.id,
+          );
           if (reg?.viewerSessionId) {
             viewerSessionIdRef.current = reg.viewerSessionId;
           }
@@ -166,10 +165,10 @@ export const ServerStats = forwardRef<ServerStatsHandle, ServerStatsProps>(
         const vsid = viewerSessionIdRef.current;
         viewerSessionIdRef.current = null;
         if (vsid) {
-          unregisterMetricsViewer(hostConfig.id, vsid);
-          stopMetricsPolling(hostConfig.id, vsid);
+          client.api.metrics.unregisterMetricsViewer(hostConfig.id, vsid);
+          client.api.metrics.stopMetricsPolling(hostConfig.id, vsid);
         } else {
-          stopMetricsPolling(hostConfig.id);
+          client.api.metrics.stopMetricsPolling(hostConfig.id);
         }
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -180,7 +179,7 @@ export const ServerStats = forwardRef<ServerStatsHandle, ServerStatsProps>(
       () => {
         fetchMetrics();
         if (viewerSessionIdRef.current) {
-          sendMetricsHeartbeat(viewerSessionIdRef.current);
+          client.api.metrics.sendMetricsHeartbeat(viewerSessionIdRef.current);
         }
       },
       3000,
@@ -192,7 +191,7 @@ export const ServerStats = forwardRef<ServerStatsHandle, ServerStatsProps>(
     const runQuickAction = useCallback(
       async (snippetId: number, name: string) => {
         try {
-          await executeSnippet(snippetId, hostConfig.id);
+          await client.api.snippets.executeSnippet(snippetId, hostConfig.id);
           toast.success(`Ran ${name}`);
         } catch (e: any) {
           toast.error(e?.message || `Failed to run ${name}`);

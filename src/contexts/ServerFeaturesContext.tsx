@@ -1,28 +1,20 @@
-import { useCallback, useSyncExternalStore } from "react";
-import {
-  hasFeature,
-  refreshEnabledPlugins,
-  subscribeServerFeatures,
-} from "@/core/api/main-axios";
+import { useCallback } from "react";
 import type { ServerFeature } from "@/core/api/compat/server-features";
+import { useActiveClient } from "@/core/accounts";
 
-let version = 0;
-const getVersion = () => version;
-subscribeServerFeatures(() => {
-  version += 1;
-});
-
-/** Which plugin features the connected server has turned on. */
+/** Which plugin features the active server has turned on. */
 export function useServerFeatures() {
-  const current = useSyncExternalStore(
-    subscribeServerFeatures,
-    getVersion,
-    getVersion,
-  );
+  const client = useActiveClient();
+  const version = client?.version;
   const has = useCallback(
-    (feature: ServerFeature) => hasFeature(feature),
+    (feature: ServerFeature) => client?.hasFeature(feature) ?? false,
+    // The client mutates in place, so its version is the real dependency.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [current],
+    [client, version],
   );
-  return { has, refresh: refreshEnabledPlugins };
+  const refresh = useCallback(
+    () => client?.refreshEnabledPlugins() ?? Promise.resolve(),
+    [client],
+  );
+  return { has, refresh };
 }

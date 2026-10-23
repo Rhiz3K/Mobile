@@ -23,15 +23,6 @@ import { useTerminalSessions } from "@/contexts/TerminalSessionsContext";
 import { useTheme, useThemeColor } from "@/contexts/ThemeContext";
 import { useAppLock } from "@/contexts/AppLockContext";
 import { useServerFeatures } from "@/contexts/ServerFeaturesContext";
-import {
-  clearSession,
-  logoutUser,
-  getUserInfo,
-  getVersionInfo,
-  getCurrentServerUrl,
-  changePassword,
-  deleteAccount,
-} from "@/core/api/main-axios";
 import { Screen } from "@/components/Screen";
 import { LockScreen } from "@/components/LockScreen";
 import {
@@ -62,6 +53,8 @@ import {
   saveWidgetPreferences,
   type WidgetPreferences,
 } from "@/widgets";
+import { api, activeClient } from "@/core/accounts";
+import { clearSession } from "@/core/api/webSession";
 
 export default function Settings() {
   const router = useRouter();
@@ -86,7 +79,7 @@ export default function Settings() {
   const [totpEnabled, setTotpEnabled] = useState(false);
   const [version, setVersion] = useState("");
   const [serverUrl, setServerUrl] = useState<string>(
-    () => getCurrentServerUrl() ?? "",
+    () => activeClient()?.serverUrl ?? "",
   );
   const [open, setOpen] = useState<string | null>("appearance");
 
@@ -132,21 +125,23 @@ export default function Settings() {
   // unchanged, so we can't rely on that alone).
   useEffect(() => {
     if (authFlowVisible) return;
-    setServerUrl(getCurrentServerUrl() ?? "");
+    setServerUrl(activeClient()?.serverUrl ?? "");
     if (!isAuthenticated) {
       setUsername("-");
       setIsAdmin(false);
       setTotpEnabled(false);
       return;
     }
-    getUserInfo()
+    api()
+      .auth.getUserInfo()
       .then((u) => {
         setUsername(u.username ?? "-");
         setIsAdmin(!!u.is_admin);
         setTotpEnabled(!!u.totp_enabled);
       })
       .catch(() => {});
-    getVersionInfo()
+    api()
+      .server.getVersionInfo()
       .then((v) => setVersion(v?.localVersion ?? v?.version ?? ""))
       .catch(() => {});
   }, [isAuthenticated, authFlowVisible]);
@@ -155,12 +150,11 @@ export default function Settings() {
 
   const handleLogout = async () => {
     try {
-      await logoutUser();
+      await api().auth.logoutUser();
     } catch {
       // best-effort - server-side logout may fail if token already expired
     }
-    await clearSession();
-    clearAllSessions();
+    await clearSession(activeClient());
     // Host names and addresses must not survive on the home screen.
     await resetWidgets();
     setAuthenticated(false);
@@ -173,11 +167,12 @@ export default function Settings() {
     // local JWT), otherwise the still-valid Termix cookie in the browser/WebView
     // lets the next OIDC resume the old account.
     try {
-      await logoutUser();
+      await api().auth.logoutUser();
     } catch {
       // best-effort - session may already be gone
     }
-    await clearSession();
+    await clearSession(activeClient());
+    setAuthenticated(false);
     // Same reason as sign-out: the old server's hosts must not linger on the
     // home screen while the user points the app somewhere else.
     await resetWidgets();
@@ -228,7 +223,7 @@ export default function Settings() {
     if (!oldPassword || !newPassword) return;
     setAccountBusy(true);
     try {
-      await changePassword(oldPassword, newPassword);
+      await api().users.changePassword(oldPassword, newPassword);
       toast.success("Password changed");
       closePasswordDialog();
     } catch (e: any) {
@@ -247,7 +242,7 @@ export default function Settings() {
     if (!deletePassword) return;
     setAccountBusy(true);
     try {
-      await deleteAccount(deletePassword);
+      await api().users.deleteAccount(deletePassword);
       closeDeleteDialog();
       await handleLogout();
       toast.success("Account deleted");

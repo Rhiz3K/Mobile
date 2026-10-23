@@ -19,11 +19,6 @@ import { WebView } from "react-native-webview";
 import { ChevronDown } from "lucide-react-native";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
-import {
-  logActivity,
-  getSnippets,
-  saveCommandToHistory,
-} from "@/core/api/main-axios";
 import { showToast } from "@/utils/toast";
 import { useTerminalCustomization } from "@/contexts/TerminalCustomizationContext";
 import {
@@ -48,6 +43,7 @@ import {
   ConnectionLog,
 } from "@/screens/sessions/shared/useConnectionLog";
 import { useUiColors } from "@/contexts/ThemeContext";
+import { useSessionClient } from "@/core/accounts/session";
 
 interface TerminalProps {
   hostConfig: {
@@ -103,6 +99,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
     },
     ref,
   ) => {
+    const client = useSessionClient();
     const ui = useUiColors();
     const webViewRef = useRef<WebView>(null);
     const wsManagerRef = useRef<NativeWebSocketManager | null>(null);
@@ -132,7 +129,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
             const command = commandBufferRef.current.trim();
             commandBufferRef.current = "";
             if (command.length > 1 && hostConfig.id > 0) {
-              saveCommandToHistory(hostConfig.id, command);
+              client.api.terminal.saveCommandToHistory(hostConfig.id, command);
             }
           } else if (ch === "\x7f" || ch === "\b") {
             commandBufferRef.current = commandBufferRef.current.slice(0, -1);
@@ -1169,7 +1166,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
             100 * (terminalConfig.environmentVariables?.length || 0) + 200;
           setTimeout(async () => {
             try {
-              const snippets = await getSnippets();
+              const snippets = await client.api.snippets.getSnippets();
               const snippet = snippets.find(
                 (s: any) => s.id === terminalConfig.startupSnippetId,
               );
@@ -1326,6 +1323,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
       wsManagerRef.current?.destroy();
 
       wsManagerRef.current = new NativeWebSocketManager({
+        client,
         hostConfig: hostConfig as TerminalHostConfig,
         tabInstanceId,
         initialSessionId,
@@ -1359,9 +1357,9 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
               webViewRef.current?.injectJavaScript(
                 `window.notifyConnected(${fromBackground}, ${isReattach}); true;`,
               );
-              logActivity("terminal", hostConfig.id, hostConfig.name).catch(
-                () => {},
-              );
+              client.api.homepage
+                .logActivity("terminal", hostConfig.id, hostConfig.name)
+                .catch(() => {});
               break;
             }
             case "dataReceived":

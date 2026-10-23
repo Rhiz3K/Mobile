@@ -11,12 +11,6 @@ import {
   ExternalLink,
   X,
 } from "lucide-react-native";
-import {
-  getActiveSessions,
-  hasFeature,
-  type ActiveSessionInfo,
-  type OpenTabRecord,
-} from "@/core/api/main-axios";
 import { useServerFeatures } from "@/contexts/ServerFeaturesContext";
 import { sessionFeature } from "@/core/api/compat/server-features";
 import {
@@ -27,7 +21,8 @@ import {
 import { Text } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { SSHHost } from "@/types";
-import { getSSHHosts, deleteOpenTab } from "@/core/api/main-axios";
+import { api, activeClient } from "@/core/accounts";
+import type { ActiveSessionInfo, OpenTabRecord } from "@/core/api/types";
 
 const TYPE_LABELS: Record<string, string> = {
   terminal: "SSH",
@@ -94,7 +89,7 @@ function canRestore(tabType: string): boolean {
   const type = toSessionType(tabType);
   if (!type) return false;
   const feature = sessionFeature(type, toRemoteProtocol(tabType));
-  return !feature || hasFeature(feature);
+  return !feature || !!activeClient()?.hasFeature(feature);
 }
 
 function toRemoteProtocol(tabType: string): RemoteDesktopProtocol | undefined {
@@ -238,14 +233,15 @@ export function ConnectionsPanel({ onClose }: { onClose?: () => void }) {
 
   const refresh = useCallback(async () => {
     const [live] = await Promise.all([
-      getActiveSessions(),
+      api().openTabs.getActiveSessions(),
       refreshRef.current(),
     ]);
     setActiveSessions(live);
   }, []);
 
   useEffect(() => {
-    getSSHHosts()
+    api()
+      .hosts.getSSHHosts()
       .then((res: any) => {
         const list = Array.isArray(res) ? res : (res?.hosts ?? []);
         setHosts(list);
@@ -384,7 +380,7 @@ export function ConnectionsPanel({ onClose }: { onClose?: () => void }) {
                 reconnectHint
                 onSwitch={() => reviveBackground(r)}
                 onClose={async () => {
-                  await deleteOpenTab(r.id);
+                  await api().openTabs.deleteOpenTab(r.id);
                   forgetBackgroundTab(r.id);
                 }}
               />

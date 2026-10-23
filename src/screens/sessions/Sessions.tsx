@@ -14,9 +14,11 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import {
   SessionType,
+  type TerminalSession,
   useTerminalSessions,
 } from "@/contexts/TerminalSessionsContext";
 import { X } from "lucide-react-native";
+import { SessionAccountProvider } from "@/core/accounts/session";
 import { useKeyboard } from "@/contexts/KeyboardContext";
 import { Terminal, TerminalHandle } from "@/features/terminal/Terminal";
 import {
@@ -607,6 +609,114 @@ export default function Sessions() {
       ? terminalBackgroundColors[activeSessionId] || ui.terminal
       : ui.background;
 
+  const renderSession = (session: TerminalSession) => {
+    if (session.type === "terminal") {
+      return (
+        <Terminal
+          key={session.id}
+          ref={terminalRefs.current[session.id]}
+          hostConfig={{
+            id: parseInt(session.host.id.toString()),
+            name: session.host.name,
+            ip: session.host.ip,
+            port: parseInt(session.host.port.toString()),
+            username: session.host.username,
+            authType: session.host.authType,
+            password: session.host.password,
+            key: session.host.key,
+            keyPassword: session.host.keyPassword,
+            keyType: session.host.keyType,
+            credentialId: session.host.credentialId
+              ? parseInt(session.host.credentialId.toString())
+              : undefined,
+            jumpHosts: session.host.jumpHosts,
+            forceKeyboardInteractive: session.host.forceKeyboardInteractive,
+            overrideCredentialUsername: session.host.overrideCredentialUsername,
+            terminalConfig: session.host.terminalConfig,
+          }}
+          isVisible={session.id === activeSessionId}
+          title={session.title}
+          tabInstanceId={session.instanceId}
+          initialSessionId={session.restoredSessionId}
+          onSessionIdChange={(backendId) =>
+            setBackendSessionId(session.id, backendId)
+          }
+          onClose={() => handleTabClose(session.id)}
+          onBackgroundColorChange={(color) => {
+            setTerminalBackgroundColors((prev) => ({
+              ...prev,
+              [session.id]: color,
+            }));
+          }}
+        />
+      );
+    } else if (session.type === "stats") {
+      return (
+        <ServerStats
+          key={session.id}
+          ref={statsRefs.current[session.id]}
+          hostConfig={{
+            id: parseInt(session.host.id.toString()),
+            name: session.host.name,
+            statsConfig: session.host.statsConfig,
+            quickActions: session.host.quickActions,
+          }}
+          isVisible={session.id === activeSessionId}
+          title={session.title}
+          onClose={() => handleTabClose(session.id)}
+        />
+      );
+    } else if (session.type === "filemanager") {
+      return (
+        <FileManager
+          key={session.id}
+          ref={fileManagerRefs.current[session.id]}
+          host={session.host}
+          sessionId={session.id}
+          isVisible={session.id === activeSessionId}
+        />
+      );
+    } else if (session.type === "tunnel") {
+      return (
+        <TunnelManager
+          key={session.id}
+          ref={tunnelManagerRefs.current[session.id]}
+          hostConfig={{
+            id: parseInt(session.host.id.toString()),
+            name: session.host.name,
+            ip: session.host.ip,
+            username: session.host.username,
+            enableTunnel: session.host.enableTunnel,
+            tunnelConnections: session.host.tunnelConnections,
+          }}
+          isVisible={session.id === activeSessionId}
+          title={session.title}
+          onClose={() => handleTabClose(session.id)}
+        />
+      );
+    } else if (session.type === "remoteDesktop") {
+      return (
+        <RemoteDesktop
+          key={session.id}
+          host={session.host}
+          isVisible={session.id === activeSessionId}
+          title={session.title}
+          protocol={session.remoteProtocol}
+          onClose={() => handleTabClose(session.id)}
+        />
+      );
+    } else if (session.type === "docker") {
+      return (
+        <Docker
+          key={session.id}
+          host={session.host}
+          isVisible={session.id === activeSessionId}
+        />
+      );
+    }
+    return null;
+  };
+
   return (
     <View
       className="flex-1"
@@ -624,115 +734,14 @@ export default function Sessions() {
           marginBottom: getBottomMargin(activeSession?.type),
         }}
       >
-        {sessions.map((session) => {
-          if (session.type === "terminal") {
-            return (
-              <Terminal
-                key={session.id}
-                ref={terminalRefs.current[session.id]}
-                hostConfig={{
-                  id: parseInt(session.host.id.toString()),
-                  name: session.host.name,
-                  ip: session.host.ip,
-                  port: parseInt(session.host.port.toString()),
-                  username: session.host.username,
-                  authType: session.host.authType,
-                  password: session.host.password,
-                  key: session.host.key,
-                  keyPassword: session.host.keyPassword,
-                  keyType: session.host.keyType,
-                  credentialId: session.host.credentialId
-                    ? parseInt(session.host.credentialId.toString())
-                    : undefined,
-                  jumpHosts: session.host.jumpHosts,
-                  forceKeyboardInteractive:
-                    session.host.forceKeyboardInteractive,
-                  overrideCredentialUsername:
-                    session.host.overrideCredentialUsername,
-                  terminalConfig: session.host.terminalConfig,
-                }}
-                isVisible={session.id === activeSessionId}
-                title={session.title}
-                tabInstanceId={session.instanceId}
-                initialSessionId={session.restoredSessionId}
-                onSessionIdChange={(backendId) =>
-                  setBackendSessionId(session.id, backendId)
-                }
-                onClose={() => handleTabClose(session.id)}
-                onBackgroundColorChange={(color) => {
-                  setTerminalBackgroundColors((prev) => ({
-                    ...prev,
-                    [session.id]: color,
-                  }));
-                }}
-              />
-            );
-          } else if (session.type === "stats") {
-            return (
-              <ServerStats
-                key={session.id}
-                ref={statsRefs.current[session.id]}
-                hostConfig={{
-                  id: parseInt(session.host.id.toString()),
-                  name: session.host.name,
-                  statsConfig: session.host.statsConfig,
-                  quickActions: session.host.quickActions,
-                }}
-                isVisible={session.id === activeSessionId}
-                title={session.title}
-                onClose={() => handleTabClose(session.id)}
-              />
-            );
-          } else if (session.type === "filemanager") {
-            return (
-              <FileManager
-                key={session.id}
-                ref={fileManagerRefs.current[session.id]}
-                host={session.host}
-                sessionId={session.id}
-                isVisible={session.id === activeSessionId}
-              />
-            );
-          } else if (session.type === "tunnel") {
-            return (
-              <TunnelManager
-                key={session.id}
-                ref={tunnelManagerRefs.current[session.id]}
-                hostConfig={{
-                  id: parseInt(session.host.id.toString()),
-                  name: session.host.name,
-                  ip: session.host.ip,
-                  username: session.host.username,
-                  enableTunnel: session.host.enableTunnel,
-                  tunnelConnections: session.host.tunnelConnections,
-                }}
-                isVisible={session.id === activeSessionId}
-                title={session.title}
-                onClose={() => handleTabClose(session.id)}
-              />
-            );
-          } else if (session.type === "remoteDesktop") {
-            return (
-              <RemoteDesktop
-                key={session.id}
-                host={session.host}
-                isVisible={session.id === activeSessionId}
-                title={session.title}
-                protocol={session.remoteProtocol}
-                onClose={() => handleTabClose(session.id)}
-              />
-            );
-          } else if (session.type === "docker") {
-            return (
-              <Docker
-                key={session.id}
-                host={session.host}
-                isVisible={session.id === activeSessionId}
-              />
-            );
-          }
-          return null;
-        })}
+        {sessions.map((session) => (
+          <SessionAccountProvider
+            key={session.id}
+            accountId={session.accountId}
+          >
+            {renderSession(session)}
+          </SessionAccountProvider>
+        ))}
       </View>
 
       {/* Connections panel: full screen when no sessions, overlay when sessions exist */}
@@ -897,20 +906,22 @@ export default function Sessions() {
               backgroundColor: ui.background,
             }}
           >
-            <BottomToolbar
-              terminalRef={
-                activeSessionId
-                  ? terminalRefs.current[activeSessionId]
-                  : React.createRef<TerminalHandle>()
-              }
-              isVisible={isCustomKeyboardVisible}
-              keyboardHeight={customKeyboardHeight}
-              isKeyboardIntentionallyHidden={
-                keyboardIntentionallyHiddenRef.current
-              }
-              initialTab={customKeyboardInitialTab}
-              hostId={activeSession?.host?.id}
-            />
+            <SessionAccountProvider accountId={activeSession.accountId}>
+              <BottomToolbar
+                terminalRef={
+                  activeSessionId
+                    ? terminalRefs.current[activeSessionId]
+                    : React.createRef<TerminalHandle>()
+                }
+                isVisible={isCustomKeyboardVisible}
+                keyboardHeight={customKeyboardHeight}
+                isKeyboardIntentionallyHidden={
+                  keyboardIntentionallyHiddenRef.current
+                }
+                initialTab={customKeyboardInitialTab}
+                hostId={activeSession?.host?.id}
+              />
+            </SessionAccountProvider>
           </View>
         )}
 

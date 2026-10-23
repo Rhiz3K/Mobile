@@ -10,17 +10,11 @@ import React, {
 import { SSHHost } from "@/types";
 import { router } from "expo-router";
 import { useAppContext } from "@/contexts/AppContext";
-import {
-  addOpenTab,
-  deleteOpenTab,
-  getOpenTabs,
-  patchOpenTab,
-  hasFeature,
-  isPluginApi,
-  type OpenTabRecord,
-} from "@/core/api/main-axios";
 import { sessionFeature } from "@/core/api/compat/server-features";
 import { toast } from "@/utils/toast";
+import { accounts, clientFor, useActiveAccount } from "@/core/accounts";
+import type { AccountClient } from "@/core/api/AccountClient";
+import type { OpenTabRecord } from "@/core/api/types";
 
 export type SessionType =
   "terminal" | "stats" | "filemanager" | "tunnel" | "docker" | "remoteDesktop";
@@ -29,6 +23,8 @@ export type RemoteDesktopProtocol = "rdp" | "vnc" | "telnet";
 
 export interface TerminalSession {
   id: string;
+  /** Account that opened the tab. It keeps using it after a switch. */
+  accountId: string;
   host: SSHHost;
   title: string;
   isActive: boolean;
@@ -76,14 +72,15 @@ function isSameSessionKind(
 /** open-tabs tabType is shared with the web app; map our session types to it. */
 function toTabType(
   type: SessionType,
-  remoteProtocol?: RemoteDesktopProtocol,
+  remoteProtocol: RemoteDesktopProtocol | undefined,
+  client: AccountClient | null,
 ): string {
   switch (type) {
     case "filemanager":
       return "files";
     case "stats":
       // 2.9+ web names this tab after its plugin.
-      return isPluginApi() ? "host-metrics" : "stats";
+      return client?.isPluginApi() ? "host-metrics" : "stats";
     case "remoteDesktop":
       return remoteProtocol ?? "rdp";
     default:
@@ -157,6 +154,7 @@ export const TerminalSessionsProvider: React.FC<
   TerminalSessionsProviderProps
 > = ({ children }) => {
   const { isAuthenticated } = useAppContext();
+  const activeAccountId = useActiveAccount().id;
   const [sessions, setSessions] = useState<TerminalSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [backgroundTabRecords, setBackgroundTabRecords] = useState<
@@ -168,8 +166,10 @@ export const TerminalSessionsProvider: React.FC<
   const [, forceUpdate] = useState({});
 
   const refreshBackgroundTabs = useCallback(async () => {
-    const records = await getOpenTabs();
-    setBackgroundTabRecords(records);
+    const client = accounts.activeClient();
+    setBackgroundTabRecords(
+      client ? await client.api.openTabs.getOpenTabs() : [],
+    );
   }, []);
 
   const addSession = useCallback(
@@ -183,6 +183,8 @@ export const TerminalSessionsProvider: React.FC<
       },
     ): string => {
       const instanceId = opts?.instanceId ?? uuid();
+      const accountId = accounts.active().id;
+      const client = clientFor(accountId);
       const sessionId = `${host.id}-${type}-${Date.now()}`;
 
       setSessions((prev) => {
@@ -200,6 +202,7 @@ export const TerminalSessionsProvider: React.FC<
 
         const newSession: TerminalSession = {
           id: sessionId,
+          accountId,
           host,
           title,
           isActive: true,
@@ -212,9 +215,9 @@ export const TerminalSessionsProvider: React.FC<
         };
 
         // Persist this tab server-side for cross-device awareness.
-        addOpenTab({
+        client?.api.openTabs.addOpenTab({
           id: instanceId,
-          tabType: toTabType(type, opts?.remoteProtocol),
+          tabType: toTabType(type, opts?.remoteProtocol, client),
           hostId: host.id,
           label: title,
           tabOrder: prev.length,
@@ -242,7 +245,9 @@ export const TerminalSessionsProvider: React.FC<
       if (!sessionToRemove) return prev;
 
       // Forget the server-side record for this tab.
-      deleteOpenTab(sessionToRemove.instanceId);
+      clientFor(sessionToRemove.accountId)?.api.openTabs.deleteOpenTab(
+        sessionToRemove.instanceId,
+      );
 
       let updatedSessions = prev.filter((session) => session.id !== sessionId);
 
@@ -327,7 +332,10 @@ export const TerminalSessionsProvider: React.FC<
       setSessions((prev) => {
         const target = prev.find((s) => s.id === sessionId);
         if (!target) return prev;
-        patchOpenTab(target.instanceId, { backendSessionId: backendId });
+        clientFor(target.accountId)?.api.openTabs.patchOpenTab(
+          target.instanceId,
+          { backendSessionId: backendId },
+        );
         return prev.map((s) =>
           s.id === sessionId
             ? { ...s, backendSessionId: backendId, restoredSessionId: null }
@@ -353,7 +361,12 @@ export const TerminalSessionsProvider: React.FC<
           type,
           opts?.remoteProtocol ?? host.connectionType,
         );
-        if (feature && !hasFeature(feature)) {
+        const client = accounts.activeClient();
+        if (!client) {
+          toast.error("Link a Termix server to connect to hosts.");
+          return;
+        }
+        if (feature && !client.hasFeature(feature)) {
           toast.error("This feature is turned off on the server.");
           return;
         }
@@ -382,13 +395,27 @@ export const TerminalSessionsProvider: React.FC<
   }, []);
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      clearAllSessions();
-    } else {
+    if (isAuthenticated) {
       // Hydrate background tab records (e.g. tabs opened on another device).
       refreshBackgroundTabs();
+      return;
     }
-  }, [isAuthenticated, clearAllSessions, refreshBackgroundTabs]);
+    setBackgroundTabRecords([]);
+    // Only a real sign out closes tabs. Switching accounts keeps them open.
+    const client = clientFor(activeAccountId);
+    if (client && !client.isAuthenticated()) {
+      setSessions((prev) => {
+        const kept = prev.filter((s) => s.accountId !== activeAccountId);
+        if (kept.length === prev.length) return prev;
+        if (!kept.some((s) => s.isActive)) {
+          const last = kept[kept.length - 1];
+          setActiveSessionId(last?.id ?? null);
+          return kept.map((s) => ({ ...s, isActive: s.id === last?.id }));
+        }
+        return kept;
+      });
+    }
+  }, [isAuthenticated, activeAccountId, refreshBackgroundTabs]);
 
   return (
     <TerminalSessionsContext.Provider

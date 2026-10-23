@@ -10,10 +10,6 @@ import {
   Trash2,
 } from "lucide-react-native";
 import { SSHHost, DockerContainer, DockerContainerAction } from "@/types";
-import {
-  getDockerContainerLogs,
-  getDockerContainerStats,
-} from "@/core/api/main-axios";
 import { Text, Badge, Tabs } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { MONO_FONT } from "@/constants/fonts";
@@ -21,6 +17,7 @@ import { toast } from "@/utils/toast";
 import { usePolling } from "@/screens/sessions/shared";
 import { DockerConsole } from "./DockerConsole";
 import type { DockerContainerStats } from "@/types";
+import { useSessionClient } from "@/core/accounts/session";
 
 type DetailTab = "logs" | "stats" | "console";
 
@@ -181,13 +178,18 @@ function LogsTab({
   sessionId: string;
   container: DockerContainer;
 }) {
+  const client = useSessionClient();
   const color = useThemeColor();
   const [logs, setLogs] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     try {
-      const text = await getDockerContainerLogs(sessionId, container.id, 300);
+      const text = await client.api.docker.getDockerContainerLogs(
+        sessionId,
+        container.id,
+        300,
+      );
       setLogs(text || "(no output)");
     } catch (e: any) {
       setLogs(e?.message || "Failed to load logs");
@@ -244,6 +246,7 @@ function StatsTab({
   container: DockerContainer;
   running: boolean;
 }) {
+  const client = useSessionClient();
   const color = useThemeColor();
   const [stats, setStats] = useState<DockerContainerStats | null>(null);
   const [error, setError] = useState<string>("");
@@ -251,7 +254,10 @@ function StatsTab({
   const load = useCallback(async () => {
     if (!running) return;
     try {
-      const data = await getDockerContainerStats(sessionId, container.id);
+      const data = await client.api.docker.getDockerContainerStats(
+        sessionId,
+        container.id,
+      );
       setStats(data);
       setError("");
     } catch (e: any) {
