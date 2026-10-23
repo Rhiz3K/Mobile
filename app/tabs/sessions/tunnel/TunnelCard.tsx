@@ -60,7 +60,7 @@ export default function TunnelCard({
             className="text-sm text-foreground"
             numberOfLines={1}
           >
-            Tunnel · {tunnel.sourcePort}
+            Tunnel | {tunnel.sourcePort}
           </Text>
         </View>
         <Badge variant={info.badge}>{info.label}</Badge>

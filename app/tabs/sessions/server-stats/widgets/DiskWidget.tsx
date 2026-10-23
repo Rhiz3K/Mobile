@@ -29,7 +29,7 @@ export function DiskWidget({
       {disk?.usedHuman && disk?.totalHuman ? (
         <Text className="mt-1.5 text-[10px] text-muted-foreground">
           {disk.usedHuman} / {disk.totalHuman}
-          {disk.availableHuman ? ` · ${disk.availableHuman} free` : ""}
+          {disk.availableHuman ? ` | ${disk.availableHuman} free` : ""}
         </Text>
       ) : null}
     </WidgetCard>

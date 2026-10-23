@@ -62,7 +62,7 @@ export function SSHAuthDialog({
     authMethod === "password" ? !!password.trim() : !!sshKey.trim();
 
   const hostLabel = hostInfo.name
-    ? `${hostInfo.name} · ${hostInfo.username}@${hostInfo.ip}:${hostInfo.port}`
+    ? `${hostInfo.name} | ${hostInfo.username}@${hostInfo.ip}:${hostInfo.port}`
     : `${hostInfo.username}@${hostInfo.ip}:${hostInfo.port}`;
 
   const reasonText =

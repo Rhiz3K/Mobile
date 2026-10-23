@@ -25,7 +25,7 @@ export function FirewallWidget({ metrics }: { metrics: ServerMetrics }) {
       <View className="gap-0.5">
         {fw?.type && fw.type !== "none" ? (
           <Text className="text-[11px] text-muted-foreground">
-            {fw.type} · {ruleCount} rules
+            {fw.type} | {ruleCount} rules
           </Text>
         ) : (
           <Text className="text-[11px] text-muted-foreground">

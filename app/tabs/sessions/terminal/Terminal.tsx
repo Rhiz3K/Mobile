@@ -1715,7 +1715,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
                   }}
                 >
                   {hostConfig.name}
-                  {"  ·  "}
+                  {"  |  "}
                   {hostConfig.ip}
                 </Text>
               </View>

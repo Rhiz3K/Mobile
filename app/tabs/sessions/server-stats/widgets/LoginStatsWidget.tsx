@@ -34,7 +34,7 @@ export function LoginStatsWidget({ metrics }: { metrics: ServerMetrics }) {
       ) : (
         <View className="gap-2">
           <Text className="text-[10px] text-muted-foreground">
-            {total} logins · {uniqueIPs} unique IP{uniqueIPs !== 1 ? "s" : ""}
+            {total} logins | {uniqueIPs} unique IP{uniqueIPs !== 1 ? "s" : ""}
           </Text>
 
           {recent.length > 0 ? (
@@ -56,7 +56,7 @@ export function LoginStatsWidget({ metrics }: { metrics: ServerMetrics }) {
                     className="flex-1 text-[10px] text-muted-foreground"
                     numberOfLines={1}
                   >
-                    {[e.from, e.time, e.type].filter(Boolean).join(" · ")}
+                    {[e.from, e.time, e.type].filter(Boolean).join(" | ")}
                   </Text>
                 </View>
               ))}
@@ -82,7 +82,7 @@ export function LoginStatsWidget({ metrics }: { metrics: ServerMetrics }) {
                     className="flex-1 text-[10px] text-muted-foreground"
                     numberOfLines={1}
                   >
-                    {[e.from, e.time, e.type].filter(Boolean).join(" · ")}
+                    {[e.from, e.time, e.type].filter(Boolean).join(" | ")}
                   </Text>
                 </View>
               ))}

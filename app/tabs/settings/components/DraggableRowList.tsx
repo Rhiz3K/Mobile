@@ -56,7 +56,7 @@ function RowItem({
               {item.label}
             </Text>
             <Text className="mt-0.5 text-[10px] text-muted-foreground">
-              {item.keys.length} keys · {item.category}
+              {item.keys.length} keys | {item.category}
             </Text>
           </View>
           <View

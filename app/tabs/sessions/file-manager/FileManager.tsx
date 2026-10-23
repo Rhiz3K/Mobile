@@ -1402,7 +1402,7 @@ function FileRow({
               {file.modified ? (
                 <>
                   {file.size !== undefined ? (
-                    <Text className="text-[11px] text-muted-foreground">·</Text>
+                    <Text className="text-[11px] text-muted-foreground">|</Text>
                   ) : null}
                   <Text className="text-[11px] text-muted-foreground">
                     {formatDate(file.modified)}
@@ -1413,7 +1413,7 @@ function FileRow({
           )}
           {file.permissions ? (
             <>
-              <Text className="text-[11px] text-muted-foreground">·</Text>
+              <Text className="text-[11px] text-muted-foreground">|</Text>
               <Text className="font-mono text-[11px] text-muted-foreground/70">
                 {file.permissions}
               </Text>

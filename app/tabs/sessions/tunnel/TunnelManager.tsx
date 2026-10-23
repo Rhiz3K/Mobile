@@ -215,7 +215,7 @@ export const TunnelManager = forwardRef<
   return (
     <SessionFrame
       title={hostConfig.name}
-      subtitle={`Tunnels · ${tunnels.length}`}
+      subtitle={`Tunnels | ${tunnels.length}`}
       status={frameStatus}
       loadingLabel="Loading tunnels…"
       errorMessage={error}

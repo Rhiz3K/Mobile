@@ -44,7 +44,7 @@ export function PassphraseDialog({
   }, [passphrase, onSubmit]);
 
   const hostLabel = hostInfo.name
-    ? `${hostInfo.name} · ${hostInfo.username}@${hostInfo.ip}:${hostInfo.port}`
+    ? `${hostInfo.name} | ${hostInfo.username}@${hostInfo.ip}:${hostInfo.port}`
     : `${hostInfo.username}@${hostInfo.ip}:${hostInfo.port}`;
 
   return (

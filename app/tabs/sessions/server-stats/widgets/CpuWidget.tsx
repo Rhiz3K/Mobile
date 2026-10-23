@@ -30,7 +30,7 @@ export function CpuWidget({
         <Text className="mt-1.5 text-[10px] text-muted-foreground">
           {cpu.cores} cores
           {cpu.load
-            ? ` · load ${cpu.load.map((l) => Number(l).toFixed(2)).join(", ")}`
+            ? ` | load ${cpu.load.map((l) => Number(l).toFixed(2)).join(", ")}`
             : ""}
         </Text>
       ) : null}

@@ -161,7 +161,7 @@ export function Docker({ host, isVisible }: DockerProps) {
       setBusyId(c.id);
       try {
         await dockerContainerAction(sessionId, c.id, action);
-        toast.success(`${action} · ${cleanName(c.name)}`);
+        toast.success(`${action} | ${cleanName(c.name)}`);
         await loadContainers(sessionId);
       } catch (e: any) {
         toast.error(e?.message || `Failed to ${action}`);
