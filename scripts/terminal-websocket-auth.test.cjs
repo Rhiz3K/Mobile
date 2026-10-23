@@ -7,12 +7,12 @@ const ts = require("typescript");
 
 const root = path.resolve(__dirname, "..");
 const nativeSource = fs.readFileSync(
-  path.join(root, "app/tabs/sessions/terminal/NativeWebSocketManager.ts"),
+  path.join(root, "src/features/terminal/NativeWebSocketManager.ts"),
   "utf8",
 );
 const apiSource = ts.createSourceFile(
   "main-axios.ts",
-  fs.readFileSync(path.join(root, "app/main-axios.ts"), "utf8"),
+  fs.readFileSync(path.join(root, "src/core/api/main-axios.ts"), "utf8"),
   ts.ScriptTarget.Latest,
   true,
 );
@@ -26,7 +26,10 @@ assert.ok(factory, "createTerminalWebSocket must exist");
 const compatExports = {};
 vm.runInNewContext(
   ts.transpileModule(
-    fs.readFileSync(path.join(root, "lib/api-compat.ts"), "utf8"),
+    fs.readFileSync(
+      path.join(root, "src/core/api/compat/api-compat.ts"),
+      "utf8",
+    ),
     {
       compilerOptions: {
         module: ts.ModuleKind.CommonJS,
@@ -83,7 +86,7 @@ function fixture(
       {
         exports,
         require: (id) => {
-          assert.equal(id, "../../../main-axios");
+          assert.equal(id, "@/core/api/main-axios");
           return api;
         },
         ...api,

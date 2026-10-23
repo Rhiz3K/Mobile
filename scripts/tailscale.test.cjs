@@ -8,7 +8,10 @@ const ts = require("typescript");
 const tailscale = {};
 vm.runInNewContext(
   ts.transpileModule(
-    fs.readFileSync(path.join(__dirname, "../lib/tailscale.ts"), "utf8"),
+    fs.readFileSync(
+      path.join(__dirname, "../src/features/tailscale/tailscale.ts"),
+      "utf8",
+    ),
     {
       compilerOptions: {
         module: ts.ModuleKind.CommonJS,
@@ -165,7 +168,10 @@ test("unknown response shapes are rejected", () => {
 
 const apiSource = ts.createSourceFile(
   "main-axios.ts",
-  fs.readFileSync(path.join(__dirname, "../app/main-axios.ts"), "utf8"),
+  fs.readFileSync(
+    path.join(__dirname, "../src/core/api/main-axios.ts"),
+    "utf8",
+  ),
   ts.ScriptTarget.Latest,
   true,
 );
@@ -187,7 +193,10 @@ const apiFunctions = [
 const features = {};
 vm.runInNewContext(
   ts.transpileModule(
-    fs.readFileSync(path.join(__dirname, "../lib/server-features.ts"), "utf8"),
+    fs.readFileSync(
+      path.join(__dirname, "../src/core/api/compat/server-features.ts"),
+      "utf8",
+    ),
     {
       compilerOptions: {
         module: ts.ModuleKind.CommonJS,

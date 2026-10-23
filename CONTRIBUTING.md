@@ -29,7 +29,7 @@ This starts the Expo development server. Open it in Expo Go or a development bui
 
 ## Theme and icons
 
-Theme colors in `app/constants/theme.ts` are copied from the [Classic Themes](https://github.com/Termix-SSH/Plugin-Classic-Themes) plugin. Change them there first, then here. `npm run verify:theme` checks the set is complete.
+Theme colors in `src/constants/theme.ts` are copied from the [Classic Themes](https://github.com/Termix-SSH/Plugin-Classic-Themes) plugin. Change them there first, then here. `npm run verify:theme` checks the set is complete.
 
 Every app icon, splash and status bar icon is built from `assets/brand/logo.svg`. After changing the logo or `scripts/icon-spec.cjs`, run:
 

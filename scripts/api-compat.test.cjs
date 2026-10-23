@@ -8,7 +8,10 @@ const ts = require("typescript");
 const compat = {};
 vm.runInNewContext(
   ts.transpileModule(
-    fs.readFileSync(path.join(__dirname, "../lib/api-compat.ts"), "utf8"),
+    fs.readFileSync(
+      path.join(__dirname, "../src/core/api/compat/api-compat.ts"),
+      "utf8",
+    ),
     {
       compilerOptions: {
         module: ts.ModuleKind.CommonJS,

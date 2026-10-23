@@ -7,7 +7,10 @@ const ts = require("typescript");
 const login = {};
 vm.runInNewContext(
   ts.transpileModule(
-    fs.readFileSync(path.join(__dirname, "../lib/rdp-login.ts"), "utf8"),
+    fs.readFileSync(
+      path.join(__dirname, "../src/features/remote-desktop/rdp-login.ts"),
+      "utf8",
+    ),
     {
       compilerOptions: {
         module: ts.ModuleKind.CommonJS,
@@ -54,7 +57,7 @@ test("an explicitly empty modern domain overrides stale legacy fields", () => {
 });
 test("the API forwards prompted credentials without changing passwords or empty domains", async () => {
   const source = fs.readFileSync(
-    path.join(__dirname, "../app/main-axios.ts"),
+    path.join(__dirname, "../src/core/api/main-axios.ts"),
     "utf8",
   );
   const start = source.indexOf(

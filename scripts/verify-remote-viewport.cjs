@@ -2,7 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
 const source = fs.readFileSync(
-  "app/tabs/sessions/remote-desktop/RemoteDesktop.tsx",
+  "src/features/remote-desktop/RemoteDesktop.tsx",
   "utf8",
 );
 const block = source

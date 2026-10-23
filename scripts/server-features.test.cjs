@@ -8,7 +8,10 @@ const ts = require("typescript");
 const features = {};
 vm.runInNewContext(
   ts.transpileModule(
-    fs.readFileSync(path.join(__dirname, "../lib/server-features.ts"), "utf8"),
+    fs.readFileSync(
+      path.join(__dirname, "../src/core/api/compat/server-features.ts"),
+      "utf8",
+    ),
     {
       compilerOptions: {
         module: ts.ModuleKind.CommonJS,

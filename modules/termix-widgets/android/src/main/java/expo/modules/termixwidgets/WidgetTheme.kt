@@ -7,7 +7,7 @@ import android.text.format.DateUtils
  * Colour + formatting helpers shared by both providers.
  *
  * Mirrors the iOS widget palette (`ios/widget/WidgetTheme.swift`) which in turn
- * mirrors `app/constants/designTokens.ts`, so a Termix widget looks the same on
+ * mirrors `src/constants/theme.ts`, so a Termix widget looks the same on
  * either platform.
  */
 object WidgetTheme {

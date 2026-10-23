@@ -1,28 +1,28 @@
 import { Stack } from "expo-router";
-import { AppProvider, useAppContext } from "./AppContext";
-import { TerminalSessionsProvider } from "./contexts/TerminalSessionsContext";
-import { TerminalCustomizationProvider } from "./contexts/TerminalCustomizationContext";
-import { KeyboardProvider } from "./contexts/KeyboardContext";
-import { KeyboardCustomizationProvider } from "./contexts/KeyboardCustomizationContext";
+import { AppProvider, useAppContext } from "@/contexts/AppContext";
+import { TerminalSessionsProvider } from "@/contexts/TerminalSessionsContext";
+import { TerminalCustomizationProvider } from "@/contexts/TerminalCustomizationContext";
+import { KeyboardProvider } from "@/contexts/KeyboardContext";
+import { KeyboardCustomizationProvider } from "@/contexts/KeyboardCustomizationContext";
 import {
   ThemeProvider,
   useTheme,
   useThemeColor,
-} from "./contexts/ThemeContext";
-import { AppLockProvider, useAppLock } from "./contexts/AppLockContext";
-import { LockScreen } from "@/app/components/LockScreen";
-import AuthFlow from "@/app/authentication/AuthFlow";
+} from "@/contexts/ThemeContext";
+import { AppLockProvider, useAppLock } from "@/contexts/AppLockContext";
+import { LockScreen } from "@/components/LockScreen";
+import AuthFlow from "@/screens/authentication/AuthFlow";
 import { View, Text, ActivityIndicator, TouchableOpacity } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { Toaster } from "@/app/components/ui/Toast";
-import { ConfirmProvider } from "@/app/components/ui/Confirm";
+import { Toaster } from "@/ui/Toast";
+import { ConfirmProvider } from "@/ui/Confirm";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useFonts } from "expo-font";
-import { FONT_MAP, MONO_FONT, MONO_FONT_BOLD } from "./constants/fonts";
+import { FONT_MAP, MONO_FONT, MONO_FONT_BOLD } from "@/constants/fonts";
 import "../global.css";
-import UpdateRequired from "@/app/authentication/UpdateRequired";
-import { WidgetDeepLinkHost } from "@/app/widgets";
+import UpdateRequired from "@/screens/authentication/UpdateRequired";
+import { WidgetDeepLinkHost } from "@/widgets";
 
 function RootLayoutContent() {
   const {

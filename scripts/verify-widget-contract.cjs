@@ -28,7 +28,7 @@ function assert(condition, message) {
   }
 }
 
-const typescript = read(projectRoot, "app", "widgets", "types.ts");
+const typescript = read(projectRoot, "src", "widgets", "types.ts");
 const swift = read(widgetModule, "ios", "widget", "WidgetModels.swift");
 const kotlin = read(
   widgetModule,
@@ -54,7 +54,7 @@ const versions = {
   TypeScript: single(
     typescript,
     /SNAPSHOT_VERSION\s*=\s*(\d+)/,
-    "SNAPSHOT_VERSION in app/widgets/types.ts",
+    "SNAPSHOT_VERSION in src/widgets/types.ts",
   ),
   Swift: single(
     swift,

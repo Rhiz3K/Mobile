@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Redirect, useLocalSearchParams } from "expo-router";
-import { rememberOidcCallback } from "@/app/utils/oidc-callback";
-import { useAppContext } from "@/app/AppContext";
+import { rememberOidcCallback } from "@/utils/oidc-callback";
+import { useAppContext } from "@/contexts/AppContext";
 
 // Route for the `termix-mobile://oidc-callback` deep link.
 //

@@ -11,7 +11,7 @@ const fontPlugin = config.plugins.find(
   (p) => Array.isArray(p) && p[0] === "expo-font",
 )[1];
 const fontsTs = fs.readFileSync(
-  path.join(root, "app/constants/fonts.ts"),
+  path.join(root, "src/constants/fonts.ts"),
   "utf8",
 );
 const STYLES = ["Regular", "Bold", "Italic", "BoldItalic"];

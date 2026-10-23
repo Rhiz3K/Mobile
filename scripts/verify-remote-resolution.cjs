@@ -3,7 +3,7 @@ const fs = require("node:fs");
 const ts = require("typescript");
 const vm = require("node:vm");
 const source = fs.readFileSync(
-  "app/tabs/sessions/remote-desktop/remoteDesktopSize.ts",
+  "src/features/remote-desktop/remoteDesktopSize.ts",
   "utf8",
 );
 const context = { exports: {} };

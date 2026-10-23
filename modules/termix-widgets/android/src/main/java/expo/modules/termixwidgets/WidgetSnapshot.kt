@@ -6,7 +6,7 @@ import org.json.JSONObject
 /**
  * Decoders for the snapshot the app publishes.
  *
- * The payload shape is defined once in `app/widgets/types.ts`. Parsing is
+ * The payload shape is defined once in `src/widgets/types.ts`. Parsing is
  * deliberately lenient - unknown fields are ignored and missing ones fall back -
  * so an app update can add fields without breaking a widget that hasn't been
  * rebuilt yet.
@@ -43,7 +43,7 @@ enum class SnapshotState {
 /**
  * Which tab a host tile opens.
  *
- * Mirrors the session types `app/widgets/useWidgetDeepLink.ts` accepts. Anything
+ * Mirrors the session types `src/widgets/useWidgetDeepLink.ts` accepts. Anything
  * outside this set is rejected by the parser and falls back to a terminal, so
  * the two lists must stay in step.
  */

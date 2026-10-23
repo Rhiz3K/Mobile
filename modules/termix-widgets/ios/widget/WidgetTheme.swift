@@ -4,7 +4,7 @@ import WidgetKit
 /**
  Visual language for the widgets.
 
- Mirrors the app's dark session surfaces (`app/constants/designTokens.ts`):
+ Mirrors the app's dark session surfaces (`src/constants/theme.ts`):
  square corners, hairline borders, monospaced type, one accent color. The
  accent is not hardcoded - it travels in the snapshot so the widget follows the
  accent the user picked in Settings.

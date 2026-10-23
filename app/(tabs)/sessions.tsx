@@ -1,7 +1,7 @@
-import Sessions from "@/app/tabs/sessions/Sessions";
-import { Screen } from "@/app/components/Screen";
-import { ConnectEmptyState } from "@/app/components/ConnectEmptyState";
-import { useAppContext } from "@/app/AppContext";
+import Sessions from "@/screens/sessions/Sessions";
+import { Screen } from "@/components/Screen";
+import { ConnectEmptyState } from "@/components/ConnectEmptyState";
+import { useAppContext } from "@/contexts/AppContext";
 
 export default function SessionsScreen() {
   const { isAuthenticated } = useAppContext();

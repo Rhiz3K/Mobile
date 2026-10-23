@@ -1,7 +1,7 @@
-import Hosts from "@/app/tabs/hosts/Hosts";
-import { Screen } from "@/app/components/Screen";
-import { ConnectEmptyState } from "@/app/components/ConnectEmptyState";
-import { useAppContext } from "@/app/AppContext";
+import Hosts from "@/screens/hosts/Hosts";
+import { Screen } from "@/components/Screen";
+import { ConnectEmptyState } from "@/components/ConnectEmptyState";
+import { useAppContext } from "@/contexts/AppContext";
 
 export default function HostsScreen() {
   const { isAuthenticated } = useAppContext();

@@ -1,6 +1,6 @@
 import { Tabs, usePathname } from "expo-router";
-import { useTerminalSessions } from "../contexts/TerminalSessionsContext";
-import { CustomTabBar } from "@/app/components/CustomTabBar";
+import { useTerminalSessions } from "@/contexts/TerminalSessionsContext";
+import { CustomTabBar } from "@/components/CustomTabBar";
 
 export default function TabLayout() {
   const { sessions } = useTerminalSessions();

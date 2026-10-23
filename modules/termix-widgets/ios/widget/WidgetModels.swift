@@ -3,7 +3,7 @@ import Foundation
 /**
  Decoders for the snapshot the app publishes.
 
- The shape is defined once in `app/widgets/types.ts`; this file mirrors it.
+ The shape is defined once in `src/widgets/types.ts`; this file mirrors it.
  Every field is decoded defensively: a widget must render *something* even if a
  future app version adds fields or a payload arrives half-written.
  */
@@ -11,7 +11,7 @@ import Foundation
 /**
  Which tab a host tile opens.
 
- Mirrors the session types `app/widgets/useWidgetDeepLink.ts` accepts. Anything
+ Mirrors the session types `src/widgets/useWidgetDeepLink.ts` accepts. Anything
  outside this set is rejected by the parser and falls back to a terminal, so the
  two lists must stay in step.
  */

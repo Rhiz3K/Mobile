@@ -8,7 +8,7 @@ const ts = require("typescript");
 const theme = {};
 vm.runInNewContext(
   ts.transpileModule(
-    fs.readFileSync(path.join(__dirname, "../app/constants/theme.ts"), "utf8"),
+    fs.readFileSync(path.join(__dirname, "../src/constants/theme.ts"), "utf8"),
     {
       compilerOptions: {
         module: ts.ModuleKind.CommonJS,
