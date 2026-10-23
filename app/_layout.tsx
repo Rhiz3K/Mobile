@@ -24,6 +24,7 @@ import "../global.css";
 import UpdateRequired from "@/screens/authentication/UpdateRequired";
 import { WidgetDeepLinkHost } from "@/widgets";
 import { registerBuiltInFeatures } from "@/features";
+import { AccountSwitcher } from "@/screens/accounts/AccountSwitcher";
 
 registerBuiltInFeatures();
 
@@ -80,6 +81,7 @@ function RootLayoutContent() {
           sheet. Mounted here so it is active for the whole session, including
           cold starts from a widget. */}
       <WidgetDeepLinkHost />
+      <AccountSwitcher />
       <AppLockGate />
       {authFlowVisible ? (
         <View className="absolute inset-0 bg-background">

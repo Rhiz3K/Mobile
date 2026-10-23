@@ -5,7 +5,11 @@ import { features } from "./registry";
 import type { Capability, FeatureContext } from "./types";
 
 function useRegistryVersion(): number {
-  return useSyncExternalStore(features.subscribe, features.getVersion);
+  return useSyncExternalStore(
+    features.subscribe,
+    features.getVersion,
+    features.getVersion,
+  );
 }
 
 function useContextFor(accountId: string): FeatureContext {

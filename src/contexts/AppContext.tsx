@@ -52,6 +52,11 @@ interface AppContextType {
   /** Call once the active account has a session. */
   finishSignIn: () => Promise<void>;
 
+  /** Account switcher sheet. */
+  accountSwitcherVisible: boolean;
+  openAccountSwitcher: () => void;
+  closeAccountSwitcher: () => void;
+
   /** Auth flow overlay control. */
   authFlowVisible: boolean;
   authFlowInitialStep: AuthStep;
@@ -143,6 +148,15 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [showUpdateScreen, setShowUpdateScreen] = useState<boolean>(false);
 
   const [authFlowVisible, setAuthFlowVisible] = useState(false);
+  const [accountSwitcherVisible, setAccountSwitcherVisible] = useState(false);
+  const openAccountSwitcher = useCallback(
+    () => setAccountSwitcherVisible(true),
+    [],
+  );
+  const closeAccountSwitcher = useCallback(
+    () => setAccountSwitcherVisible(false),
+    [],
+  );
   const [authFlowInitialStep, setAuthFlowInitialStep] =
     useState<AuthStep>("server");
 
@@ -327,6 +341,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         hasServerConfigured: isServerAccount(active),
         linkServer,
         finishSignIn,
+        accountSwitcherVisible,
+        openAccountSwitcher,
+        closeAccountSwitcher,
         authFlowVisible,
         authFlowInitialStep,
         openAuthFlow,

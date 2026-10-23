@@ -24,11 +24,13 @@ import {
   FileText,
   Radar,
   Server,
+  Users,
 } from "lucide-react-native";
 import HostTree from "@/screens/hosts/navigation/Folder";
 import type { HostMetrics } from "@/screens/hosts/navigation/Host";
 import { HostActionSheet } from "@/screens/hosts/HostActionSheet";
 import { useCapability, useHostFilters } from "@/core/features";
+import { useAppContext } from "@/contexts/AppContext";
 import HostForm from "@/screens/hosts/HostForm";
 import { QuickConnect } from "@/screens/hosts/QuickConnect";
 import { TailscaleDevices } from "@/features/tailscale/TailscaleDevices";
@@ -106,6 +108,7 @@ const STORAGE_EXPANDED = "hostExpandedFolders";
 
 export default function Hosts() {
   const color = useThemeColor();
+  const { openAccountSwitcher } = useAppContext();
   const hostFilters = useHostFilters();
   const canQuickConnect = useCapability("host.quickConnect");
   const tailscaleAvailable = useCapability("hosts.discovery");
@@ -571,6 +574,13 @@ export default function Hosts() {
             accessibilityLabel="Snippets"
             onPress={() => router.push("/tabs/settings/Snippets" as never)}
             icon={<FileText size={18} color={color("muted-foreground")} />}
+          />
+          <Button
+            variant="ghost"
+            size="icon"
+            accessibilityLabel="Accounts"
+            onPress={openAccountSwitcher}
+            icon={<Users size={18} color={color("muted-foreground")} />}
           />
           <Button
             variant="ghost"

@@ -34,7 +34,11 @@ export function api(): ApiModules {
 }
 
 export function useAccounts(): { accounts: Account[]; active: Account } {
-  return useSyncExternalStore(accounts.subscribe, accounts.getSnapshot);
+  return useSyncExternalStore(
+    accounts.subscribe,
+    accounts.getSnapshot,
+    accounts.getSnapshot,
+  );
 }
 
 export function useActiveAccount(): Account {
@@ -45,9 +49,11 @@ export function useActiveAccount(): Account {
 export function useClient(accountId: string | null): AccountClient | null {
   useAccounts();
   const client = accountId ? accounts.client(accountId) : null;
+  const version = () => client?.version ?? -1;
   useSyncExternalStore(
     (listener) => client?.subscribe(listener) ?? (() => {}),
-    () => client?.version ?? -1,
+    version,
+    version,
   );
   return client;
 }

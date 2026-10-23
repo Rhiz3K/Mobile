@@ -11,6 +11,7 @@ import {
   LogOut,
   Lock,
   Server as ServerIcon,
+  Users,
   Monitor,
   Key,
   LayoutGrid,
@@ -60,8 +61,13 @@ export default function Settings() {
   const hasSnippetWidget = useCapability("widgets.snippets");
   const color = useThemeColor();
   const appVersion = Constants.expoConfig?.version ?? "";
-  const { isAuthenticated, setAuthenticated, openAuthFlow, authFlowVisible } =
-    useAppContext();
+  const {
+    isAuthenticated,
+    setAuthenticated,
+    openAuthFlow,
+    authFlowVisible,
+    openAccountSwitcher,
+  } = useAppContext();
   const { clearAllSessions } = useTerminalSessions();
   const { theme, setTheme, accent, setAccent } = useTheme();
   const appLock = useAppLock();
@@ -300,6 +306,14 @@ export default function Settings() {
             <Button
               variant="muted"
               className="mt-1"
+              onPress={openAccountSwitcher}
+              icon={<Users size={15} color={color("foreground")} />}
+            >
+              Switch account
+            </Button>
+
+            <Button
+              variant="muted"
               onPress={handleChangeServer}
               icon={<ServerIcon size={15} color={color("foreground")} />}
             >
