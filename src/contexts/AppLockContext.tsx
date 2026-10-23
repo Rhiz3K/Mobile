@@ -10,6 +10,8 @@ import { AppState, type AppStateStatus } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
+import { localStores } from "@/core/db/stores";
+import { DEVICE_ONLY } from "@/core/storage/kv";
 
 /**
  * App Lock - optional biometric / PIN gate when the app is opened or returns
@@ -52,6 +54,7 @@ export function AppLockProvider({ children }: { children: React.ReactNode }) {
   const [enabled, setEnabled] = useState(false);
   const [locked, setLocked] = useState(false);
   const [hasBiometrics, setHasBiometrics] = useState(false);
+  const [ready, setReady] = useState(false);
   const backgroundedAt = useRef<number | null>(null);
   const appState = useRef(AppState.currentState);
 
@@ -69,8 +72,16 @@ export function AppLockProvider({ children }: { children: React.ReactNode }) {
       // appear but do nothing.
       setHasBiometrics(!!hw && !!enrolled);
       if (on) setLocked(true); // lock on cold start
+      setReady(true);
     })();
   }, []);
+
+  // Local data keys are only read while the app is unlocked.
+  useEffect(() => {
+    if (!ready) return;
+    if (locked) localStores.lock();
+    else localStores.unlock();
+  }, [ready, locked]);
 
   // Re-lock when returning from background after the delay.
   useEffect(() => {
@@ -89,14 +100,14 @@ export function AppLockProvider({ children }: { children: React.ReactNode }) {
   }, [enabled]);
 
   const enable = useCallback(async (pin: string) => {
-    await SecureStore.setItemAsync(PIN_KEY, pin);
+    await SecureStore.setItemAsync(PIN_KEY, pin, DEVICE_ONLY);
     await AsyncStorage.setItem(ENABLED_KEY, "true");
     setEnabled(true);
     setLocked(false);
   }, []);
 
   const disable = useCallback(async () => {
-    await SecureStore.deleteItemAsync(PIN_KEY).catch(() => {});
+    await SecureStore.deleteItemAsync(PIN_KEY, DEVICE_ONLY).catch(() => {});
     await AsyncStorage.setItem(ENABLED_KEY, "false");
     setEnabled(false);
     setLocked(false);
@@ -127,7 +138,9 @@ export function AppLockProvider({ children }: { children: React.ReactNode }) {
   }, [authenticateBiometrics]);
 
   const verifyPin = useCallback(async (pin: string) => {
-    const stored = await SecureStore.getItemAsync(PIN_KEY).catch(() => null);
+    const stored = await SecureStore.getItemAsync(PIN_KEY, DEVICE_ONLY).catch(
+      () => null,
+    );
     return !!stored && stored === pin;
   }, []);
 
