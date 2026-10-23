@@ -38,6 +38,7 @@ import { SSHHost, ServerStatus, Snippet } from "@/types";
 import { publishHostSnapshot } from "@/widgets";
 import { accounts, api, activeClient } from "@/core/accounts";
 import { hostStatusesByLocalId, isSynced } from "@/core/sync";
+import { SyncBanner } from "@/screens/hosts/SyncBanner";
 import { Screen } from "@/components/Screen";
 import {
   Text,
@@ -725,6 +726,7 @@ export default function Hosts() {
             />
           }
         >
+          <SyncBanner />
           {alerts.map((alert) => (
             <View
               key={alert.id}

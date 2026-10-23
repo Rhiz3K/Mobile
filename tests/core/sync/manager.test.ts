@@ -6,6 +6,12 @@ import { hosts, snippets } from "@/core/db/schema";
 import { localStores } from "@/core/db/stores";
 import { SyncManager } from "@/core/sync/manager";
 import {
+  resolveConflict,
+  retryRejected,
+  setKindEnabled,
+} from "@/core/sync/settings";
+import { SyncBook } from "@/core/sync/store";
+import {
   clearSnippetIds,
   hostStatusesByLocalId,
   serverHostConfig,
@@ -261,4 +267,62 @@ test("snippets, statuses and relay configs use the server's ids", async () => {
       { id: 999, syncId: "gone" },
     ]),
   ).toEqual({ [web.id]: { status: "online" } });
+});
+
+test("a kind switched off and on again is pulled in full", async () => {
+  manager.start();
+  await manager.syncNow(account.id);
+  await setKindEnabled(account.id, "snippets", false, localStores);
+  expect(find().disabledTypes).toEqual(["snippets", "snippetFolders"]);
+  server.put("snippets", "later", { name: "added while off", content: "w" });
+  await manager.syncNow(account.id);
+  expect((await db()).select().from(snippets).all()).toHaveLength(1);
+
+  await setKindEnabled(account.id, "snippets", true, localStores);
+  await manager.syncNow(account.id);
+  const names = (await db())
+    .select()
+    .from(snippets)
+    .all()
+    .map((s) => s.name)
+    .sort();
+  expect(names).toEqual(["added while off", "uptime"]);
+});
+
+test("Keep mine puts the phone's version back and sends it", async () => {
+  manager.start();
+  await manager.syncNow(account.id);
+  const id = "44444444-4444-4444-8444-444444444444";
+  (await db())
+    .update(hosts)
+    .set({ notes: "phone" })
+    .where(eq(hosts.syncId, id))
+    .run();
+  server.put("hosts", id, {
+    ...server.get("hosts", id)!.row!,
+    notes: "desktop",
+  });
+  await manager.syncNow(account.id);
+  const book = new SyncBook(await db());
+  const [conflict] = book.conflicts();
+  await resolveConflict(account.id, conflict.id, "mine", localStores);
+  await manager.syncNow(account.id);
+  expect(server.get("hosts", id)!.row!.notes).toBe("phone");
+  expect(book.conflicts()).toHaveLength(0);
+});
+
+test("refused changes can be tried again", async () => {
+  manager.start();
+  await manager.syncNow(account.id);
+  server.entityTypes = server.entityTypes.map((t) =>
+    t.type === "snippets" ? { ...t, readOnly: true } : t,
+  );
+  (await db()).update(snippets).set({ content: "x" }).run();
+  await manager.syncNow(account.id);
+  expect(new SyncBook(await db()).errors()).toHaveLength(1);
+  server.entityTypes = server.entityTypes.map((t) =>
+    t.type === "snippets" ? { ...t, readOnly: false } : t,
+  );
+  await retryRejected(account.id, localStores);
+  expect(new SyncBook(await db()).errors()).toHaveLength(0);
 });

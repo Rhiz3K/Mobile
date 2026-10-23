@@ -16,6 +16,7 @@ import {
   Key,
   LayoutGrid,
   Trash2,
+  RefreshCw,
 } from "lucide-react-native";
 import { useAppContext } from "@/contexts/AppContext";
 import { useTerminalSessions } from "@/contexts/TerminalSessionsContext";
@@ -311,6 +312,16 @@ export default function Settings() {
             >
               Switch account
             </Button>
+
+            {serverUrl ? (
+              <Button
+                variant="muted"
+                onPress={() => router.push("/tabs/settings/Sync" as any)}
+                icon={<RefreshCw size={15} color={color("foreground")} />}
+              >
+                Sync and proxy
+              </Button>
+            ) : null}
 
             <Button
               variant="muted"
