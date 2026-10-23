@@ -32,10 +32,13 @@ pub fn config(user: &str, port: u16) -> ConnectConfig {
         passphrase: None,
         certificate: None,
         force_keyboard_interactive: false,
+        try_keyboard: true,
         allow_legacy_algorithms: false,
         connect_timeout_secs: 10,
         keepalive_interval_secs: 30,
         keepalive_count_max: 5,
+        proxies: vec![],
+        port_knock: vec![],
     }
 }
 
@@ -71,7 +74,9 @@ pub struct Cb {
     pub reject: bool,
     pub host_keys: Mutex<Vec<HostKeyInfo>>,
     pub rounds: Mutex<Vec<KbdRequest>>,
-    pub disconnects: Mutex<Vec<(Instant, String)>>,
+    pub disconnects: Mutex<Vec<(Instant, DisconnectKind, String)>>,
+    /// Never answers keyboard-interactive, to test cancel.
+    pub hang: bool,
 }
 
 impl Cb {
@@ -88,6 +93,9 @@ impl SessionCallbacks for Cb {
     }
 
     async fn keyboard_interactive(&self, request: KbdRequest) -> Option<Vec<String>> {
+        if self.hang {
+            std::future::pending::<()>().await;
+        }
         let answers = request
             .prompts
             .iter()
@@ -102,8 +110,8 @@ impl SessionCallbacks for Cb {
 
     fn on_banner(&self, _banner: String) {}
 
-    fn on_disconnect(&self, reason: String) {
-        self.disconnects.lock().unwrap().push((Instant::now(), reason));
+    fn on_disconnect(&self, kind: DisconnectKind, reason: String) {
+        self.disconnects.lock().unwrap().push((Instant::now(), kind, reason));
     }
 }
 
@@ -117,7 +125,7 @@ impl ShellCallbacks for Out {
     fn on_data(&self, data: Vec<u8>) {
         self.data.lock().unwrap().extend_from_slice(&data);
     }
-    fn on_exit(&self, exit_code: Option<u32>) {
+    fn on_exit(&self, exit_code: Option<u32>, _exit_signal: Option<String>) {
         *self.exit.lock().unwrap() = Some(exit_code);
     }
 }

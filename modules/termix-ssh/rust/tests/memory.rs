@@ -40,12 +40,12 @@ async fn sftp_memory() {
     }
     let mut c = config("key", 2222);
     c.private_key = Some(key("id_ed25519"));
-    let s = connect(c, Cb::new()).await.unwrap();
+    let s = connect(c, Cb::new(), None).await.unwrap();
     let sftp = s.open_sftp().await.unwrap();
     let local = std::env::temp_dir().join("termix-mem.bin");
     let l = local.to_string_lossy().to_string();
-    let (down, down_mb) = peak_during(sftp.download("/data/big.bin".into(), l.clone(), None)).await;
-    let (up, up_mb) = peak_during(sftp.upload(l.clone(), "/home/key/mem.bin".into(), None)).await;
+    let (down, down_mb) = peak_during(sftp.download("/data/big.bin".into(), l.clone(), 0, None, None)).await;
+    let (up, up_mb) = peak_during(sftp.upload(l.clone(), "/home/key/mem.bin".into(), 0, None, None)).await;
     down.unwrap();
     up.unwrap();
     sftp.remove("/home/key/mem.bin".into()).await.unwrap();

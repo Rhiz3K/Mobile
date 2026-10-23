@@ -7,16 +7,31 @@ The phone's own SSH and SFTP engine. A Rust core on [russh](https://github.com/w
 
 ## What it does
 
-- Logins: password, key (OpenSSH, PEM, PKCS8, PuTTY PPK) with or without passphrase, key plus password,
-  OpenSSH user certificates, keyboard-interactive (every round goes to the app, so TOTP, push and Warpgate
-  work like on the server)
+- Logins in core's order: `none` first, then key, password and keyboard-interactive. Keys can be OpenSSH,
+  PEM, PKCS8 or PuTTY PPK (v2 and v3), with or without passphrase. Key plus password works. An OpenSSH user
+  certificate is tried on its own, like core. Every keyboard-interactive round goes to the app, so TOTP,
+  push and saved passwords work like on the server. When nothing fits, the error is
+  `authMethodNotAvailable`, so the app can ask for a login
 - Host key check before login, with the raw blob hex Termix stores and the `SHA256:` fingerprint; host
   certificates are reported with their CA
-- Shell with a pty and resize, exec, SFTP list, stat, streamed download and upload, remove
-- Local forwards and a SOCKS5 proxy on the phone, jump hosts (any number of hops)
-- Keepalive with interval and count max, like core's `sshOptions`
+- Proxies on the way in (SOCKS4, SOCKS5 with login, HTTP CONNECT, chained) and port knocking (TCP and
+  UDP), like core's transport
+- Shell with a pty, terminal modes, resize and signals; exec with a timeout and an output cap; streaming
+  exec with stdin
+- SFTP: list, stat, lstat, realpath, read link, symlink, mkdir, rmdir, rename, chmod, remove, recursive
+  delete (never follows links), small reads and writes, and streamed download and upload with progress
+  and resume
+- Local, remote and dynamic (SOCKS5) forwards. Stopping a forward closes its live connections too
+- Jump hosts (any number of hops), keepalive with interval and count max, and `reconnect()` with the
+  login kept in native memory
+- Every long call takes an `AbortSignal`; cancelling a login also drops its open prompts
+- Key tools for the login editor: `inspectKey`, `convertKeyToOpenssh` and `inspectCertificate`
 - Core's algorithm list, plus a legacy set (ssh-rsa, sha1 key exchange, 3des, hmac-sha1) behind
-  `allowLegacyAlgorithms`. Not supported: `sntrup761x25519-sha512` (mlkem768 and curve25519 are)
+  `allowLegacyAlgorithms` (on by default, like core). Not supported: `sntrup761x25519-sha512`. Agent
+  auth and browser sign-ins (OPKSSH, Step CA, Vault) need a Termix server
+
+Secrets stay in Rust once a login starts: the config kept for `reconnect()` is wiped when the session
+goes, and `ConnectConfig` never prints secrets in logs.
 
 ## Use
 
@@ -29,17 +44,20 @@ const session = await connect(
     verifyHostKey: async (key) => askUser(key),
     keyboardInteractive: async (round) => askUser(round.prompts),
   },
+  { signal },
 );
 const shell = await session.openShell(
   { cols: 80, rows: 24 },
   { onData: (bytes) => term.write(bytes), onExit: () => {} },
 );
-await shell.write("ls\n");
-session.onDisconnect((reason) => {});
+await shell.write("ls
+");
+await session.sftp.download("/var/log/syslog", fileUri, { onProgress, signal });
+session.onDisconnect(({ kind, reason }) => {});
 ```
 
-Errors are `SshError` with a `kind` (`auth`, `hostKeyRejected`, `passphraseRequired`, ...).
-`isSshEngineAvailable` is false in Expo Go and on web.
+Errors are `SshError` with a `kind` (`auth`, `authMethodNotAvailable`, `hostKeyRejected`,
+`passphraseRequired`, `cancelled`, ...). `isSshEngineAvailable` is false in Expo Go and on web.
 
 ## Layout
 
@@ -76,7 +94,9 @@ docker compose -f test-server/compose.yml up -d --build
 cd rust && SSH_TEST_DOCKER=1 cargo test --release
 ```
 
-The JS wrapper has Jest tests in `tests/modules/termix-ssh`.
+`rust/tests/scenarios.rs` holds the A4 checks, `rust/tests/engine.rs` the rest (none auth, cancel,
+reconnect, SFTP, forwards, proxies, PuTTY keys). Unit tests in `rust/src` need no docker. The JS wrapper
+has Jest tests in `tests/modules/termix-ssh`, the local transport in `tests/core/transport/local`.
 
 ## Notes for callers
 

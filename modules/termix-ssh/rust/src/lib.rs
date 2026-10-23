@@ -1,19 +1,51 @@
 //! Termix SSH engine core. Swift and Kotlin reach it through UniFFI.
 
 mod algorithms;
+mod cancel;
+mod exec;
 mod forward;
+mod keys;
+mod proxy;
 mod session;
 mod sftp;
 mod shell;
 
+pub use cancel::CancelToken;
+pub use exec::ExecHandle;
 pub use forward::Forward;
+pub use keys::{convert_key_to_openssh, inspect_certificate, inspect_key, CertInfo, KeyInfo};
 pub use session::{connect, Session};
 pub use sftp::Sftp;
 pub use shell::{EnvVar, Shell};
 
 uniffi::setup_scaffolding!();
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum ProxyKind {
+    Socks4,
+    Socks5,
+    Http,
+}
+
+/// One proxy on the way to the host. Several make a chain, first one is dialed directly.
+#[derive(Clone, uniffi::Record)]
+pub struct ProxyHop {
+    pub kind: ProxyKind,
+    pub host: String,
+    pub port: u16,
+    pub username: Option<String>,
+    pub password: Option<String>,
+}
+
 #[derive(Debug, Clone, uniffi::Record)]
+pub struct PortKnock {
+    pub port: u16,
+    pub udp: bool,
+    /// Wait after this knock, like core's default of 100 ms.
+    pub delay_ms: u32,
+}
+
+#[derive(Clone, uniffi::Record)]
 pub struct ConnectConfig {
     pub host: String,
     pub port: u16,
@@ -22,13 +54,43 @@ pub struct ConnectConfig {
     /// OpenSSH, PEM, PKCS8 or PuTTY PPK text.
     pub private_key: Option<String>,
     pub passphrase: Option<String>,
-    /// OpenSSH user certificate (`*-cert.pub` text) for `private_key`.
+    /// OpenSSH user certificate (`*-cert.pub` text) for `private_key`. Like core, a certificate
+    /// login tries only the certificate.
     pub certificate: Option<String>,
     pub force_keyboard_interactive: bool,
+    /// Ask keyboard-interactive prompts when the server offers them.
+    pub try_keyboard: bool,
     pub allow_legacy_algorithms: bool,
     pub connect_timeout_secs: u32,
     pub keepalive_interval_secs: u32,
     pub keepalive_count_max: u32,
+    pub proxies: Vec<ProxyHop>,
+    pub port_knock: Vec<PortKnock>,
+}
+
+// Secrets never show up in logs or panic messages.
+impl std::fmt::Debug for ConnectConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ConnectConfig")
+            .field("host", &self.host)
+            .field("port", &self.port)
+            .field("username", &self.username)
+            .field("password", &self.password.as_ref().map(|_| "***"))
+            .field("private_key", &self.private_key.as_ref().map(|_| "***"))
+            .field("certificate", &self.certificate.is_some())
+            .field("proxies", &self.proxies.len())
+            .finish_non_exhaustive()
+    }
+}
+
+impl std::fmt::Debug for ProxyHop {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ProxyHop")
+            .field("kind", &self.kind)
+            .field("host", &self.host)
+            .field("port", &self.port)
+            .finish_non_exhaustive()
+    }
 }
 
 #[derive(Debug, Clone, uniffi::Record)]
@@ -75,6 +137,9 @@ pub struct ExecResult {
     pub stdout: Vec<u8>,
     pub stderr: Vec<u8>,
     pub exit_code: Option<u32>,
+    pub exit_signal: Option<String>,
+    /// True when output went past the cap and the rest was dropped.
+    pub truncated: bool,
 }
 
 #[derive(Debug, Clone, uniffi::Record)]
@@ -83,14 +148,33 @@ pub struct FileEntry {
     pub size: u64,
     pub is_dir: bool,
     pub is_symlink: bool,
+    /// Full st_mode, file type bits included.
     pub permissions: u32,
     pub mtime: u32,
+    pub atime: u32,
+    pub uid: Option<u32>,
+    pub gid: Option<u32>,
+    /// Where a symlink points, filled by `list` and `lstat`.
+    pub link_target: Option<String>,
 }
 
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct TransferResult {
     pub bytes: u64,
     pub millis: u64,
+}
+
+/// Why a session ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum DisconnectKind {
+    /// The server sent a disconnect.
+    Server,
+    /// Keepalive replies stopped coming.
+    Keepalive,
+    /// The socket broke.
+    Network,
+    /// This side closed it.
+    Local,
 }
 
 #[derive(Debug, thiserror::Error, uniffi::Error)]
@@ -107,8 +191,15 @@ pub enum SshError {
     InvalidKey { msg: String },
     #[error("Login failed: {msg}")]
     Auth { msg: String },
+    /// Nothing this login has fits what the server accepts.
+    #[error("The server does not accept any login method we have: {msg}")]
+    AuthMethodNotAvailable { msg: String },
     #[error("Login cancelled")]
     AuthCancelled,
+    #[error("Cancelled")]
+    Cancelled,
+    #[error("Timed out")]
+    Timeout,
     #[error("Channel error: {msg}")]
     Channel { msg: String },
     #[error("SFTP error: {msg}")]
@@ -151,13 +242,20 @@ pub trait SessionCallbacks: Send + Sync {
     /// Return None to cancel the login.
     async fn keyboard_interactive(&self, request: KbdRequest) -> Option<Vec<String>>;
     fn on_banner(&self, banner: String);
-    fn on_disconnect(&self, reason: String);
+    fn on_disconnect(&self, kind: DisconnectKind, reason: String);
 }
 
 #[uniffi::export(with_foreign)]
 pub trait ShellCallbacks: Send + Sync {
     fn on_data(&self, data: Vec<u8>);
-    fn on_exit(&self, exit_code: Option<u32>);
+    fn on_exit(&self, exit_code: Option<u32>, exit_signal: Option<String>);
+}
+
+#[uniffi::export(with_foreign)]
+pub trait ExecCallbacks: Send + Sync {
+    fn on_stdout(&self, data: Vec<u8>);
+    fn on_stderr(&self, data: Vec<u8>);
+    fn on_exit(&self, exit_code: Option<u32>, exit_signal: Option<String>);
 }
 
 #[uniffi::export(with_foreign)]

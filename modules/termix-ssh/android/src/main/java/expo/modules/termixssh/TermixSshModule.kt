@@ -7,12 +7,21 @@ import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
+import uniffi.termix_ssh_core.CancelToken
 import uniffi.termix_ssh_core.ConnectConfig
+import uniffi.termix_ssh_core.DisconnectKind
 import uniffi.termix_ssh_core.EnvVar
+import uniffi.termix_ssh_core.ExecCallbacks
+import uniffi.termix_ssh_core.ExecHandle
+import uniffi.termix_ssh_core.FileEntry
 import uniffi.termix_ssh_core.Forward
 import uniffi.termix_ssh_core.HostKeyInfo
 import uniffi.termix_ssh_core.KbdRequest
+import uniffi.termix_ssh_core.PortKnock
 import uniffi.termix_ssh_core.ProgressCallback
+import uniffi.termix_ssh_core.ProxyHop
+import uniffi.termix_ssh_core.ProxyKind
+import uniffi.termix_ssh_core.PtySize
 import uniffi.termix_ssh_core.Session
 import uniffi.termix_ssh_core.SessionCallbacks
 import uniffi.termix_ssh_core.Sftp
@@ -20,8 +29,12 @@ import uniffi.termix_ssh_core.Shell
 import uniffi.termix_ssh_core.ShellCallbacks
 import uniffi.termix_ssh_core.SshException
 import uniffi.termix_ssh_core.connect
+import uniffi.termix_ssh_core.convertKeyToOpenssh
 import uniffi.termix_ssh_core.engineVersion
+import uniffi.termix_ssh_core.inspectCertificate
+import uniffi.termix_ssh_core.inspectKey
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 
 // How long a login waits for the user to answer a host key or prompt.
 private const val PROMPT_TIMEOUT_MS = 5 * 60 * 1000L
@@ -35,7 +48,10 @@ private fun SshException.coded(): CodedException = when (this) {
     is SshException.BadPassphrase -> SshCodedException("SSH_BAD_PASSPHRASE", "Wrong passphrase")
     is SshException.InvalidKey -> SshCodedException("SSH_INVALID_KEY", msg)
     is SshException.Auth -> SshCodedException("SSH_AUTH", msg)
+    is SshException.AuthMethodNotAvailable -> SshCodedException("SSH_AUTH_METHOD_NOT_AVAILABLE", msg)
     is SshException.AuthCancelled -> SshCodedException("SSH_AUTH_CANCELLED", "Login cancelled")
+    is SshException.Cancelled -> SshCodedException("SSH_CANCELLED", "Cancelled")
+    is SshException.Timeout -> SshCodedException("SSH_TIMEOUT", "Timed out")
     is SshException.Channel -> SshCodedException("SSH_CHANNEL", msg)
     is SshException.Sftp -> SshCodedException("SSH_SFTP", msg)
     is SshException.Io -> SshCodedException("SSH_IO", msg)
@@ -48,9 +64,58 @@ private suspend fun <T> ssh(block: suspend () -> T): T = try {
     throw e.coded()
 }
 
+private fun <T> sshSync(block: () -> T): T = try {
+    block()
+} catch (e: SshException) {
+    throw e.coded()
+}
+
 private fun b64(bytes: ByteArray): String = Base64.encodeToString(bytes, Base64.NO_WRAP)
 
+private fun unb64(text: String): ByteArray = Base64.decode(text, Base64.DEFAULT)
+
 private fun localPath(path: String) = path.removePrefix("file://")
+
+private fun Map<String, Any?>.str(key: String) = this[key] as? String
+
+private fun Map<String, Any?>.int(key: String, fallback: Int) = (this[key] as? Number)?.toInt() ?: fallback
+
+private fun Map<String, Any?>.bool(key: String, fallback: Boolean) = this[key] as? Boolean ?: fallback
+
+@Suppress("UNCHECKED_CAST")
+private fun Map<String, Any?>.list(key: String) = (this[key] as? List<Map<String, Any?>>) ?: emptyList()
+
+private fun parseConfig(c: Map<String, Any?>) = ConnectConfig(
+    host = c.str("host") ?: throw SshCodedException("SSH_CONNECT", "No host"),
+    port = c.int("port", 22).toUShort(),
+    username = c.str("username") ?: "",
+    password = c.str("password"),
+    privateKey = c.str("privateKey"),
+    passphrase = c.str("passphrase"),
+    certificate = c.str("certificate"),
+    forceKeyboardInteractive = c.bool("forceKeyboardInteractive", false),
+    tryKeyboard = c.bool("tryKeyboard", true),
+    allowLegacyAlgorithms = c.bool("allowLegacyAlgorithms", true),
+    connectTimeoutSecs = c.int("connectTimeoutSecs", 15).toUInt(),
+    keepaliveIntervalSecs = c.int("keepaliveIntervalSecs", 30).toUInt(),
+    keepaliveCountMax = c.int("keepaliveCountMax", 5).toUInt(),
+    proxies = c.list("proxies").map {
+        ProxyHop(
+            kind = when (it.str("kind")) {
+                "socks4" -> ProxyKind.SOCKS4
+                "http" -> ProxyKind.HTTP
+                else -> ProxyKind.SOCKS5
+            },
+            host = it.str("host") ?: "",
+            port = it.int("port", 1080).toUShort(),
+            username = it.str("username"),
+            password = it.str("password"),
+        )
+    },
+    portKnock = c.list("portKnock").map {
+        PortKnock(port = it.int("port", 0).toUShort(), udp = it.bool("udp", false), delayMs = it.int("delayMs", 100).toUInt())
+    },
+)
 
 private fun HostKeyInfo.toMap() = mapOf(
     "host" to host,
@@ -63,54 +128,128 @@ private fun HostKeyInfo.toMap() = mapOf(
     "principals" to principals,
 )
 
+private fun FileEntry.toMap() = mapOf(
+    "name" to name, "size" to size.toDouble(), "isDir" to isDir, "isSymlink" to isSymlink,
+    "permissions" to permissions.toInt(), "mtime" to mtime.toDouble(), "atime" to atime.toDouble(),
+    "uid" to uid?.toInt(), "gid" to gid?.toInt(), "linkTarget" to linkTarget,
+)
+
+private fun sessionInfo(s: Session) = mapOf(
+    "hostKey" to s.hostKey().toMap(),
+    "algorithms" to s.algorithms()?.let {
+        mapOf("kex" to it.kex, "hostKey" to it.hostKey, "cipher" to it.cipher, "mac" to it.mac)
+    },
+)
+
+private fun DisconnectKind.label() = when (this) {
+    DisconnectKind.SERVER -> "server"
+    DisconnectKind.KEEPALIVE -> "keepalive"
+    DisconnectKind.NETWORK -> "network"
+    DisconnectKind.LOCAL -> "local"
+}
+
 private class Live(val session: Session) {
     @Volatile var sftp: Sftp? = null
+
+    fun destroy() {
+        sftp?.destroy()
+        sftp = null
+        session.destroy()
+    }
 }
+
+/** A channel object plus the session it belongs to, so a dropped session can clean up after itself. */
+private class Owned<T>(val sessionId: String, val value: T)
+
+private class Pending<T>(val sessionId: String, val answer: CompletableDeferred<T>)
 
 class TermixSshModule : Module() {
     private val sessions = ConcurrentHashMap<String, Live>()
-    private val shells = ConcurrentHashMap<String, Shell>()
-    private val forwards = ConcurrentHashMap<String, Forward>()
-    private val hostKeyAnswers = ConcurrentHashMap<String, CompletableDeferred<Boolean>>()
-    private val kbdAnswers = ConcurrentHashMap<String, CompletableDeferred<List<String>?>>()
+    private val shells = ConcurrentHashMap<String, Owned<Shell>>()
+    private val execs = ConcurrentHashMap<String, Owned<ExecHandle>>()
+    private val forwards = ConcurrentHashMap<String, Owned<Forward>>()
+    private val cancels = ConcurrentHashMap<String, CancelToken>()
+    private val hostKeyAnswers = ConcurrentHashMap<String, Pending<Boolean>>()
+    private val kbdAnswers = ConcurrentHashMap<String, Pending<List<String>?>>()
+    private val requestIds = AtomicLong()
 
     private fun live(id: String) = sessions[id] ?: throw SshCodedException("SSH_DISCONNECTED", "No session $id")
 
     private suspend fun sftp(id: String): Sftp {
         val l = live(id)
-        return l.sftp ?: l.session.openSftp().also { l.sftp = it }
+        return l.sftp ?: ssh { l.session.openSftp() }.also { l.sftp = it }
+    }
+
+    // Runs a cancellable call; `cancel(opId)` from JS fires the token.
+    private suspend fun <T> withCancel(opId: String, block: suspend (CancelToken) -> T): T {
+        val token = CancelToken()
+        cancels[opId] = token
+        try {
+            return ssh { block(token) }
+        } finally {
+            cancels.remove(opId)
+            token.destroy()
+        }
+    }
+
+    // The server dropped the session: close its channels but keep the record so JS can reconnect.
+    private fun dropChannels(sessionId: String) {
+        sessions[sessionId]?.let { l -> l.sftp?.destroy(); l.sftp = null }
+        shells.entries.removeIf { (_, o) -> (o.sessionId == sessionId).also { if (it) o.value.destroy() } }
+        execs.entries.removeIf { (_, o) -> (o.sessionId == sessionId).also { if (it) o.value.destroy() } }
+        forwards.entries.removeIf { (_, o) ->
+            (o.sessionId == sessionId).also { if (it) { o.value.stop(); o.value.destroy() } }
+        }
     }
 
     private fun callbacks(id: String) = object : SessionCallbacks {
         override suspend fun verifyHostKey(info: HostKeyInfo): Boolean {
-            val answer = CompletableDeferred<Boolean>()
-            hostKeyAnswers[id] = answer
-            sendEvent("onHostKey", mapOf("sessionId" to id, "hostKey" to info.toMap()))
-            return (withTimeoutOrNull(PROMPT_TIMEOUT_MS) { answer.await() } ?: false).also { hostKeyAnswers.remove(id) }
+            val requestId = "hk${requestIds.incrementAndGet()}"
+            val pending = Pending(id, CompletableDeferred<Boolean>())
+            hostKeyAnswers[requestId] = pending
+            try {
+                sendEvent("onHostKey", mapOf("sessionId" to id, "requestId" to requestId, "hostKey" to info.toMap()))
+                return withTimeoutOrNull(PROMPT_TIMEOUT_MS) { pending.answer.await() } ?: false
+            } finally {
+                hostKeyAnswers.remove(requestId)
+            }
         }
 
         override suspend fun keyboardInteractive(request: KbdRequest): List<String>? {
-            val answer = CompletableDeferred<List<String>?>()
-            kbdAnswers[id] = answer
-            sendEvent(
-                "onKeyboardInteractive",
-                mapOf(
-                    "sessionId" to id,
-                    "request" to mapOf(
-                        "name" to request.name,
-                        "instructions" to request.instructions,
-                        "prompts" to request.prompts.map { mapOf("prompt" to it.prompt, "echo" to it.echo) },
-                        "round" to request.round.toInt(),
+            val requestId = "kb${requestIds.incrementAndGet()}"
+            val pending = Pending(id, CompletableDeferred<List<String>?>())
+            kbdAnswers[requestId] = pending
+            try {
+                sendEvent(
+                    "onKeyboardInteractive",
+                    mapOf(
+                        "sessionId" to id,
+                        "requestId" to requestId,
+                        "request" to mapOf(
+                            "name" to request.name,
+                            "instructions" to request.instructions,
+                            "prompts" to request.prompts.map { mapOf("prompt" to it.prompt, "echo" to it.echo) },
+                            "round" to request.round.toInt(),
+                        ),
                     ),
-                ),
-            )
-            return withTimeoutOrNull(PROMPT_TIMEOUT_MS) { answer.await() }.also { kbdAnswers.remove(id) }
+                )
+                return withTimeoutOrNull(PROMPT_TIMEOUT_MS) { pending.answer.await() }
+            } finally {
+                kbdAnswers.remove(requestId)
+            }
         }
 
         override fun onBanner(banner: String) = sendEvent("onBanner", mapOf("sessionId" to id, "banner" to banner))
 
-        override fun onDisconnect(reason: String) {
-            sendEvent("onDisconnect", mapOf("sessionId" to id, "reason" to reason))
+        override fun onDisconnect(kind: DisconnectKind, reason: String) {
+            dropChannels(id)
+            sendEvent("onDisconnect", mapOf("sessionId" to id, "kind" to kind.label(), "reason" to reason))
+        }
+    }
+
+    private fun progress(opId: String) = object : ProgressCallback {
+        override fun onProgress(done: ULong, total: ULong) {
+            sendEvent("onProgress", mapOf("opId" to opId, "done" to done.toDouble(), "total" to total.toDouble()))
         }
     }
 
@@ -119,58 +258,94 @@ class TermixSshModule : Module() {
 
         Events(
             "onHostKey", "onKeyboardInteractive", "onBanner", "onDisconnect",
-            "onShellData", "onShellExit", "onTransferProgress",
+            "onShellData", "onShellExit", "onExecData", "onExecExit", "onProgress",
         )
 
         Function("engineVersion") { engineVersion() }
 
         AsyncFunction("connect") Coroutine { id: String, c: Map<String, Any?>, parentId: String? ->
-            val config = ConnectConfig(
-                host = c["host"] as String,
-                port = (c["port"] as Number).toInt().toUShort(),
-                username = c["username"] as String,
-                password = c["password"] as String?,
-                privateKey = c["privateKey"] as String?,
-                passphrase = c["passphrase"] as String?,
-                certificate = c["certificate"] as String?,
-                forceKeyboardInteractive = c["forceKeyboardInteractive"] as Boolean? ?: false,
-                allowLegacyAlgorithms = c["allowLegacyAlgorithms"] as Boolean? ?: false,
-                connectTimeoutSecs = ((c["connectTimeoutSecs"] as Number?)?.toInt() ?: 15).toUInt(),
-                keepaliveIntervalSecs = ((c["keepaliveIntervalSecs"] as Number?)?.toInt() ?: 30).toUInt(),
-                keepaliveCountMax = ((c["keepaliveCountMax"] as Number?)?.toInt() ?: 5).toUInt(),
-            )
-            val session = ssh {
-                if (parentId != null) live(parentId).session.connectVia(config, callbacks(id))
-                else connect(config, callbacks(id))
+            val config = parseConfig(c)
+            val session = withCancel(id) { token ->
+                if (parentId != null) live(parentId).session.connectVia(config, callbacks(id), token)
+                else connect(config, callbacks(id), token)
             }
             sessions[id] = Live(session)
-            mapOf(
-                "hostKey" to session.hostKey().toMap(),
-                "algorithms" to session.algorithms()?.let {
-                    mapOf("kex" to it.kex, "hostKey" to it.hostKey, "cipher" to it.cipher, "mac" to it.mac)
-                },
-            )
+            sessionInfo(session)
         }
 
-        Function("answerHostKey") { id: String, accept: Boolean -> hostKeyAnswers[id]?.complete(accept) }
+        AsyncFunction("reconnect") Coroutine { id: String ->
+            val old = live(id)
+            val fresh = withCancel(id) { token -> old.session.reconnect(token) }
+            sessions[id] = Live(fresh)
+            dropChannels(id)
+            old.destroy()
+            sessionInfo(fresh)
+        }
 
-        Function("answerKeyboardInteractive") { id: String, answers: List<String>? -> kbdAnswers[id]?.complete(answers) }
+        Function("cancel") { opId: String ->
+            cancels[opId]?.cancel()
+            // A login waiting on the user gives up right away.
+            hostKeyAnswers.values.filter { it.sessionId == opId }.forEach { it.answer.complete(false) }
+            kbdAnswers.values.filter { it.sessionId == opId }.forEach { it.answer.complete(null) }
+        }
+
+        Function("answerHostKey") { requestId: String, accept: Boolean -> hostKeyAnswers[requestId]?.answer?.complete(accept) }
+
+        Function("answerKeyboardInteractive") { requestId: String, answers: List<String>? ->
+            kbdAnswers[requestId]?.answer?.complete(answers)
+        }
 
         Function("isClosed") { id: String -> sessions[id]?.session?.isClosed() ?: true }
 
-        AsyncFunction("ping") Coroutine { id: String -> ssh { live(id).session.ping() } }
+        AsyncFunction("ping") Coroutine { id: String, timeoutSecs: Int -> ssh { live(id).session.ping(timeoutSecs.toUInt()) } }
 
         AsyncFunction("disconnect") Coroutine { id: String ->
             val l = sessions.remove(id) ?: return@Coroutine
+            dropChannels(id)
             runCatching { l.session.disconnect() }
-            l.sftp?.destroy()
-            l.session.destroy()
+            l.destroy()
         }
 
-        AsyncFunction("exec") Coroutine { id: String, command: String ->
-            val r = ssh { live(id).session.exec(command) }
-            mapOf("stdout" to b64(r.stdout), "stderr" to b64(r.stderr), "exitCode" to r.exitCode?.toInt())
+        AsyncFunction("exec") Coroutine { id: String, opId: String, command: String, timeoutSecs: Int, maxBytes: Double ->
+            val r = withCancel(opId) { token ->
+                live(id).session.exec(command, timeoutSecs.toUInt(), maxBytes.toLong().toULong(), token)
+            }
+            mapOf(
+                "stdout" to b64(r.stdout), "stderr" to b64(r.stderr), "exitCode" to r.exitCode?.toInt(),
+                "exitSignal" to r.exitSignal, "truncated" to r.truncated,
+            )
         }
+
+        AsyncFunction("execStream") Coroutine { id: String, execId: String, command: String, pty: Map<String, Any?>? ->
+            val size = pty?.let { PtySize(it.str("term") ?: "xterm-256color", it.int("cols", 80).toUInt(), it.int("rows", 24).toUInt()) }
+            val handle = ssh {
+                live(id).session.execStream(
+                    command, size,
+                    object : ExecCallbacks {
+                        override fun onStdout(data: ByteArray) =
+                            sendEvent("onExecData", mapOf("execId" to execId, "stream" to "stdout", "data" to b64(data)))
+                        override fun onStderr(data: ByteArray) =
+                            sendEvent("onExecData", mapOf("execId" to execId, "stream" to "stderr", "data" to b64(data)))
+                        override fun onExit(exitCode: UInt?, exitSignal: String?) {
+                            execs.remove(execId)?.value?.destroy()
+                            sendEvent("onExecExit", mapOf("execId" to execId, "exitCode" to exitCode?.toInt(), "exitSignal" to exitSignal))
+                        }
+                    },
+                )
+            }
+            execs[execId] = Owned(id, handle)
+        }
+
+        AsyncFunction("execWrite") Coroutine { execId: String, data: String ->
+            val h = execs[execId]?.value ?: throw SshCodedException("SSH_DISCONNECTED", "Command ended")
+            ssh { h.write(unb64(data)) }
+        }
+
+        AsyncFunction("execEof") Coroutine { execId: String -> execs[execId]?.value?.let { ssh { it.eof() } } }
+
+        AsyncFunction("execSignal") Coroutine { execId: String, name: String -> execs[execId]?.value?.let { ssh { it.signal(name) } } }
+
+        AsyncFunction("execClose") Coroutine { execId: String -> execs[execId]?.value?.let { runCatching { it.end() } } }
 
         AsyncFunction("openShell") Coroutine { id: String, shellId: String, term: String, cols: Int, rows: Int, env: Map<String, String> ->
             val shell = ssh {
@@ -178,81 +353,138 @@ class TermixSshModule : Module() {
                     term, cols.toUInt(), rows.toUInt(), env.map { EnvVar(it.key, it.value) },
                     object : ShellCallbacks {
                         override fun onData(data: ByteArray) = sendEvent("onShellData", mapOf("shellId" to shellId, "data" to b64(data)))
-                        override fun onExit(exitCode: UInt?) {
-                            shells.remove(shellId)?.destroy()
-                            sendEvent("onShellExit", mapOf("shellId" to shellId, "exitCode" to exitCode?.toInt()))
+                        override fun onExit(exitCode: UInt?, exitSignal: String?) {
+                            shells.remove(shellId)?.value?.destroy()
+                            sendEvent("onShellExit", mapOf("shellId" to shellId, "exitCode" to exitCode?.toInt(), "exitSignal" to exitSignal))
                         }
                     },
                 )
             }
-            shells[shellId] = shell
+            shells[shellId] = Owned(id, shell)
         }
 
         AsyncFunction("writeShell") Coroutine { shellId: String, data: String ->
-            val shell = shells[shellId] ?: throw SshCodedException("SSH_DISCONNECTED", "Shell closed")
-            ssh { shell.write(Base64.decode(data, Base64.DEFAULT)) }
+            val shell = shells[shellId]?.value ?: throw SshCodedException("SSH_DISCONNECTED", "Shell closed")
+            ssh { shell.write(unb64(data)) }
         }
 
         AsyncFunction("resizeShell") Coroutine { shellId: String, cols: Int, rows: Int ->
-            shells[shellId]?.let { ssh { it.resize(cols.toUInt(), rows.toUInt()) } }
+            shells[shellId]?.value?.let { ssh { it.resize(cols.toUInt(), rows.toUInt()) } }
+        }
+
+        AsyncFunction("signalShell") Coroutine { shellId: String, name: String ->
+            shells[shellId]?.value?.let { ssh { it.signal(name) } }
         }
 
         AsyncFunction("closeShell") Coroutine { shellId: String ->
-            shells[shellId]?.let { s -> runCatching { s.end() } }
+            shells[shellId]?.value?.let { s -> runCatching { s.end() } }
         }
 
-        AsyncFunction("sftpList") Coroutine { id: String, path: String ->
-            ssh { sftp(id).list(path) }.map {
-                mapOf(
-                    "name" to it.name, "size" to it.size.toDouble(), "isDir" to it.isDir, "isSymlink" to it.isSymlink,
-                    "permissions" to it.permissions.toInt(), "mtime" to it.mtime.toDouble(),
-                )
-            }
-        }
+        AsyncFunction("sftpList") Coroutine { id: String, path: String -> ssh { sftp(id).list(path) }.map { it.toMap() } }
+
+        AsyncFunction("sftpStat") Coroutine { id: String, path: String -> ssh { sftp(id).stat(path) }.toMap() }
+
+        AsyncFunction("sftpLstat") Coroutine { id: String, path: String -> ssh { sftp(id).lstat(path) }.toMap() }
 
         AsyncFunction("sftpSize") Coroutine { id: String, path: String -> ssh { sftp(id).size(path) }.toDouble() }
 
-        AsyncFunction("sftpDownload") Coroutine { id: String, transferId: String, remote: String, local: String ->
-            val r = ssh { sftp(id).download(remote, localPath(local), progress(transferId)) }
-            mapOf("bytes" to r.bytes.toDouble(), "millis" to r.millis.toDouble())
-        }
+        AsyncFunction("sftpRealpath") Coroutine { id: String, path: String -> ssh { sftp(id).realpath(path) } }
 
-        AsyncFunction("sftpUpload") Coroutine { id: String, transferId: String, local: String, remote: String ->
-            val r = ssh { sftp(id).upload(localPath(local), remote, progress(transferId)) }
-            mapOf("bytes" to r.bytes.toDouble(), "millis" to r.millis.toDouble())
-        }
+        AsyncFunction("sftpReadLink") Coroutine { id: String, path: String -> ssh { sftp(id).readLink(path) } }
+
+        AsyncFunction("sftpSymlink") Coroutine { id: String, path: String, target: String -> ssh { sftp(id).symlink(path, target) } }
+
+        AsyncFunction("sftpMkdir") Coroutine { id: String, path: String, mode: Int? -> ssh { sftp(id).mkdir(path, mode?.toUInt()) } }
+
+        AsyncFunction("sftpRmdir") Coroutine { id: String, path: String -> ssh { sftp(id).rmdir(path) } }
+
+        AsyncFunction("sftpRename") Coroutine { id: String, from: String, to: String -> ssh { sftp(id).rename(from, to) } }
+
+        AsyncFunction("sftpChmod") Coroutine { id: String, path: String, mode: Int -> ssh { sftp(id).chmod(path, mode.toUInt()) } }
 
         AsyncFunction("sftpRemove") Coroutine { id: String, path: String -> ssh { sftp(id).remove(path) } }
 
+        AsyncFunction("sftpRemoveRecursive") Coroutine { id: String, opId: String, path: String ->
+            val s = sftp(id)
+            withCancel(opId) { token -> s.removeRecursive(path, progress(opId), token) }.toDouble()
+        }
+
+        AsyncFunction("sftpReadFile") Coroutine { id: String, path: String, maxBytes: Double ->
+            b64(ssh { sftp(id).readFile(path, maxBytes.toLong().toULong()) })
+        }
+
+        AsyncFunction("sftpWriteFile") Coroutine { id: String, path: String, data: String, mode: Int? ->
+            ssh { sftp(id).writeFile(path, unb64(data), mode?.toUInt()) }
+        }
+
+        AsyncFunction("sftpDownload") Coroutine { id: String, opId: String, remote: String, local: String, offset: Double ->
+            val s = sftp(id)
+            val r = withCancel(opId) { token -> s.download(remote, localPath(local), offset.toLong().toULong(), progress(opId), token) }
+            mapOf("bytes" to r.bytes.toDouble(), "millis" to r.millis.toDouble())
+        }
+
+        AsyncFunction("sftpUpload") Coroutine { id: String, opId: String, local: String, remote: String, offset: Double ->
+            val s = sftp(id)
+            val r = withCancel(opId) { token -> s.upload(localPath(local), remote, offset.toLong().toULong(), progress(opId), token) }
+            mapOf("bytes" to r.bytes.toDouble(), "millis" to r.millis.toDouble())
+        }
+
         AsyncFunction("forwardLocal") Coroutine { id: String, forwardId: String, bindHost: String, bindPort: Int, host: String, port: Int ->
             val f = ssh { live(id).session.forwardLocal(bindHost, bindPort.toUShort(), host, port.toUShort()) }
-            forwards[forwardId] = f
+            forwards[forwardId] = Owned(id, f)
             f.port().toInt()
         }
 
         AsyncFunction("forwardDynamic") Coroutine { id: String, forwardId: String, bindHost: String, bindPort: Int ->
             val f = ssh { live(id).session.forwardDynamic(bindHost, bindPort.toUShort()) }
-            forwards[forwardId] = f
+            forwards[forwardId] = Owned(id, f)
             f.port().toInt()
         }
 
-        Function("closeForward") { forwardId: String ->
-            forwards.remove(forwardId)?.let { it.stop(); it.destroy() }
+        AsyncFunction("forwardRemote") Coroutine { id: String, forwardId: String, remoteHost: String, remotePort: Int, localHost: String, localPort: Int ->
+            val f = ssh { live(id).session.forwardRemote(remoteHost, remotePort.toUShort(), localHost, localPort.toUShort()) }
+            forwards[forwardId] = Owned(id, f)
+            f.port().toInt()
+        }
+
+        AsyncFunction("closeForward") Coroutine { forwardId: String ->
+            forwards.remove(forwardId)?.value?.let { f ->
+                runCatching { f.shutdown() }
+                f.destroy()
+            }
+        }
+
+        Function("inspectKey") { text: String, passphrase: String? ->
+            val k = sshSync { inspectKey(text, passphrase) }
+            mapOf(
+                "keyType" to k.keyType, "bits" to k.bits.toInt(), "sha256" to k.sha256, "publicOpenssh" to k.publicOpenssh,
+                "encrypted" to k.encrypted, "format" to k.format, "comment" to k.comment,
+            )
+        }
+
+        Function("convertKeyToOpenssh") { text: String, passphrase: String?, newPassphrase: String? ->
+            sshSync { convertKeyToOpenssh(text, passphrase, newPassphrase) }
+        }
+
+        Function("inspectCertificate") { text: String ->
+            val c = sshSync { inspectCertificate(text) }
+            mapOf(
+                "keyType" to c.keyType, "keyId" to c.keyId, "serial" to c.serial.toDouble(), "principals" to c.principals,
+                "validAfter" to c.validAfter.toDouble(), "validBefore" to c.validBefore.toDouble(),
+                "caSha256" to c.caSha256, "isHost" to c.isHost,
+            )
         }
 
         OnDestroy {
-            forwards.values.forEach { it.stop(); it.destroy() }
+            cancels.values.forEach { it.cancel() }
+            forwards.values.forEach { it.value.stop(); it.value.destroy() }
             forwards.clear()
-            shells.values.forEach { it.destroy() }
+            execs.values.forEach { it.value.destroy() }
+            execs.clear()
+            shells.values.forEach { it.value.destroy() }
             shells.clear()
-            sessions.values.forEach { it.sftp?.destroy(); it.session.destroy() }
+            sessions.values.forEach { it.destroy() }
             sessions.clear()
-        }
-    }
-
-    private fun progress(transferId: String) = object : ProgressCallback {
-        override fun onProgress(done: ULong, total: ULong) {
-            sendEvent("onTransferProgress", mapOf("transferId" to transferId, "done" to done.toDouble(), "total" to total.toDouble()))
         }
     }
 }

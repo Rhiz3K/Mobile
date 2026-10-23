@@ -657,6 +657,15 @@ internal open class UniffiForeignFutureResultVoid(
 internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
     fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultVoid.UniffiByValue,)
 }
+internal interface UniffiCallbackInterfaceExecCallbacksMethod0 : com.sun.jna.Callback {
+    fun callback(`uniffiHandle`: Long,`data`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,)
+}
+internal interface UniffiCallbackInterfaceExecCallbacksMethod1 : com.sun.jna.Callback {
+    fun callback(`uniffiHandle`: Long,`data`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,)
+}
+internal interface UniffiCallbackInterfaceExecCallbacksMethod2 : com.sun.jna.Callback {
+    fun callback(`uniffiHandle`: Long,`exitCode`: RustBuffer.ByValue,`exitSignal`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,)
+}
 internal interface UniffiCallbackInterfaceProgressCallbackMethod0 : com.sun.jna.Callback {
     fun callback(`uniffiHandle`: Long,`done`: Long,`total`: Long,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,)
 }
@@ -670,13 +679,38 @@ internal interface UniffiCallbackInterfaceSessionCallbacksMethod2 : com.sun.jna.
     fun callback(`uniffiHandle`: Long,`banner`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,)
 }
 internal interface UniffiCallbackInterfaceSessionCallbacksMethod3 : com.sun.jna.Callback {
-    fun callback(`uniffiHandle`: Long,`reason`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,)
+    fun callback(`uniffiHandle`: Long,`kind`: RustBuffer.ByValue,`reason`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,)
 }
 internal interface UniffiCallbackInterfaceShellCallbacksMethod0 : com.sun.jna.Callback {
     fun callback(`uniffiHandle`: Long,`data`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,)
 }
 internal interface UniffiCallbackInterfaceShellCallbacksMethod1 : com.sun.jna.Callback {
-    fun callback(`uniffiHandle`: Long,`exitCode`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,)
+    fun callback(`uniffiHandle`: Long,`exitCode`: RustBuffer.ByValue,`exitSignal`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,)
+}
+@Structure.FieldOrder("uniffiFree", "uniffiClone", "onStdout", "onStderr", "onExit")
+internal open class UniffiVTableCallbackInterfaceExecCallbacks(
+    @JvmField internal var `uniffiFree`: UniffiCallbackInterfaceFree? = null,
+    @JvmField internal var `uniffiClone`: UniffiCallbackInterfaceClone? = null,
+    @JvmField internal var `onStdout`: UniffiCallbackInterfaceExecCallbacksMethod0? = null,
+    @JvmField internal var `onStderr`: UniffiCallbackInterfaceExecCallbacksMethod1? = null,
+    @JvmField internal var `onExit`: UniffiCallbackInterfaceExecCallbacksMethod2? = null,
+) : Structure() {
+    class UniffiByValue(
+        `uniffiFree`: UniffiCallbackInterfaceFree? = null,
+        `uniffiClone`: UniffiCallbackInterfaceClone? = null,
+        `onStdout`: UniffiCallbackInterfaceExecCallbacksMethod0? = null,
+        `onStderr`: UniffiCallbackInterfaceExecCallbacksMethod1? = null,
+        `onExit`: UniffiCallbackInterfaceExecCallbacksMethod2? = null,
+    ): UniffiVTableCallbackInterfaceExecCallbacks(`uniffiFree`,`uniffiClone`,`onStdout`,`onStderr`,`onExit`,), Structure.ByValue
+
+   internal fun uniffiSetValue(other: UniffiVTableCallbackInterfaceExecCallbacks) {
+        `uniffiFree` = other.`uniffiFree`
+        `uniffiClone` = other.`uniffiClone`
+        `onStdout` = other.`onStdout`
+        `onStderr` = other.`onStderr`
+        `onExit` = other.`onExit`
+    }
+
 }
 @Structure.FieldOrder("uniffiFree", "uniffiClone", "onProgress")
 internal open class UniffiVTableCallbackInterfaceProgressCallback(
@@ -774,7 +808,19 @@ internal object IntegrityCheckingUniffiLib {
     internal fun ensureInitialized() = Unit
     external fun uniffi_termix_ssh_core_checksum_func_engine_version(
     ): Int
+    external fun uniffi_termix_ssh_core_checksum_func_convert_key_to_openssh(
+    ): Int
+    external fun uniffi_termix_ssh_core_checksum_func_inspect_certificate(
+    ): Int
+    external fun uniffi_termix_ssh_core_checksum_func_inspect_key(
+    ): Int
     external fun uniffi_termix_ssh_core_checksum_func_connect(
+    ): Int
+    external fun uniffi_termix_ssh_core_checksum_method_execcallbacks_on_stdout(
+    ): Int
+    external fun uniffi_termix_ssh_core_checksum_method_execcallbacks_on_stderr(
+    ): Int
+    external fun uniffi_termix_ssh_core_checksum_method_execcallbacks_on_exit(
     ): Int
     external fun uniffi_termix_ssh_core_checksum_method_progresscallback_on_progress(
     ): Int
@@ -790,13 +836,33 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_termix_ssh_core_checksum_method_shellcallbacks_on_exit(
     ): Int
+    external fun uniffi_termix_ssh_core_checksum_method_canceltoken_cancel(
+    ): Int
+    external fun uniffi_termix_ssh_core_checksum_method_canceltoken_is_cancelled(
+    ): Int
+    external fun uniffi_termix_ssh_core_checksum_method_exechandle_end(
+    ): Int
+    external fun uniffi_termix_ssh_core_checksum_method_exechandle_eof(
+    ): Int
+    external fun uniffi_termix_ssh_core_checksum_method_exechandle_signal(
+    ): Int
+    external fun uniffi_termix_ssh_core_checksum_method_exechandle_write(
+    ): Int
     external fun uniffi_termix_ssh_core_checksum_method_forward_port(
     ): Int
+    external fun uniffi_termix_ssh_core_checksum_method_forward_shutdown(
+    ): Int
     external fun uniffi_termix_ssh_core_checksum_method_forward_stop(
+    ): Int
+    external fun uniffi_termix_ssh_core_checksum_method_session_exec(
+    ): Int
+    external fun uniffi_termix_ssh_core_checksum_method_session_exec_stream(
     ): Int
     external fun uniffi_termix_ssh_core_checksum_method_session_forward_dynamic(
     ): Int
     external fun uniffi_termix_ssh_core_checksum_method_session_forward_local(
+    ): Int
+    external fun uniffi_termix_ssh_core_checksum_method_session_forward_remote(
     ): Int
     external fun uniffi_termix_ssh_core_checksum_method_session_algorithms(
     ): Int
@@ -804,35 +870,63 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_termix_ssh_core_checksum_method_session_disconnect(
     ): Int
-    external fun uniffi_termix_ssh_core_checksum_method_session_exec(
-    ): Int
     external fun uniffi_termix_ssh_core_checksum_method_session_host_key(
     ): Int
     external fun uniffi_termix_ssh_core_checksum_method_session_is_closed(
     ): Int
     external fun uniffi_termix_ssh_core_checksum_method_session_ping(
     ): Int
+    external fun uniffi_termix_ssh_core_checksum_method_session_reconnect(
+    ): Int
     external fun uniffi_termix_ssh_core_checksum_method_session_open_sftp(
     ): Int
     external fun uniffi_termix_ssh_core_checksum_method_session_open_shell(
+    ): Int
+    external fun uniffi_termix_ssh_core_checksum_method_sftp_chmod(
     ): Int
     external fun uniffi_termix_ssh_core_checksum_method_sftp_download(
     ): Int
     external fun uniffi_termix_ssh_core_checksum_method_sftp_list(
     ): Int
+    external fun uniffi_termix_ssh_core_checksum_method_sftp_lstat(
+    ): Int
+    external fun uniffi_termix_ssh_core_checksum_method_sftp_mkdir(
+    ): Int
+    external fun uniffi_termix_ssh_core_checksum_method_sftp_read_file(
+    ): Int
+    external fun uniffi_termix_ssh_core_checksum_method_sftp_read_link(
+    ): Int
+    external fun uniffi_termix_ssh_core_checksum_method_sftp_realpath(
+    ): Int
     external fun uniffi_termix_ssh_core_checksum_method_sftp_remove(
+    ): Int
+    external fun uniffi_termix_ssh_core_checksum_method_sftp_remove_recursive(
+    ): Int
+    external fun uniffi_termix_ssh_core_checksum_method_sftp_rename(
+    ): Int
+    external fun uniffi_termix_ssh_core_checksum_method_sftp_rmdir(
     ): Int
     external fun uniffi_termix_ssh_core_checksum_method_sftp_shutdown(
     ): Int
     external fun uniffi_termix_ssh_core_checksum_method_sftp_size(
     ): Int
+    external fun uniffi_termix_ssh_core_checksum_method_sftp_stat(
+    ): Int
+    external fun uniffi_termix_ssh_core_checksum_method_sftp_symlink(
+    ): Int
     external fun uniffi_termix_ssh_core_checksum_method_sftp_upload(
+    ): Int
+    external fun uniffi_termix_ssh_core_checksum_method_sftp_write_file(
     ): Int
     external fun uniffi_termix_ssh_core_checksum_method_shell_end(
     ): Int
     external fun uniffi_termix_ssh_core_checksum_method_shell_resize(
     ): Int
+    external fun uniffi_termix_ssh_core_checksum_method_shell_signal(
+    ): Int
     external fun uniffi_termix_ssh_core_checksum_method_shell_write(
+    ): Int
+    external fun uniffi_termix_ssh_core_checksum_constructor_canceltoken_new(
     ): Int
     external fun ffi_termix_ssh_core_uniffi_contract_version(
     ): Int
@@ -850,6 +944,7 @@ internal object UniffiLib {
 
     init {
         Native.register(UniffiLib::class.java, findLibraryName(componentName = "termix_ssh_core"))
+        uniffiCallbackInterfaceExecCallbacks.register(this)
         uniffiCallbackInterfaceProgressCallback.register(this)
         uniffiCallbackInterfaceSessionCallbacks.register(this)
         uniffiCallbackInterfaceShellCallbacks.register(this)
@@ -857,6 +952,18 @@ internal object UniffiLib {
     }
 
     internal fun ensureInitialized() = Unit
+    external fun uniffi_termix_ssh_core_fn_clone_execcallbacks(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Long
+    external fun uniffi_termix_ssh_core_fn_free_execcallbacks(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_termix_ssh_core_fn_init_callback_vtable_execcallbacks(`vtable`: UniffiVTableCallbackInterfaceExecCallbacks,
+    ): Unit
+    external fun uniffi_termix_ssh_core_fn_method_execcallbacks_on_stdout(`ptr`: Long,`data`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_termix_ssh_core_fn_method_execcallbacks_on_stderr(`ptr`: Long,`data`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_termix_ssh_core_fn_method_execcallbacks_on_exit(`ptr`: Long,`exitCode`: RustBuffer.ByValue,`exitSignal`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
     external fun uniffi_termix_ssh_core_fn_clone_progresscallback(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
     external fun uniffi_termix_ssh_core_fn_free_progresscallback(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
@@ -877,7 +984,7 @@ internal object UniffiLib {
     ): Long
     external fun uniffi_termix_ssh_core_fn_method_sessioncallbacks_on_banner(`ptr`: Long,`banner`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
-    external fun uniffi_termix_ssh_core_fn_method_sessioncallbacks_on_disconnect(`ptr`: Long,`reason`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    external fun uniffi_termix_ssh_core_fn_method_sessioncallbacks_on_disconnect(`ptr`: Long,`kind`: RustBuffer.ByValue,`reason`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_termix_ssh_core_fn_clone_shellcallbacks(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
@@ -887,37 +994,67 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_termix_ssh_core_fn_method_shellcallbacks_on_data(`ptr`: Long,`data`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
-    external fun uniffi_termix_ssh_core_fn_method_shellcallbacks_on_exit(`ptr`: Long,`exitCode`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    external fun uniffi_termix_ssh_core_fn_method_shellcallbacks_on_exit(`ptr`: Long,`exitCode`: RustBuffer.ByValue,`exitSignal`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
+    external fun uniffi_termix_ssh_core_fn_clone_canceltoken(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Long
+    external fun uniffi_termix_ssh_core_fn_free_canceltoken(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_termix_ssh_core_fn_constructor_canceltoken_new(uniffi_out_err: UniffiRustCallStatus, 
+    ): Long
+    external fun uniffi_termix_ssh_core_fn_method_canceltoken_cancel(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_termix_ssh_core_fn_method_canceltoken_is_cancelled(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Byte
+    external fun uniffi_termix_ssh_core_fn_clone_exechandle(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Long
+    external fun uniffi_termix_ssh_core_fn_free_exechandle(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_termix_ssh_core_fn_method_exechandle_end(`ptr`: Long,
+    ): Long
+    external fun uniffi_termix_ssh_core_fn_method_exechandle_eof(`ptr`: Long,
+    ): Long
+    external fun uniffi_termix_ssh_core_fn_method_exechandle_signal(`ptr`: Long,`name`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_termix_ssh_core_fn_method_exechandle_write(`ptr`: Long,`data`: RustBuffer.ByValue,
+    ): Long
     external fun uniffi_termix_ssh_core_fn_clone_forward(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
     external fun uniffi_termix_ssh_core_fn_free_forward(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_termix_ssh_core_fn_method_forward_port(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Int
+    external fun uniffi_termix_ssh_core_fn_method_forward_shutdown(`ptr`: Long,
+    ): Long
     external fun uniffi_termix_ssh_core_fn_method_forward_stop(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_termix_ssh_core_fn_clone_session(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
     external fun uniffi_termix_ssh_core_fn_free_session(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
+    external fun uniffi_termix_ssh_core_fn_method_session_exec(`ptr`: Long,`command`: RustBuffer.ByValue,`timeoutSecs`: Int,`maxBytes`: Long,`cancel`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_termix_ssh_core_fn_method_session_exec_stream(`ptr`: Long,`command`: RustBuffer.ByValue,`pty`: RustBuffer.ByValue,`callbacks`: Long,
+    ): Long
     external fun uniffi_termix_ssh_core_fn_method_session_forward_dynamic(`ptr`: Long,`bindHost`: RustBuffer.ByValue,`bindPort`: Short,
     ): Long
     external fun uniffi_termix_ssh_core_fn_method_session_forward_local(`ptr`: Long,`bindHost`: RustBuffer.ByValue,`bindPort`: Short,`remoteHost`: RustBuffer.ByValue,`remotePort`: Short,
     ): Long
+    external fun uniffi_termix_ssh_core_fn_method_session_forward_remote(`ptr`: Long,`remoteBindHost`: RustBuffer.ByValue,`remotePort`: Short,`localHost`: RustBuffer.ByValue,`localPort`: Short,
+    ): Long
     external fun uniffi_termix_ssh_core_fn_method_session_algorithms(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
-    external fun uniffi_termix_ssh_core_fn_method_session_connect_via(`ptr`: Long,`config`: RustBuffer.ByValue,`callbacks`: Long,
+    external fun uniffi_termix_ssh_core_fn_method_session_connect_via(`ptr`: Long,`config`: RustBuffer.ByValue,`callbacks`: Long,`cancel`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_termix_ssh_core_fn_method_session_disconnect(`ptr`: Long,
-    ): Long
-    external fun uniffi_termix_ssh_core_fn_method_session_exec(`ptr`: Long,`command`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_termix_ssh_core_fn_method_session_host_key(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_termix_ssh_core_fn_method_session_is_closed(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Byte
-    external fun uniffi_termix_ssh_core_fn_method_session_ping(`ptr`: Long,
+    external fun uniffi_termix_ssh_core_fn_method_session_ping(`ptr`: Long,`timeoutSecs`: Int,
+    ): Long
+    external fun uniffi_termix_ssh_core_fn_method_session_reconnect(`ptr`: Long,`cancel`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_termix_ssh_core_fn_method_session_open_sftp(`ptr`: Long,
     ): Long
@@ -927,17 +1064,41 @@ internal object UniffiLib {
     ): Long
     external fun uniffi_termix_ssh_core_fn_free_sftp(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
-    external fun uniffi_termix_ssh_core_fn_method_sftp_download(`ptr`: Long,`remote`: RustBuffer.ByValue,`local`: RustBuffer.ByValue,`progress`: RustBuffer.ByValue,
+    external fun uniffi_termix_ssh_core_fn_method_sftp_chmod(`ptr`: Long,`path`: RustBuffer.ByValue,`mode`: Int,
+    ): Long
+    external fun uniffi_termix_ssh_core_fn_method_sftp_download(`ptr`: Long,`remote`: RustBuffer.ByValue,`local`: RustBuffer.ByValue,`offset`: Long,`progress`: RustBuffer.ByValue,`cancel`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_termix_ssh_core_fn_method_sftp_list(`ptr`: Long,`path`: RustBuffer.ByValue,
     ): Long
+    external fun uniffi_termix_ssh_core_fn_method_sftp_lstat(`ptr`: Long,`path`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_termix_ssh_core_fn_method_sftp_mkdir(`ptr`: Long,`path`: RustBuffer.ByValue,`mode`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_termix_ssh_core_fn_method_sftp_read_file(`ptr`: Long,`path`: RustBuffer.ByValue,`maxBytes`: Long,
+    ): Long
+    external fun uniffi_termix_ssh_core_fn_method_sftp_read_link(`ptr`: Long,`path`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_termix_ssh_core_fn_method_sftp_realpath(`ptr`: Long,`path`: RustBuffer.ByValue,
+    ): Long
     external fun uniffi_termix_ssh_core_fn_method_sftp_remove(`ptr`: Long,`path`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_termix_ssh_core_fn_method_sftp_remove_recursive(`ptr`: Long,`path`: RustBuffer.ByValue,`progress`: RustBuffer.ByValue,`cancel`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_termix_ssh_core_fn_method_sftp_rename(`ptr`: Long,`from`: RustBuffer.ByValue,`to`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_termix_ssh_core_fn_method_sftp_rmdir(`ptr`: Long,`path`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_termix_ssh_core_fn_method_sftp_shutdown(`ptr`: Long,
     ): Long
     external fun uniffi_termix_ssh_core_fn_method_sftp_size(`ptr`: Long,`path`: RustBuffer.ByValue,
     ): Long
-    external fun uniffi_termix_ssh_core_fn_method_sftp_upload(`ptr`: Long,`local`: RustBuffer.ByValue,`remote`: RustBuffer.ByValue,`progress`: RustBuffer.ByValue,
+    external fun uniffi_termix_ssh_core_fn_method_sftp_stat(`ptr`: Long,`path`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_termix_ssh_core_fn_method_sftp_symlink(`ptr`: Long,`path`: RustBuffer.ByValue,`target`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_termix_ssh_core_fn_method_sftp_upload(`ptr`: Long,`local`: RustBuffer.ByValue,`remote`: RustBuffer.ByValue,`offset`: Long,`progress`: RustBuffer.ByValue,`cancel`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_termix_ssh_core_fn_method_sftp_write_file(`ptr`: Long,`path`: RustBuffer.ByValue,`data`: RustBuffer.ByValue,`mode`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_termix_ssh_core_fn_clone_shell(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
@@ -947,11 +1108,19 @@ internal object UniffiLib {
     ): Long
     external fun uniffi_termix_ssh_core_fn_method_shell_resize(`ptr`: Long,`cols`: Int,`rows`: Int,
     ): Long
+    external fun uniffi_termix_ssh_core_fn_method_shell_signal(`ptr`: Long,`name`: RustBuffer.ByValue,
+    ): Long
     external fun uniffi_termix_ssh_core_fn_method_shell_write(`ptr`: Long,`data`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_termix_ssh_core_fn_func_engine_version(uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
-    external fun uniffi_termix_ssh_core_fn_func_connect(`config`: RustBuffer.ByValue,`callbacks`: Long,
+    external fun uniffi_termix_ssh_core_fn_func_convert_key_to_openssh(`text`: RustBuffer.ByValue,`passphrase`: RustBuffer.ByValue,`newPassphrase`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_termix_ssh_core_fn_func_inspect_certificate(`text`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_termix_ssh_core_fn_func_inspect_key(`text`: RustBuffer.ByValue,`passphrase`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_termix_ssh_core_fn_func_connect(`config`: RustBuffer.ByValue,`callbacks`: Long,`cancel`: RustBuffer.ByValue,
     ): Long
     external fun ffi_termix_ssh_core_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -1075,7 +1244,25 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_termix_ssh_core_checksum_func_engine_version() and 0xFFFF) != 33488) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_termix_ssh_core_checksum_func_connect() and 0xFFFF) != 7922) {
+    if ((lib.uniffi_termix_ssh_core_checksum_func_convert_key_to_openssh() and 0xFFFF) != 11626) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_termix_ssh_core_checksum_func_inspect_certificate() and 0xFFFF) != 41445) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_termix_ssh_core_checksum_func_inspect_key() and 0xFFFF) != 38327) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_termix_ssh_core_checksum_func_connect() and 0xFFFF) != 5080) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_termix_ssh_core_checksum_method_execcallbacks_on_stdout() and 0xFFFF) != 32055) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_termix_ssh_core_checksum_method_execcallbacks_on_stderr() and 0xFFFF) != 30185) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_termix_ssh_core_checksum_method_execcallbacks_on_exit() and 0xFFFF) != 41475) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_termix_ssh_core_checksum_method_progresscallback_on_progress() and 0xFFFF) != 27852) {
@@ -1090,19 +1277,46 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_termix_ssh_core_checksum_method_sessioncallbacks_on_banner() and 0xFFFF) != 14288) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_termix_ssh_core_checksum_method_sessioncallbacks_on_disconnect() and 0xFFFF) != 23040) {
+    if ((lib.uniffi_termix_ssh_core_checksum_method_sessioncallbacks_on_disconnect() and 0xFFFF) != 29852) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_termix_ssh_core_checksum_method_shellcallbacks_on_data() and 0xFFFF) != 53188) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_termix_ssh_core_checksum_method_shellcallbacks_on_exit() and 0xFFFF) != 19097) {
+    if ((lib.uniffi_termix_ssh_core_checksum_method_shellcallbacks_on_exit() and 0xFFFF) != 50067) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_termix_ssh_core_checksum_method_forward_port() and 0xFFFF) != 29998) {
+    if ((lib.uniffi_termix_ssh_core_checksum_method_canceltoken_cancel() and 0xFFFF) != 35693) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_termix_ssh_core_checksum_method_canceltoken_is_cancelled() and 0xFFFF) != 54838) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_termix_ssh_core_checksum_method_exechandle_end() and 0xFFFF) != 56423) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_termix_ssh_core_checksum_method_exechandle_eof() and 0xFFFF) != 7767) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_termix_ssh_core_checksum_method_exechandle_signal() and 0xFFFF) != 31333) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_termix_ssh_core_checksum_method_exechandle_write() and 0xFFFF) != 59711) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_termix_ssh_core_checksum_method_forward_port() and 0xFFFF) != 22279) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_termix_ssh_core_checksum_method_forward_shutdown() and 0xFFFF) != 22346) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_termix_ssh_core_checksum_method_forward_stop() and 0xFFFF) != 2633) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_termix_ssh_core_checksum_method_session_exec() and 0xFFFF) != 2934) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_termix_ssh_core_checksum_method_session_exec_stream() and 0xFFFF) != 51936) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_termix_ssh_core_checksum_method_session_forward_dynamic() and 0xFFFF) != 61529) {
@@ -1111,16 +1325,16 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_termix_ssh_core_checksum_method_session_forward_local() and 0xFFFF) != 41196) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_termix_ssh_core_checksum_method_session_forward_remote() and 0xFFFF) != 38130) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_termix_ssh_core_checksum_method_session_algorithms() and 0xFFFF) != 49707) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_termix_ssh_core_checksum_method_session_connect_via() and 0xFFFF) != 52915) {
+    if ((lib.uniffi_termix_ssh_core_checksum_method_session_connect_via() and 0xFFFF) != 18926) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_termix_ssh_core_checksum_method_session_disconnect() and 0xFFFF) != 5467) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_termix_ssh_core_checksum_method_session_exec() and 0xFFFF) != 22479) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_termix_ssh_core_checksum_method_session_host_key() and 0xFFFF) != 64742) {
@@ -1129,7 +1343,10 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_termix_ssh_core_checksum_method_session_is_closed() and 0xFFFF) != 33781) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_termix_ssh_core_checksum_method_session_ping() and 0xFFFF) != 664) {
+    if ((lib.uniffi_termix_ssh_core_checksum_method_session_ping() and 0xFFFF) != 15966) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_termix_ssh_core_checksum_method_session_reconnect() and 0xFFFF) != 44892) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_termix_ssh_core_checksum_method_session_open_sftp() and 0xFFFF) != 39640) {
@@ -1138,13 +1355,40 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_termix_ssh_core_checksum_method_session_open_shell() and 0xFFFF) != 31884) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_termix_ssh_core_checksum_method_sftp_download() and 0xFFFF) != 58604) {
+    if ((lib.uniffi_termix_ssh_core_checksum_method_sftp_chmod() and 0xFFFF) != 8107) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_termix_ssh_core_checksum_method_sftp_download() and 0xFFFF) != 48218) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_termix_ssh_core_checksum_method_sftp_list() and 0xFFFF) != 3492) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_termix_ssh_core_checksum_method_sftp_lstat() and 0xFFFF) != 49377) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_termix_ssh_core_checksum_method_sftp_mkdir() and 0xFFFF) != 52954) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_termix_ssh_core_checksum_method_sftp_read_file() and 0xFFFF) != 44081) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_termix_ssh_core_checksum_method_sftp_read_link() and 0xFFFF) != 60858) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_termix_ssh_core_checksum_method_sftp_realpath() and 0xFFFF) != 5579) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_termix_ssh_core_checksum_method_sftp_remove() and 0xFFFF) != 5948) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_termix_ssh_core_checksum_method_sftp_remove_recursive() and 0xFFFF) != 44650) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_termix_ssh_core_checksum_method_sftp_rename() and 0xFFFF) != 7058) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_termix_ssh_core_checksum_method_sftp_rmdir() and 0xFFFF) != 3851) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_termix_ssh_core_checksum_method_sftp_shutdown() and 0xFFFF) != 4984) {
@@ -1153,7 +1397,16 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_termix_ssh_core_checksum_method_sftp_size() and 0xFFFF) != 51437) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_termix_ssh_core_checksum_method_sftp_upload() and 0xFFFF) != 4867) {
+    if ((lib.uniffi_termix_ssh_core_checksum_method_sftp_stat() and 0xFFFF) != 28980) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_termix_ssh_core_checksum_method_sftp_symlink() and 0xFFFF) != 39787) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_termix_ssh_core_checksum_method_sftp_upload() and 0xFFFF) != 6209) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_termix_ssh_core_checksum_method_sftp_write_file() and 0xFFFF) != 33418) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_termix_ssh_core_checksum_method_shell_end() and 0xFFFF) != 21084) {
@@ -1162,7 +1415,13 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_termix_ssh_core_checksum_method_shell_resize() and 0xFFFF) != 30553) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_termix_ssh_core_checksum_method_shell_signal() and 0xFFFF) != 34912) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_termix_ssh_core_checksum_method_shell_write() and 0xFFFF) != 39054) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_termix_ssh_core_checksum_constructor_canceltoken_new() and 0xFFFF) != 54914) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
 }
@@ -1750,18 +2009,1031 @@ public object FfiConverterByteArray: FfiConverterRustBuffer<ByteArray> {
 //
 
 
+/**
+ * Passed into long calls; `cancel()` from any thread stops them with `SshError::Cancelled`.
+ */
+public interface CancelTokenInterface {
+    
+    fun `cancel`()
+    
+    fun `isCancelled`(): kotlin.Boolean
+    
+    companion object
+}
+
+/**
+ * Passed into long calls; `cancel()` from any thread stops them with `SshError::Cancelled`.
+ */
+open class CancelToken: Disposable, AutoCloseable, CancelTokenInterface
+{
+
+    @Suppress("UNUSED_PARAMETER")
+    /**
+     * @suppress
+     */
+    constructor(withHandle: UniffiWithHandle, handle: Long) {
+        this.handle = handle
+        this.cleanable = UniffiLib.CLEANER.register(this, UniffiCleanAction(handle))
+    }
+
+    /**
+     * @suppress
+     *
+     * This constructor can be used to instantiate a fake object. Only used for tests. Any
+     * attempt to actually use an object constructed this way will fail as there is no
+     * connected Rust object.
+     */
+    @Suppress("UNUSED_PARAMETER")
+    constructor(noHandle: NoHandle) {
+        this.handle = 0
+        this.cleanable = null
+    }
+    constructor() :
+        this(UniffiWithHandle, 
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_termix_ssh_core_fn_constructor_canceltoken_new(
+    
+        _status)
+}
+    )
+
+    protected val handle: Long
+    protected val cleanable: UniffiCleaner.Cleanable?
+
+    private val wasDestroyed = AtomicBoolean(false)
+    private val callCounter = AtomicLong(1)
+
+    /**
+     * Whether the current object has been destroyed and its reference is gone in the Rust side.
+     */
+    val uniffiIsDestroyed: Boolean get() = wasDestroyed.get()
+
+    override fun destroy() {
+        // Only allow a single call to this method.
+        // TODO: maybe we should log a warning if called more than once?
+        if (this.wasDestroyed.compareAndSet(false, true)) {
+            // This decrement always matches the initial count of 1 given at creation time.
+            if (this.callCounter.decrementAndGet() == 0L) {
+                cleanable?.clean()
+            }
+        }
+    }
+
+    @Synchronized
+    override fun close() {
+        this.destroy()
+    }
+
+    internal inline fun <R> callWithHandle(block: (handle: Long) -> R): R {
+        // Check and increment the call counter, to keep the object alive.
+        // This needs a compare-and-set retry loop in case of concurrent updates.
+        do {
+            val c = this.callCounter.get()
+            if (c == 0L) {
+                throw IllegalStateException("${this.javaClass.simpleName} object has already been destroyed")
+            }
+            if (c == Long.MAX_VALUE) {
+                throw IllegalStateException("${this.javaClass.simpleName} call counter would overflow")
+            }
+        } while (! this.callCounter.compareAndSet(c, c + 1L))
+        // Now we can safely do the method call without the handle being freed concurrently.
+        try {
+            return block(this.uniffiCloneHandle())
+        } finally {
+            // This decrement always matches the increment we performed above.
+            if (this.callCounter.decrementAndGet() == 0L) {
+                cleanable?.clean()
+            }
+        }
+    }
+
+    // Use a static inner class instead of a closure so as not to accidentally
+    // capture `this` as part of the cleanable's action.
+    private class UniffiCleanAction(private val handle: Long) : Runnable {
+        override fun run() {
+            if (handle == 0.toLong()) {
+                // Fake object created with `NoHandle`, don't try to free.
+                return;
+            }
+            uniffiRustCall { status ->
+                UniffiLib.uniffi_termix_ssh_core_fn_free_canceltoken(handle, status)
+            }
+        }
+    }
+
+    /**
+     * @suppress
+     */
+    fun uniffiCloneHandle(): Long {
+        if (handle == 0.toLong()) {
+            throw InternalException("uniffiCloneHandle() called on NoHandle object");
+        }
+        return uniffiRustCall() { status ->
+            UniffiLib.uniffi_termix_ssh_core_fn_clone_canceltoken(handle, status)
+        }
+    }
+
+    override fun `cancel`()
+        = 
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_termix_ssh_core_fn_method_canceltoken_cancel(
+        it,
+        _status)
+}
+    }
+    
+    
+
+    override fun `isCancelled`(): kotlin.Boolean {
+            return FfiConverterBoolean.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_termix_ssh_core_fn_method_canceltoken_is_cancelled(
+        it,
+        _status)
+}
+    }
+    )
+    }
+    
+
+    
+
+    
+
+
+    
+    
+    /**
+     * @suppress
+     */
+    companion object
+    
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeCancelToken: FfiConverter<CancelToken, Long> {
+    override fun lower(value: CancelToken): Long {
+        return value.uniffiCloneHandle()
+    }
+
+    override fun lift(value: Long): CancelToken {
+        return CancelToken(UniffiWithHandle, value)
+    }
+
+    override fun read(buf: ByteBuffer): CancelToken {
+        return lift(buf.getLong())
+    }
+
+    override fun allocationSize(value: CancelToken) = 8UL
+
+    override fun write(value: CancelToken, buf: ByteBuffer) {
+        buf.putLong(lower(value))
+    }
+}
+
+
+// This template implements a class for working with a Rust struct via a handle
+// to the live Rust struct on the other side of the FFI.
+//
+// There's some subtlety here, because we have to be careful not to operate on a Rust
+// struct after it has been dropped, and because we must expose a public API for freeing
+// theq Kotlin wrapper object in lieu of reliable finalizers. The core requirements are:
+//
+//   * Each instance holds an opaque handle to the underlying Rust struct.
+//     Method calls need to read this handle from the object's state and pass it in to
+//     the Rust FFI.
+//
+//   * When an instance is no longer needed, its handle should be passed to a
+//     special destructor function provided by the Rust FFI, which will drop the
+//     underlying Rust struct.
+//
+//   * Given an instance, calling code is expected to call the special
+//     `destroy` method in order to free it after use, either by calling it explicitly
+//     or by using a higher-level helper like the `use` method. Failing to do so risks
+//     leaking the underlying Rust struct.
+//
+//   * We can't assume that calling code will do the right thing, and must be prepared
+//     to handle Kotlin method calls executing concurrently with or even after a call to
+//     `destroy`, and to handle multiple (possibly concurrent!) calls to `destroy`.
+//
+//   * We must never allow Rust code to operate on the underlying Rust struct after
+//     the destructor has been called, and must never call the destructor more than once.
+//     Doing so may trigger memory unsafety.
+//
+//   * To mitigate many of the risks of leaking memory and use-after-free unsafety, a `Cleaner`
+//     is implemented to call the destructor when the Kotlin object becomes unreachable.
+//     This is done in a background thread. This is not a panacea, and client code should be aware that
+//      1. the thread may starve if some there are objects that have poorly performing
+//     `drop` methods or do significant work in their `drop` methods.
+//      2. the thread is shared across the whole library. This can be tuned by using `android_cleaner = true`,
+//         or `android = true` in the [`kotlin` section of the `uniffi.toml` file](https://mozilla.github.io/uniffi-rs/kotlin/configuration.html).
+//
+// If we try to implement this with mutual exclusion on access to the handle, there is the
+// possibility of a race between a method call and a concurrent call to `destroy`:
+//
+//    * Thread A starts a method call, reads the value of the handle, but is interrupted
+//      before it can pass the handle over the FFI to Rust.
+//    * Thread B calls `destroy` and frees the underlying Rust struct.
+//    * Thread A resumes, passing the already-read handle value to Rust and triggering
+//      a use-after-free.
+//
+// One possible solution would be to use a `ReadWriteLock`, with each method call taking
+// a read lock (and thus allowed to run concurrently) and the special `destroy` method
+// taking a write lock (and thus blocking on live method calls). However, we aim not to
+// generate methods with any hidden blocking semantics, and a `destroy` method that might
+// block if called incorrectly seems to meet that bar.
+//
+// So, we achieve our goals by giving each instance an associated `AtomicLong` counter to track
+// the number of in-flight method calls, and an `AtomicBoolean` flag to indicate whether `destroy`
+// has been called. These are updated according to the following rules:
+//
+//    * The initial value of the counter is 1, indicating a live object with no in-flight calls.
+//      The initial value for the flag is false.
+//
+//    * At the start of each method call, we atomically check the counter.
+//      If it is 0 then the underlying Rust struct has already been destroyed and the call is aborted.
+//      If it is nonzero them we atomically increment it by 1 and proceed with the method call.
+//
+//    * At the end of each method call, we atomically decrement and check the counter.
+//      If it has reached zero then we destroy the underlying Rust struct.
+//
+//    * When `destroy` is called, we atomically flip the flag from false to true.
+//      If the flag was already true we silently fail.
+//      Otherwise we atomically decrement and check the counter.
+//      If it has reached zero then we destroy the underlying Rust struct.
+//
+// Astute readers may observe that this all sounds very similar to the way that Rust's `Arc<T>` works,
+// and indeed it is, with the addition of a flag to guard against multiple calls to `destroy`.
+//
+// The overall effect is that the underlying Rust struct is destroyed only when `destroy` has been
+// called *and* all in-flight method calls have completed, avoiding violating any of the expectations
+// of the underlying Rust code.
+//
+// This makes a cleaner a better alternative to _not_ calling `destroy()` as
+// and when the object is finished with, but the abstraction is not perfect: if the Rust object's `drop`
+// method is slow, and/or there are many objects to cleanup, and it's on a low end Android device, then the cleaner
+// thread may be starved, and the app will leak memory.
+//
+// In this case, `destroy`ing manually may be a better solution.
+//
+// The cleaner can live side by side with the manual calling of `destroy`. In the order of responsiveness, uniffi objects
+// with Rust peers are reclaimed:
+//
+// 1. By calling the `destroy` method of the object, which calls `rustObject.free()`. If that doesn't happen:
+// 2. When the object becomes unreachable, AND the Cleaner thread gets to call `rustObject.free()`. If the thread is starved then:
+// 3. The memory is reclaimed when the process terminates.
+//
+// [1] https://stackoverflow.com/questions/24376768/can-java-finalize-an-object-when-it-is-still-in-scope/24380219
+//
+
+
+public interface ExecCallbacks {
+    
+    fun `onStdout`(`data`: kotlin.ByteArray)
+    
+    fun `onStderr`(`data`: kotlin.ByteArray)
+    
+    fun `onExit`(`exitCode`: kotlin.UInt?, `exitSignal`: kotlin.String?)
+    
+    companion object
+}
+
+open class ExecCallbacksImpl: Disposable, AutoCloseable, ExecCallbacks
+{
+
+    @Suppress("UNUSED_PARAMETER")
+    /**
+     * @suppress
+     */
+    constructor(withHandle: UniffiWithHandle, handle: Long) {
+        this.handle = handle
+        this.cleanable = UniffiLib.CLEANER.register(this, UniffiCleanAction(handle))
+    }
+
+    /**
+     * @suppress
+     *
+     * This constructor can be used to instantiate a fake object. Only used for tests. Any
+     * attempt to actually use an object constructed this way will fail as there is no
+     * connected Rust object.
+     */
+    @Suppress("UNUSED_PARAMETER")
+    constructor(noHandle: NoHandle) {
+        this.handle = 0
+        this.cleanable = null
+    }
+
+    protected val handle: Long
+    protected val cleanable: UniffiCleaner.Cleanable?
+
+    private val wasDestroyed = AtomicBoolean(false)
+    private val callCounter = AtomicLong(1)
+
+    /**
+     * Whether the current object has been destroyed and its reference is gone in the Rust side.
+     */
+    val uniffiIsDestroyed: Boolean get() = wasDestroyed.get()
+
+    override fun destroy() {
+        // Only allow a single call to this method.
+        // TODO: maybe we should log a warning if called more than once?
+        if (this.wasDestroyed.compareAndSet(false, true)) {
+            // This decrement always matches the initial count of 1 given at creation time.
+            if (this.callCounter.decrementAndGet() == 0L) {
+                cleanable?.clean()
+            }
+        }
+    }
+
+    @Synchronized
+    override fun close() {
+        this.destroy()
+    }
+
+    internal inline fun <R> callWithHandle(block: (handle: Long) -> R): R {
+        // Check and increment the call counter, to keep the object alive.
+        // This needs a compare-and-set retry loop in case of concurrent updates.
+        do {
+            val c = this.callCounter.get()
+            if (c == 0L) {
+                throw IllegalStateException("${this.javaClass.simpleName} object has already been destroyed")
+            }
+            if (c == Long.MAX_VALUE) {
+                throw IllegalStateException("${this.javaClass.simpleName} call counter would overflow")
+            }
+        } while (! this.callCounter.compareAndSet(c, c + 1L))
+        // Now we can safely do the method call without the handle being freed concurrently.
+        try {
+            return block(this.uniffiCloneHandle())
+        } finally {
+            // This decrement always matches the increment we performed above.
+            if (this.callCounter.decrementAndGet() == 0L) {
+                cleanable?.clean()
+            }
+        }
+    }
+
+    // Use a static inner class instead of a closure so as not to accidentally
+    // capture `this` as part of the cleanable's action.
+    private class UniffiCleanAction(private val handle: Long) : Runnable {
+        override fun run() {
+            if (handle == 0.toLong()) {
+                // Fake object created with `NoHandle`, don't try to free.
+                return;
+            }
+            uniffiRustCall { status ->
+                UniffiLib.uniffi_termix_ssh_core_fn_free_execcallbacks(handle, status)
+            }
+        }
+    }
+
+    /**
+     * @suppress
+     */
+    fun uniffiCloneHandle(): Long {
+        if (handle == 0.toLong()) {
+            throw InternalException("uniffiCloneHandle() called on NoHandle object");
+        }
+        return uniffiRustCall() { status ->
+            UniffiLib.uniffi_termix_ssh_core_fn_clone_execcallbacks(handle, status)
+        }
+    }
+
+    override fun `onStdout`(`data`: kotlin.ByteArray)
+        = 
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_termix_ssh_core_fn_method_execcallbacks_on_stdout(
+        it,
+        
+        FfiConverterByteArray.lower(`data`),_status)
+}
+    }
+    
+    
+
+    override fun `onStderr`(`data`: kotlin.ByteArray)
+        = 
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_termix_ssh_core_fn_method_execcallbacks_on_stderr(
+        it,
+        
+        FfiConverterByteArray.lower(`data`),_status)
+}
+    }
+    
+    
+
+    override fun `onExit`(`exitCode`: kotlin.UInt?, `exitSignal`: kotlin.String?)
+        = 
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_termix_ssh_core_fn_method_execcallbacks_on_exit(
+        it,
+        
+        FfiConverterOptionalUInt.lower(`exitCode`),
+        FfiConverterOptionalString.lower(`exitSignal`),_status)
+}
+    }
+    
+    
+
+    
+
+    
+
+
+    
+    
+    /**
+     * @suppress
+     */
+    companion object
+    
+}
+
+
+
+// Put the implementation in an object so we don't pollute the top-level namespace
+internal object uniffiCallbackInterfaceExecCallbacks {
+    internal object `onStdout`: UniffiCallbackInterfaceExecCallbacksMethod0 {
+        override fun callback(`uniffiHandle`: Long,`data`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,) {
+            val uniffiObj = FfiConverterTypeExecCallbacks.handleMap.get(uniffiHandle)
+            val makeCall = { ->
+                uniffiObj.`onStdout`(
+                    FfiConverterByteArray.lift(`data`),
+                )
+            }
+            val writeReturn = { _: Unit -> Unit }
+            uniffiTraitInterfaceCall(uniffiCallStatus, makeCall, writeReturn)
+        }
+    }
+    internal object `onStderr`: UniffiCallbackInterfaceExecCallbacksMethod1 {
+        override fun callback(`uniffiHandle`: Long,`data`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,) {
+            val uniffiObj = FfiConverterTypeExecCallbacks.handleMap.get(uniffiHandle)
+            val makeCall = { ->
+                uniffiObj.`onStderr`(
+                    FfiConverterByteArray.lift(`data`),
+                )
+            }
+            val writeReturn = { _: Unit -> Unit }
+            uniffiTraitInterfaceCall(uniffiCallStatus, makeCall, writeReturn)
+        }
+    }
+    internal object `onExit`: UniffiCallbackInterfaceExecCallbacksMethod2 {
+        override fun callback(`uniffiHandle`: Long,`exitCode`: RustBuffer.ByValue,`exitSignal`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,) {
+            val uniffiObj = FfiConverterTypeExecCallbacks.handleMap.get(uniffiHandle)
+            val makeCall = { ->
+                uniffiObj.`onExit`(
+                    FfiConverterOptionalUInt.lift(`exitCode`),
+                    FfiConverterOptionalString.lift(`exitSignal`),
+                )
+            }
+            val writeReturn = { _: Unit -> Unit }
+            uniffiTraitInterfaceCall(uniffiCallStatus, makeCall, writeReturn)
+        }
+    }
+
+    internal object uniffiFree: UniffiCallbackInterfaceFree {
+        override fun callback(handle: Long) {
+            FfiConverterTypeExecCallbacks.handleMap.remove(handle)
+        }
+    }
+
+    internal object uniffiClone: UniffiCallbackInterfaceClone {
+        override fun callback(handle: Long): Long {
+            return FfiConverterTypeExecCallbacks.handleMap.clone(handle)
+        }
+    }
+
+    internal var vtable = UniffiVTableCallbackInterfaceExecCallbacks.UniffiByValue(
+        uniffiFree,
+        uniffiClone,
+        `onStdout`,
+        `onStderr`,
+        `onExit`,
+    )
+
+    // Registers the foreign callback with the Rust side.
+    // This method is generated for each callback interface.
+    internal fun register(lib: UniffiLib) {
+        lib.uniffi_termix_ssh_core_fn_init_callback_vtable_execcallbacks(vtable)
+    }
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeExecCallbacks: FfiConverter<ExecCallbacks, Long> {
+    internal val handleMap = UniffiHandleMap<ExecCallbacks>()
+
+    override fun lower(value: ExecCallbacks): Long {
+        if (value is ExecCallbacksImpl) {
+             // Rust-implemented object.  Clone the handle and return it
+            return value.uniffiCloneHandle()
+         } else {
+            // Kotlin object, generate a new vtable handle and return that.
+            return handleMap.insert(value)
+         }
+    }
+
+    override fun lift(value: Long): ExecCallbacks {
+        if ((value and 1.toLong()) == 0.toLong()) {
+            // Rust-generated handle, construct a new class that uses the handle to implement the
+            // interface
+            return ExecCallbacksImpl(UniffiWithHandle, value)
+        } else {
+            // Kotlin-generated handle, get the object from the handle map
+            return handleMap.remove(value)
+        }
+    }
+
+    override fun read(buf: ByteBuffer): ExecCallbacks {
+        return lift(buf.getLong())
+    }
+
+    override fun allocationSize(value: ExecCallbacks) = 8UL
+
+    override fun write(value: ExecCallbacks, buf: ByteBuffer) {
+        buf.putLong(lower(value))
+    }
+}
+
+
+// This template implements a class for working with a Rust struct via a handle
+// to the live Rust struct on the other side of the FFI.
+//
+// There's some subtlety here, because we have to be careful not to operate on a Rust
+// struct after it has been dropped, and because we must expose a public API for freeing
+// theq Kotlin wrapper object in lieu of reliable finalizers. The core requirements are:
+//
+//   * Each instance holds an opaque handle to the underlying Rust struct.
+//     Method calls need to read this handle from the object's state and pass it in to
+//     the Rust FFI.
+//
+//   * When an instance is no longer needed, its handle should be passed to a
+//     special destructor function provided by the Rust FFI, which will drop the
+//     underlying Rust struct.
+//
+//   * Given an instance, calling code is expected to call the special
+//     `destroy` method in order to free it after use, either by calling it explicitly
+//     or by using a higher-level helper like the `use` method. Failing to do so risks
+//     leaking the underlying Rust struct.
+//
+//   * We can't assume that calling code will do the right thing, and must be prepared
+//     to handle Kotlin method calls executing concurrently with or even after a call to
+//     `destroy`, and to handle multiple (possibly concurrent!) calls to `destroy`.
+//
+//   * We must never allow Rust code to operate on the underlying Rust struct after
+//     the destructor has been called, and must never call the destructor more than once.
+//     Doing so may trigger memory unsafety.
+//
+//   * To mitigate many of the risks of leaking memory and use-after-free unsafety, a `Cleaner`
+//     is implemented to call the destructor when the Kotlin object becomes unreachable.
+//     This is done in a background thread. This is not a panacea, and client code should be aware that
+//      1. the thread may starve if some there are objects that have poorly performing
+//     `drop` methods or do significant work in their `drop` methods.
+//      2. the thread is shared across the whole library. This can be tuned by using `android_cleaner = true`,
+//         or `android = true` in the [`kotlin` section of the `uniffi.toml` file](https://mozilla.github.io/uniffi-rs/kotlin/configuration.html).
+//
+// If we try to implement this with mutual exclusion on access to the handle, there is the
+// possibility of a race between a method call and a concurrent call to `destroy`:
+//
+//    * Thread A starts a method call, reads the value of the handle, but is interrupted
+//      before it can pass the handle over the FFI to Rust.
+//    * Thread B calls `destroy` and frees the underlying Rust struct.
+//    * Thread A resumes, passing the already-read handle value to Rust and triggering
+//      a use-after-free.
+//
+// One possible solution would be to use a `ReadWriteLock`, with each method call taking
+// a read lock (and thus allowed to run concurrently) and the special `destroy` method
+// taking a write lock (and thus blocking on live method calls). However, we aim not to
+// generate methods with any hidden blocking semantics, and a `destroy` method that might
+// block if called incorrectly seems to meet that bar.
+//
+// So, we achieve our goals by giving each instance an associated `AtomicLong` counter to track
+// the number of in-flight method calls, and an `AtomicBoolean` flag to indicate whether `destroy`
+// has been called. These are updated according to the following rules:
+//
+//    * The initial value of the counter is 1, indicating a live object with no in-flight calls.
+//      The initial value for the flag is false.
+//
+//    * At the start of each method call, we atomically check the counter.
+//      If it is 0 then the underlying Rust struct has already been destroyed and the call is aborted.
+//      If it is nonzero them we atomically increment it by 1 and proceed with the method call.
+//
+//    * At the end of each method call, we atomically decrement and check the counter.
+//      If it has reached zero then we destroy the underlying Rust struct.
+//
+//    * When `destroy` is called, we atomically flip the flag from false to true.
+//      If the flag was already true we silently fail.
+//      Otherwise we atomically decrement and check the counter.
+//      If it has reached zero then we destroy the underlying Rust struct.
+//
+// Astute readers may observe that this all sounds very similar to the way that Rust's `Arc<T>` works,
+// and indeed it is, with the addition of a flag to guard against multiple calls to `destroy`.
+//
+// The overall effect is that the underlying Rust struct is destroyed only when `destroy` has been
+// called *and* all in-flight method calls have completed, avoiding violating any of the expectations
+// of the underlying Rust code.
+//
+// This makes a cleaner a better alternative to _not_ calling `destroy()` as
+// and when the object is finished with, but the abstraction is not perfect: if the Rust object's `drop`
+// method is slow, and/or there are many objects to cleanup, and it's on a low end Android device, then the cleaner
+// thread may be starved, and the app will leak memory.
+//
+// In this case, `destroy`ing manually may be a better solution.
+//
+// The cleaner can live side by side with the manual calling of `destroy`. In the order of responsiveness, uniffi objects
+// with Rust peers are reclaimed:
+//
+// 1. By calling the `destroy` method of the object, which calls `rustObject.free()`. If that doesn't happen:
+// 2. When the object becomes unreachable, AND the Cleaner thread gets to call `rustObject.free()`. If the thread is starved then:
+// 3. The memory is reclaimed when the process terminates.
+//
+// [1] https://stackoverflow.com/questions/24376768/can-java-finalize-an-object-when-it-is-still-in-scope/24380219
+//
+
+
+/**
+ * A running command whose output streams to callbacks.
+ */
+public interface ExecHandleInterface {
+    
+    suspend fun `end`()
+    
+    /**
+     * Ends stdin, for commands that read until EOF.
+     */
+    suspend fun `eof`()
+    
+    suspend fun `signal`(`name`: kotlin.String)
+    
+    suspend fun `write`(`data`: kotlin.ByteArray)
+    
+    companion object
+}
+
+/**
+ * A running command whose output streams to callbacks.
+ */
+open class ExecHandle: Disposable, AutoCloseable, ExecHandleInterface
+{
+
+    @Suppress("UNUSED_PARAMETER")
+    /**
+     * @suppress
+     */
+    constructor(withHandle: UniffiWithHandle, handle: Long) {
+        this.handle = handle
+        this.cleanable = UniffiLib.CLEANER.register(this, UniffiCleanAction(handle))
+    }
+
+    /**
+     * @suppress
+     *
+     * This constructor can be used to instantiate a fake object. Only used for tests. Any
+     * attempt to actually use an object constructed this way will fail as there is no
+     * connected Rust object.
+     */
+    @Suppress("UNUSED_PARAMETER")
+    constructor(noHandle: NoHandle) {
+        this.handle = 0
+        this.cleanable = null
+    }
+
+    protected val handle: Long
+    protected val cleanable: UniffiCleaner.Cleanable?
+
+    private val wasDestroyed = AtomicBoolean(false)
+    private val callCounter = AtomicLong(1)
+
+    /**
+     * Whether the current object has been destroyed and its reference is gone in the Rust side.
+     */
+    val uniffiIsDestroyed: Boolean get() = wasDestroyed.get()
+
+    override fun destroy() {
+        // Only allow a single call to this method.
+        // TODO: maybe we should log a warning if called more than once?
+        if (this.wasDestroyed.compareAndSet(false, true)) {
+            // This decrement always matches the initial count of 1 given at creation time.
+            if (this.callCounter.decrementAndGet() == 0L) {
+                cleanable?.clean()
+            }
+        }
+    }
+
+    @Synchronized
+    override fun close() {
+        this.destroy()
+    }
+
+    internal inline fun <R> callWithHandle(block: (handle: Long) -> R): R {
+        // Check and increment the call counter, to keep the object alive.
+        // This needs a compare-and-set retry loop in case of concurrent updates.
+        do {
+            val c = this.callCounter.get()
+            if (c == 0L) {
+                throw IllegalStateException("${this.javaClass.simpleName} object has already been destroyed")
+            }
+            if (c == Long.MAX_VALUE) {
+                throw IllegalStateException("${this.javaClass.simpleName} call counter would overflow")
+            }
+        } while (! this.callCounter.compareAndSet(c, c + 1L))
+        // Now we can safely do the method call without the handle being freed concurrently.
+        try {
+            return block(this.uniffiCloneHandle())
+        } finally {
+            // This decrement always matches the increment we performed above.
+            if (this.callCounter.decrementAndGet() == 0L) {
+                cleanable?.clean()
+            }
+        }
+    }
+
+    // Use a static inner class instead of a closure so as not to accidentally
+    // capture `this` as part of the cleanable's action.
+    private class UniffiCleanAction(private val handle: Long) : Runnable {
+        override fun run() {
+            if (handle == 0.toLong()) {
+                // Fake object created with `NoHandle`, don't try to free.
+                return;
+            }
+            uniffiRustCall { status ->
+                UniffiLib.uniffi_termix_ssh_core_fn_free_exechandle(handle, status)
+            }
+        }
+    }
+
+    /**
+     * @suppress
+     */
+    fun uniffiCloneHandle(): Long {
+        if (handle == 0.toLong()) {
+            throw InternalException("uniffiCloneHandle() called on NoHandle object");
+        }
+        return uniffiRustCall() { status ->
+            UniffiLib.uniffi_termix_ssh_core_fn_clone_exechandle(handle, status)
+        }
+    }
+
+    
+    @Throws(SshException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `end`() {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_termix_ssh_core_fn_method_exechandle_end(
+                uniffiHandle,
+                
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_termix_ssh_core_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        SshException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Ends stdin, for commands that read until EOF.
+     */
+    @Throws(SshException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `eof`() {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_termix_ssh_core_fn_method_exechandle_eof(
+                uniffiHandle,
+                
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_termix_ssh_core_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        SshException.ErrorHandler,
+    )
+    }
+
+    
+    @Throws(SshException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `signal`(`name`: kotlin.String) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_termix_ssh_core_fn_method_exechandle_signal(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`name`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_termix_ssh_core_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        SshException.ErrorHandler,
+    )
+    }
+
+    
+    @Throws(SshException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `write`(`data`: kotlin.ByteArray) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_termix_ssh_core_fn_method_exechandle_write(
+                uniffiHandle,
+                
+        FfiConverterByteArray.lower(`data`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_termix_ssh_core_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        SshException.ErrorHandler,
+    )
+    }
+
+    
+
+    
+
+
+    
+    
+    /**
+     * @suppress
+     */
+    companion object
+    
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeExecHandle: FfiConverter<ExecHandle, Long> {
+    override fun lower(value: ExecHandle): Long {
+        return value.uniffiCloneHandle()
+    }
+
+    override fun lift(value: Long): ExecHandle {
+        return ExecHandle(UniffiWithHandle, value)
+    }
+
+    override fun read(buf: ByteBuffer): ExecHandle {
+        return lift(buf.getLong())
+    }
+
+    override fun allocationSize(value: ExecHandle) = 8UL
+
+    override fun write(value: ExecHandle, buf: ByteBuffer) {
+        buf.putLong(lower(value))
+    }
+}
+
+
+// This template implements a class for working with a Rust struct via a handle
+// to the live Rust struct on the other side of the FFI.
+//
+// There's some subtlety here, because we have to be careful not to operate on a Rust
+// struct after it has been dropped, and because we must expose a public API for freeing
+// theq Kotlin wrapper object in lieu of reliable finalizers. The core requirements are:
+//
+//   * Each instance holds an opaque handle to the underlying Rust struct.
+//     Method calls need to read this handle from the object's state and pass it in to
+//     the Rust FFI.
+//
+//   * When an instance is no longer needed, its handle should be passed to a
+//     special destructor function provided by the Rust FFI, which will drop the
+//     underlying Rust struct.
+//
+//   * Given an instance, calling code is expected to call the special
+//     `destroy` method in order to free it after use, either by calling it explicitly
+//     or by using a higher-level helper like the `use` method. Failing to do so risks
+//     leaking the underlying Rust struct.
+//
+//   * We can't assume that calling code will do the right thing, and must be prepared
+//     to handle Kotlin method calls executing concurrently with or even after a call to
+//     `destroy`, and to handle multiple (possibly concurrent!) calls to `destroy`.
+//
+//   * We must never allow Rust code to operate on the underlying Rust struct after
+//     the destructor has been called, and must never call the destructor more than once.
+//     Doing so may trigger memory unsafety.
+//
+//   * To mitigate many of the risks of leaking memory and use-after-free unsafety, a `Cleaner`
+//     is implemented to call the destructor when the Kotlin object becomes unreachable.
+//     This is done in a background thread. This is not a panacea, and client code should be aware that
+//      1. the thread may starve if some there are objects that have poorly performing
+//     `drop` methods or do significant work in their `drop` methods.
+//      2. the thread is shared across the whole library. This can be tuned by using `android_cleaner = true`,
+//         or `android = true` in the [`kotlin` section of the `uniffi.toml` file](https://mozilla.github.io/uniffi-rs/kotlin/configuration.html).
+//
+// If we try to implement this with mutual exclusion on access to the handle, there is the
+// possibility of a race between a method call and a concurrent call to `destroy`:
+//
+//    * Thread A starts a method call, reads the value of the handle, but is interrupted
+//      before it can pass the handle over the FFI to Rust.
+//    * Thread B calls `destroy` and frees the underlying Rust struct.
+//    * Thread A resumes, passing the already-read handle value to Rust and triggering
+//      a use-after-free.
+//
+// One possible solution would be to use a `ReadWriteLock`, with each method call taking
+// a read lock (and thus allowed to run concurrently) and the special `destroy` method
+// taking a write lock (and thus blocking on live method calls). However, we aim not to
+// generate methods with any hidden blocking semantics, and a `destroy` method that might
+// block if called incorrectly seems to meet that bar.
+//
+// So, we achieve our goals by giving each instance an associated `AtomicLong` counter to track
+// the number of in-flight method calls, and an `AtomicBoolean` flag to indicate whether `destroy`
+// has been called. These are updated according to the following rules:
+//
+//    * The initial value of the counter is 1, indicating a live object with no in-flight calls.
+//      The initial value for the flag is false.
+//
+//    * At the start of each method call, we atomically check the counter.
+//      If it is 0 then the underlying Rust struct has already been destroyed and the call is aborted.
+//      If it is nonzero them we atomically increment it by 1 and proceed with the method call.
+//
+//    * At the end of each method call, we atomically decrement and check the counter.
+//      If it has reached zero then we destroy the underlying Rust struct.
+//
+//    * When `destroy` is called, we atomically flip the flag from false to true.
+//      If the flag was already true we silently fail.
+//      Otherwise we atomically decrement and check the counter.
+//      If it has reached zero then we destroy the underlying Rust struct.
+//
+// Astute readers may observe that this all sounds very similar to the way that Rust's `Arc<T>` works,
+// and indeed it is, with the addition of a flag to guard against multiple calls to `destroy`.
+//
+// The overall effect is that the underlying Rust struct is destroyed only when `destroy` has been
+// called *and* all in-flight method calls have completed, avoiding violating any of the expectations
+// of the underlying Rust code.
+//
+// This makes a cleaner a better alternative to _not_ calling `destroy()` as
+// and when the object is finished with, but the abstraction is not perfect: if the Rust object's `drop`
+// method is slow, and/or there are many objects to cleanup, and it's on a low end Android device, then the cleaner
+// thread may be starved, and the app will leak memory.
+//
+// In this case, `destroy`ing manually may be a better solution.
+//
+// The cleaner can live side by side with the manual calling of `destroy`. In the order of responsiveness, uniffi objects
+// with Rust peers are reclaimed:
+//
+// 1. By calling the `destroy` method of the object, which calls `rustObject.free()`. If that doesn't happen:
+// 2. When the object becomes unreachable, AND the Cleaner thread gets to call `rustObject.free()`. If the thread is starved then:
+// 3. The memory is reclaimed when the process terminates.
+//
+// [1] https://stackoverflow.com/questions/24376768/can-java-finalize-an-object-when-it-is-still-in-scope/24380219
+//
+
+
+/**
+ * A running forward. Stopping it closes the listener and every connection it piped.
+ */
 public interface ForwardInterface {
     
     /**
-     * The local port, useful when 0 was asked for.
+     * The bound port: on the phone for local and dynamic forwards, on the server for remote ones.
      */
     fun `port`(): kotlin.UShort
+    
+    /**
+     * Like `stop`, and for a remote forward also asks the server to stop listening.
+     */
+    suspend fun `shutdown`()
     
     fun `stop`()
     
     companion object
 }
 
+/**
+ * A running forward. Stopping it closes the listener and every connection it piped.
+ */
 open class Forward: Disposable, AutoCloseable, ForwardInterface
 {
 
@@ -1865,7 +3137,7 @@ open class Forward: Disposable, AutoCloseable, ForwardInterface
 
     
     /**
-     * The local port, useful when 0 was asked for.
+     * The bound port: on the phone for local and dynamic forwards, on the server for remote ones.
      */override fun `port`(): kotlin.UShort {
             return FfiConverterUShort.lift(
     callWithHandle {
@@ -1878,6 +3150,31 @@ open class Forward: Disposable, AutoCloseable, ForwardInterface
     )
     }
     
+
+    
+    /**
+     * Like `stop`, and for a remote forward also asks the server to stop listening.
+     */
+    @Throws(SshException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `shutdown`() {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_termix_ssh_core_fn_method_forward_shutdown(
+                uniffiHandle,
+                
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_termix_ssh_core_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        SshException.ErrorHandler,
+    )
+    }
 
     override fun `stop`()
         = 
@@ -2341,6 +3638,17 @@ public object FfiConverterTypeProgressCallback: FfiConverter<ProgressCallback, L
 public interface SessionInterface {
     
     /**
+     * Runs a command and collects its output. `max_bytes` caps stdout and stderr each;
+     * `timeout_secs` of 0 means no limit. The channel closes on timeout or cancel.
+     */
+    suspend fun `exec`(`command`: kotlin.String, `timeoutSecs`: kotlin.UInt, `maxBytes`: kotlin.ULong, `cancel`: CancelToken?): ExecResult
+    
+    /**
+     * Starts a command and streams its output. With `pty` the command gets a terminal of that size.
+     */
+    suspend fun `execStream`(`command`: kotlin.String, `pty`: PtySize?, `callbacks`: ExecCallbacks): ExecHandle
+    
+    /**
      * A SOCKS5 proxy on `bind_host:bind_port` that opens every connection through SSH.
      */
     suspend fun `forwardDynamic`(`bindHost`: kotlin.String, `bindPort`: kotlin.UShort): Forward
@@ -2350,16 +3658,20 @@ public interface SessionInterface {
      */
     suspend fun `forwardLocal`(`bindHost`: kotlin.String, `bindPort`: kotlin.UShort, `remoteHost`: kotlin.String, `remotePort`: kotlin.UShort): Forward
     
+    /**
+     * Asks the server to listen on `remote_bind_host:remote_port` (0 lets it pick) and sends each
+     * connection to `local_host:local_port` as seen from the phone.
+     */
+    suspend fun `forwardRemote`(`remoteBindHost`: kotlin.String, `remotePort`: kotlin.UShort, `localHost`: kotlin.String, `localPort`: kotlin.UShort): Forward
+    
     fun `algorithms`(): NegotiatedAlgorithms?
     
     /**
      * Logs in to another host through this one (a jump host hop).
      */
-    suspend fun `connectVia`(`config`: ConnectConfig, `callbacks`: SessionCallbacks): Session
+    suspend fun `connectVia`(`config`: ConnectConfig, `callbacks`: SessionCallbacks, `cancel`: CancelToken?): Session
     
     suspend fun `disconnect`()
-    
-    suspend fun `exec`(`command`: kotlin.String): ExecResult
     
     fun `hostKey`(): HostKeyInfo
     
@@ -2368,7 +3680,13 @@ public interface SessionInterface {
     /**
      * Sends a keepalive and waits for the reply. Useful after the app comes back to the foreground.
      */
-    suspend fun `ping`()
+    suspend fun `ping`(`timeoutSecs`: kotlin.UInt)
+    
+    /**
+     * Logs in again with the same config and callbacks, so the app never resends secrets.
+     * A hop reconnects through its parent, which must still be open.
+     */
+    suspend fun `reconnect`(`cancel`: CancelToken?): Session
     
     suspend fun `openSftp`(): Sftp
     
@@ -2483,6 +3801,62 @@ open class Session: Disposable, AutoCloseable, SessionInterface
 
     
     /**
+     * Runs a command and collects its output. `max_bytes` caps stdout and stderr each;
+     * `timeout_secs` of 0 means no limit. The channel closes on timeout or cancel.
+     */
+    @Throws(SshException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `exec`(`command`: kotlin.String, `timeoutSecs`: kotlin.UInt, `maxBytes`: kotlin.ULong, `cancel`: CancelToken?) : ExecResult {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_termix_ssh_core_fn_method_session_exec(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`command`),
+        FfiConverterUInt.lower(`timeoutSecs`),
+        FfiConverterULong.lower(`maxBytes`),
+        FfiConverterOptionalTypeCancelToken.lower(`cancel`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_termix_ssh_core_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeExecResult.lift(it) },
+        // Error FFI converter
+        SshException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Starts a command and streams its output. With `pty` the command gets a terminal of that size.
+     */
+    @Throws(SshException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `execStream`(`command`: kotlin.String, `pty`: PtySize?, `callbacks`: ExecCallbacks) : ExecHandle {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_termix_ssh_core_fn_method_session_exec_stream(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`command`),
+        FfiConverterOptionalTypePtySize.lower(`pty`),
+        FfiConverterTypeExecCallbacks.lower(`callbacks`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_poll_u64(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_complete_u64(future, continuation) },
+        { future -> UniffiLib.ffi_termix_ssh_core_rust_future_free_u64(future) },
+        // lift function
+        { FfiConverterTypeExecHandle.lift(it) },
+        // Error FFI converter
+        SshException.ErrorHandler,
+    )
+    }
+
+    
+    /**
      * A SOCKS5 proxy on `bind_host:bind_port` that opens every connection through SSH.
      */
     @Throws(SshException::class)
@@ -2535,6 +3909,35 @@ open class Session: Disposable, AutoCloseable, SessionInterface
     )
     }
 
+    
+    /**
+     * Asks the server to listen on `remote_bind_host:remote_port` (0 lets it pick) and sends each
+     * connection to `local_host:local_port` as seen from the phone.
+     */
+    @Throws(SshException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `forwardRemote`(`remoteBindHost`: kotlin.String, `remotePort`: kotlin.UShort, `localHost`: kotlin.String, `localPort`: kotlin.UShort) : Forward {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_termix_ssh_core_fn_method_session_forward_remote(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`remoteBindHost`),
+        FfiConverterUShort.lower(`remotePort`),
+        FfiConverterString.lower(`localHost`),
+        FfiConverterUShort.lower(`localPort`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_poll_u64(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_complete_u64(future, continuation) },
+        { future -> UniffiLib.ffi_termix_ssh_core_rust_future_free_u64(future) },
+        // lift function
+        { FfiConverterTypeForward.lift(it) },
+        // Error FFI converter
+        SshException.ErrorHandler,
+    )
+    }
+
     override fun `algorithms`(): NegotiatedAlgorithms? {
             return FfiConverterOptionalTypeNegotiatedAlgorithms.lift(
     callWithHandle {
@@ -2554,7 +3957,7 @@ open class Session: Disposable, AutoCloseable, SessionInterface
      */
     @Throws(SshException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `connectVia`(`config`: ConnectConfig, `callbacks`: SessionCallbacks) : Session {
+    override suspend fun `connectVia`(`config`: ConnectConfig, `callbacks`: SessionCallbacks, `cancel`: CancelToken?) : Session {
         return uniffiRustCallAsync(
         callWithHandle { uniffiHandle ->
             UniffiLib.uniffi_termix_ssh_core_fn_method_session_connect_via(
@@ -2562,6 +3965,7 @@ open class Session: Disposable, AutoCloseable, SessionInterface
                 
         FfiConverterTypeConnectConfig.lower(`config`),
         FfiConverterTypeSessionCallbacks.lower(`callbacks`),
+        FfiConverterOptionalTypeCancelToken.lower(`cancel`),
             )
         },
         { future, callback, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_poll_u64(future, callback, continuation) },
@@ -2591,28 +3995,6 @@ open class Session: Disposable, AutoCloseable, SessionInterface
         // lift function
         { },
         
-        // Error FFI converter
-        SshException.ErrorHandler,
-    )
-    }
-
-    
-    @Throws(SshException::class)
-    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `exec`(`command`: kotlin.String) : ExecResult {
-        return uniffiRustCallAsync(
-        callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_termix_ssh_core_fn_method_session_exec(
-                uniffiHandle,
-                
-        FfiConverterString.lower(`command`),
-            )
-        },
-        { future, callback, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_poll_rust_buffer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_complete_rust_buffer(future, continuation) },
-        { future -> UniffiLib.ffi_termix_ssh_core_rust_future_free_rust_buffer(future) },
-        // lift function
-        { FfiConverterTypeExecResult.lift(it) },
         // Error FFI converter
         SshException.ErrorHandler,
     )
@@ -2650,12 +4032,13 @@ open class Session: Disposable, AutoCloseable, SessionInterface
      */
     @Throws(SshException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `ping`() {
+    override suspend fun `ping`(`timeoutSecs`: kotlin.UInt) {
         return uniffiRustCallAsync(
         callWithHandle { uniffiHandle ->
             UniffiLib.uniffi_termix_ssh_core_fn_method_session_ping(
                 uniffiHandle,
                 
+        FfiConverterUInt.lower(`timeoutSecs`),
             )
         },
         { future, callback, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_poll_void(future, callback, continuation) },
@@ -2664,6 +4047,32 @@ open class Session: Disposable, AutoCloseable, SessionInterface
         // lift function
         { },
         
+        // Error FFI converter
+        SshException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Logs in again with the same config and callbacks, so the app never resends secrets.
+     * A hop reconnects through its parent, which must still be open.
+     */
+    @Throws(SshException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `reconnect`(`cancel`: CancelToken?) : Session {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_termix_ssh_core_fn_method_session_reconnect(
+                uniffiHandle,
+                
+        FfiConverterOptionalTypeCancelToken.lower(`cancel`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_poll_u64(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_complete_u64(future, continuation) },
+        { future -> UniffiLib.ffi_termix_ssh_core_rust_future_free_u64(future) },
+        // lift function
+        { FfiConverterTypeSession.lift(it) },
         // Error FFI converter
         SshException.ErrorHandler,
     )
@@ -2867,7 +4276,7 @@ public interface SessionCallbacks {
     
     fun `onBanner`(`banner`: kotlin.String)
     
-    fun `onDisconnect`(`reason`: kotlin.String)
+    fun `onDisconnect`(`kind`: DisconnectKind, `reason`: kotlin.String)
     
     companion object
 }
@@ -3034,13 +4443,14 @@ open class SessionCallbacksImpl: Disposable, AutoCloseable, SessionCallbacks
     
     
 
-    override fun `onDisconnect`(`reason`: kotlin.String)
+    override fun `onDisconnect`(`kind`: DisconnectKind, `reason`: kotlin.String)
         = 
     callWithHandle {
     uniffiRustCall() { _status ->
     UniffiLib.uniffi_termix_ssh_core_fn_method_sessioncallbacks_on_disconnect(
         it,
         
+        FfiConverterTypeDisconnectKind.lower(`kind`),
         FfiConverterString.lower(`reason`),_status)
 }
     }
@@ -3144,10 +4554,11 @@ internal object uniffiCallbackInterfaceSessionCallbacks {
         }
     }
     internal object `onDisconnect`: UniffiCallbackInterfaceSessionCallbacksMethod3 {
-        override fun callback(`uniffiHandle`: Long,`reason`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,) {
+        override fun callback(`uniffiHandle`: Long,`kind`: RustBuffer.ByValue,`reason`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,) {
             val uniffiObj = FfiConverterTypeSessionCallbacks.handleMap.get(uniffiHandle)
             val makeCall = { ->
                 uniffiObj.`onDisconnect`(
+                    FfiConverterTypeDisconnectKind.lift(`kind`),
                     FfiConverterString.lift(`reason`),
                 )
             }
@@ -3321,19 +4732,72 @@ public object FfiConverterTypeSessionCallbacks: FfiConverter<SessionCallbacks, L
 public interface SftpInterface {
     
     /**
-     * Streams a remote file to a local path in fixed chunks, never the whole file in memory.
+     * Sets permission bits (like 0o644); file type bits are ignored.
      */
-    suspend fun `download`(`remote`: kotlin.String, `local`: kotlin.String, `progress`: ProgressCallback?): TransferResult
+    suspend fun `chmod`(`path`: kotlin.String, `mode`: kotlin.UInt)
+    
+    /**
+     * Streams a remote file to a local path in fixed chunks, never the whole file in memory.
+     * With `offset` > 0 it resumes: the local file is kept up to there and appended to.
+     */
+    suspend fun `download`(`remote`: kotlin.String, `local`: kotlin.String, `offset`: kotlin.ULong, `progress`: ProgressCallback?, `cancel`: CancelToken?): TransferResult
     
     suspend fun `list`(`path`: kotlin.String): List<FileEntry>
     
+    /**
+     * Describes a symlink itself, with its target.
+     */
+    suspend fun `lstat`(`path`: kotlin.String): FileEntry
+    
+    suspend fun `mkdir`(`path`: kotlin.String, `mode`: kotlin.UInt?)
+    
+    /**
+     * Reads a small file into memory. Fails when it is bigger than `max_bytes`.
+     */
+    suspend fun `readFile`(`path`: kotlin.String, `maxBytes`: kotlin.ULong): kotlin.ByteArray
+    
+    suspend fun `readLink`(`path`: kotlin.String): kotlin.String
+    
+    /**
+     * Absolute path with `.` and `..` resolved. `.` gives the home folder.
+     */
+    suspend fun `realpath`(`path`: kotlin.String): kotlin.String
+    
     suspend fun `remove`(`path`: kotlin.String)
+    
+    /**
+     * Deletes a file or a whole folder. Symlinks are removed, never followed.
+     * Progress reports the count removed so far, with a total of 0.
+     */
+    suspend fun `removeRecursive`(`path`: kotlin.String, `progress`: ProgressCallback?, `cancel`: CancelToken?): kotlin.ULong
+    
+    suspend fun `rename`(`from`: kotlin.String, `to`: kotlin.String)
+    
+    suspend fun `rmdir`(`path`: kotlin.String)
     
     suspend fun `shutdown`()
     
     suspend fun `size`(`path`: kotlin.String): kotlin.ULong
     
-    suspend fun `upload`(`local`: kotlin.String, `remote`: kotlin.String, `progress`: ProgressCallback?): TransferResult
+    /**
+     * Follows symlinks.
+     */
+    suspend fun `stat`(`path`: kotlin.String): FileEntry
+    
+    /**
+     * Makes `path` a link to `target`.
+     */
+    suspend fun `symlink`(`path`: kotlin.String, `target`: kotlin.String)
+    
+    /**
+     * Streams a local file up. With `offset` > 0 it resumes into the existing remote file.
+     */
+    suspend fun `upload`(`local`: kotlin.String, `remote`: kotlin.String, `offset`: kotlin.ULong, `progress`: ProgressCallback?, `cancel`: CancelToken?): TransferResult
+    
+    /**
+     * Writes a whole file, replacing it. `mode` applies to new files.
+     */
+    suspend fun `writeFile`(`path`: kotlin.String, `data`: kotlin.ByteArray, `mode`: kotlin.UInt?)
     
     companion object
 }
@@ -3441,11 +4905,39 @@ open class Sftp: Disposable, AutoCloseable, SftpInterface
 
     
     /**
-     * Streams a remote file to a local path in fixed chunks, never the whole file in memory.
+     * Sets permission bits (like 0o644); file type bits are ignored.
      */
     @Throws(SshException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `download`(`remote`: kotlin.String, `local`: kotlin.String, `progress`: ProgressCallback?) : TransferResult {
+    override suspend fun `chmod`(`path`: kotlin.String, `mode`: kotlin.UInt) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_termix_ssh_core_fn_method_sftp_chmod(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`path`),
+        FfiConverterUInt.lower(`mode`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_termix_ssh_core_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        SshException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Streams a remote file to a local path in fixed chunks, never the whole file in memory.
+     * With `offset` > 0 it resumes: the local file is kept up to there and appended to.
+     */
+    @Throws(SshException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `download`(`remote`: kotlin.String, `local`: kotlin.String, `offset`: kotlin.ULong, `progress`: ProgressCallback?, `cancel`: CancelToken?) : TransferResult {
         return uniffiRustCallAsync(
         callWithHandle { uniffiHandle ->
             UniffiLib.uniffi_termix_ssh_core_fn_method_sftp_download(
@@ -3453,7 +4945,9 @@ open class Sftp: Disposable, AutoCloseable, SftpInterface
                 
         FfiConverterString.lower(`remote`),
         FfiConverterString.lower(`local`),
+        FfiConverterULong.lower(`offset`),
         FfiConverterOptionalTypeProgressCallback.lower(`progress`),
+        FfiConverterOptionalTypeCancelToken.lower(`cancel`),
             )
         },
         { future, callback, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_poll_rust_buffer(future, callback, continuation) },
@@ -3489,12 +4983,209 @@ open class Sftp: Disposable, AutoCloseable, SftpInterface
     }
 
     
+    /**
+     * Describes a symlink itself, with its target.
+     */
+    @Throws(SshException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `lstat`(`path`: kotlin.String) : FileEntry {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_termix_ssh_core_fn_method_sftp_lstat(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`path`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_termix_ssh_core_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeFileEntry.lift(it) },
+        // Error FFI converter
+        SshException.ErrorHandler,
+    )
+    }
+
+    
+    @Throws(SshException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `mkdir`(`path`: kotlin.String, `mode`: kotlin.UInt?) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_termix_ssh_core_fn_method_sftp_mkdir(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`path`),
+        FfiConverterOptionalUInt.lower(`mode`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_termix_ssh_core_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        SshException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Reads a small file into memory. Fails when it is bigger than `max_bytes`.
+     */
+    @Throws(SshException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `readFile`(`path`: kotlin.String, `maxBytes`: kotlin.ULong) : kotlin.ByteArray {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_termix_ssh_core_fn_method_sftp_read_file(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`path`),
+        FfiConverterULong.lower(`maxBytes`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_termix_ssh_core_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterByteArray.lift(it) },
+        // Error FFI converter
+        SshException.ErrorHandler,
+    )
+    }
+
+    
+    @Throws(SshException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `readLink`(`path`: kotlin.String) : kotlin.String {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_termix_ssh_core_fn_method_sftp_read_link(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`path`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_termix_ssh_core_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterString.lift(it) },
+        // Error FFI converter
+        SshException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Absolute path with `.` and `..` resolved. `.` gives the home folder.
+     */
+    @Throws(SshException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `realpath`(`path`: kotlin.String) : kotlin.String {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_termix_ssh_core_fn_method_sftp_realpath(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`path`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_termix_ssh_core_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterString.lift(it) },
+        // Error FFI converter
+        SshException.ErrorHandler,
+    )
+    }
+
+    
     @Throws(SshException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `remove`(`path`: kotlin.String) {
         return uniffiRustCallAsync(
         callWithHandle { uniffiHandle ->
             UniffiLib.uniffi_termix_ssh_core_fn_method_sftp_remove(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`path`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_termix_ssh_core_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        SshException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Deletes a file or a whole folder. Symlinks are removed, never followed.
+     * Progress reports the count removed so far, with a total of 0.
+     */
+    @Throws(SshException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `removeRecursive`(`path`: kotlin.String, `progress`: ProgressCallback?, `cancel`: CancelToken?) : kotlin.ULong {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_termix_ssh_core_fn_method_sftp_remove_recursive(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`path`),
+        FfiConverterOptionalTypeProgressCallback.lower(`progress`),
+        FfiConverterOptionalTypeCancelToken.lower(`cancel`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_poll_u64(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_complete_u64(future, continuation) },
+        { future -> UniffiLib.ffi_termix_ssh_core_rust_future_free_u64(future) },
+        // lift function
+        { FfiConverterULong.lift(it) },
+        // Error FFI converter
+        SshException.ErrorHandler,
+    )
+    }
+
+    
+    @Throws(SshException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `rename`(`from`: kotlin.String, `to`: kotlin.String) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_termix_ssh_core_fn_method_sftp_rename(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`from`),
+        FfiConverterString.lower(`to`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_termix_ssh_core_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        SshException.ErrorHandler,
+    )
+    }
+
+    
+    @Throws(SshException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `rmdir`(`path`: kotlin.String) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_termix_ssh_core_fn_method_sftp_rmdir(
                 uniffiHandle,
                 
         FfiConverterString.lower(`path`),
@@ -3556,9 +5247,64 @@ open class Sftp: Disposable, AutoCloseable, SftpInterface
     }
 
     
+    /**
+     * Follows symlinks.
+     */
     @Throws(SshException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `upload`(`local`: kotlin.String, `remote`: kotlin.String, `progress`: ProgressCallback?) : TransferResult {
+    override suspend fun `stat`(`path`: kotlin.String) : FileEntry {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_termix_ssh_core_fn_method_sftp_stat(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`path`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_termix_ssh_core_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeFileEntry.lift(it) },
+        // Error FFI converter
+        SshException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Makes `path` a link to `target`.
+     */
+    @Throws(SshException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `symlink`(`path`: kotlin.String, `target`: kotlin.String) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_termix_ssh_core_fn_method_sftp_symlink(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`path`),
+        FfiConverterString.lower(`target`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_termix_ssh_core_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        SshException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Streams a local file up. With `offset` > 0 it resumes into the existing remote file.
+     */
+    @Throws(SshException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `upload`(`local`: kotlin.String, `remote`: kotlin.String, `offset`: kotlin.ULong, `progress`: ProgressCallback?, `cancel`: CancelToken?) : TransferResult {
         return uniffiRustCallAsync(
         callWithHandle { uniffiHandle ->
             UniffiLib.uniffi_termix_ssh_core_fn_method_sftp_upload(
@@ -3566,7 +5312,9 @@ open class Sftp: Disposable, AutoCloseable, SftpInterface
                 
         FfiConverterString.lower(`local`),
         FfiConverterString.lower(`remote`),
+        FfiConverterULong.lower(`offset`),
         FfiConverterOptionalTypeProgressCallback.lower(`progress`),
+        FfiConverterOptionalTypeCancelToken.lower(`cancel`),
             )
         },
         { future, callback, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_poll_rust_buffer(future, callback, continuation) },
@@ -3574,6 +5322,34 @@ open class Sftp: Disposable, AutoCloseable, SftpInterface
         { future -> UniffiLib.ffi_termix_ssh_core_rust_future_free_rust_buffer(future) },
         // lift function
         { FfiConverterTypeTransferResult.lift(it) },
+        // Error FFI converter
+        SshException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Writes a whole file, replacing it. `mode` applies to new files.
+     */
+    @Throws(SshException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `writeFile`(`path`: kotlin.String, `data`: kotlin.ByteArray, `mode`: kotlin.UInt?) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_termix_ssh_core_fn_method_sftp_write_file(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`path`),
+        FfiConverterByteArray.lower(`data`),
+        FfiConverterOptionalUInt.lower(`mode`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_termix_ssh_core_rust_future_free_void(future) },
+        // lift function
+        { },
+        
         // Error FFI converter
         SshException.ErrorHandler,
     )
@@ -3719,6 +5495,11 @@ public interface ShellInterface {
     
     suspend fun `resize`(`cols`: kotlin.UInt, `rows`: kotlin.UInt)
     
+    /**
+     * Like `INT` or `TERM`. Many servers ignore signals; Ctrl+C as input always works.
+     */
+    suspend fun `signal`(`name`: kotlin.String)
+    
     suspend fun `write`(`data`: kotlin.ByteArray)
     
     companion object
@@ -3858,6 +5639,32 @@ open class Shell: Disposable, AutoCloseable, ShellInterface
                 
         FfiConverterUInt.lower(`cols`),
         FfiConverterUInt.lower(`rows`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_termix_ssh_core_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        SshException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Like `INT` or `TERM`. Many servers ignore signals; Ctrl+C as input always works.
+     */
+    @Throws(SshException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `signal`(`name`: kotlin.String) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_termix_ssh_core_fn_method_shell_signal(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`name`),
             )
         },
         { future, callback, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_poll_void(future, callback, continuation) },
@@ -4032,7 +5839,7 @@ public interface ShellCallbacks {
     
     fun `onData`(`data`: kotlin.ByteArray)
     
-    fun `onExit`(`exitCode`: kotlin.UInt?)
+    fun `onExit`(`exitCode`: kotlin.UInt?, `exitSignal`: kotlin.String?)
     
     companion object
 }
@@ -4151,14 +5958,15 @@ open class ShellCallbacksImpl: Disposable, AutoCloseable, ShellCallbacks
     
     
 
-    override fun `onExit`(`exitCode`: kotlin.UInt?)
+    override fun `onExit`(`exitCode`: kotlin.UInt?, `exitSignal`: kotlin.String?)
         = 
     callWithHandle {
     uniffiRustCall() { _status ->
     UniffiLib.uniffi_termix_ssh_core_fn_method_shellcallbacks_on_exit(
         it,
         
-        FfiConverterOptionalUInt.lower(`exitCode`),_status)
+        FfiConverterOptionalUInt.lower(`exitCode`),
+        FfiConverterOptionalString.lower(`exitSignal`),_status)
 }
     }
     
@@ -4195,11 +6003,12 @@ internal object uniffiCallbackInterfaceShellCallbacks {
         }
     }
     internal object `onExit`: UniffiCallbackInterfaceShellCallbacksMethod1 {
-        override fun callback(`uniffiHandle`: Long,`exitCode`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,) {
+        override fun callback(`uniffiHandle`: Long,`exitCode`: RustBuffer.ByValue,`exitSignal`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,) {
             val uniffiObj = FfiConverterTypeShellCallbacks.handleMap.get(uniffiHandle)
             val makeCall = { ->
                 uniffiObj.`onExit`(
                     FfiConverterOptionalUInt.lift(`exitCode`),
+                    FfiConverterOptionalString.lift(`exitSignal`),
                 )
             }
             val writeReturn = { _: Unit -> Unit }
@@ -4273,6 +6082,77 @@ public object FfiConverterTypeShellCallbacks: FfiConverter<ShellCallbacks, Long>
 
 
 
+data class CertInfo (
+    var `keyType`: kotlin.String
+    , 
+    var `keyId`: kotlin.String
+    , 
+    var `serial`: kotlin.ULong
+    , 
+    var `principals`: List<kotlin.String>
+    , 
+    /**
+     * Unix seconds. `valid_before` is u64::MAX for "forever".
+     */
+    var `validAfter`: kotlin.ULong
+    , 
+    var `validBefore`: kotlin.ULong
+    , 
+    var `caSha256`: kotlin.String
+    , 
+    var `isHost`: kotlin.Boolean
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeCertInfo: FfiConverterRustBuffer<CertInfo> {
+    override fun read(buf: ByteBuffer): CertInfo {
+        return CertInfo(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterSequenceString.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: CertInfo) = (
+            FfiConverterString.allocationSize(value.`keyType`) +
+            FfiConverterString.allocationSize(value.`keyId`) +
+            FfiConverterULong.allocationSize(value.`serial`) +
+            FfiConverterSequenceString.allocationSize(value.`principals`) +
+            FfiConverterULong.allocationSize(value.`validAfter`) +
+            FfiConverterULong.allocationSize(value.`validBefore`) +
+            FfiConverterString.allocationSize(value.`caSha256`) +
+            FfiConverterBoolean.allocationSize(value.`isHost`)
+    )
+
+    override fun write(value: CertInfo, buf: ByteBuffer) {
+            FfiConverterString.write(value.`keyType`, buf)
+            FfiConverterString.write(value.`keyId`, buf)
+            FfiConverterULong.write(value.`serial`, buf)
+            FfiConverterSequenceString.write(value.`principals`, buf)
+            FfiConverterULong.write(value.`validAfter`, buf)
+            FfiConverterULong.write(value.`validBefore`, buf)
+            FfiConverterString.write(value.`caSha256`, buf)
+            FfiConverterBoolean.write(value.`isHost`, buf)
+    }
+}
+
+
+
 data class ConnectConfig (
     var `host`: kotlin.String
     , 
@@ -4290,11 +6170,17 @@ data class ConnectConfig (
     var `passphrase`: kotlin.String?
     , 
     /**
-     * OpenSSH user certificate (`*-cert.pub` text) for `private_key`.
+     * OpenSSH user certificate (`*-cert.pub` text) for `private_key`. Like core, a certificate
+     * login tries only the certificate.
      */
     var `certificate`: kotlin.String?
     , 
     var `forceKeyboardInteractive`: kotlin.Boolean
+    , 
+    /**
+     * Ask keyboard-interactive prompts when the server offers them.
+     */
+    var `tryKeyboard`: kotlin.Boolean
     , 
     var `allowLegacyAlgorithms`: kotlin.Boolean
     , 
@@ -4303,6 +6189,10 @@ data class ConnectConfig (
     var `keepaliveIntervalSecs`: kotlin.UInt
     , 
     var `keepaliveCountMax`: kotlin.UInt
+    , 
+    var `proxies`: List<ProxyHop>
+    , 
+    var `portKnock`: List<PortKnock>
     
 ){
     
@@ -4328,9 +6218,12 @@ public object FfiConverterTypeConnectConfig: FfiConverterRustBuffer<ConnectConfi
             FfiConverterOptionalString.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
             FfiConverterUInt.read(buf),
             FfiConverterUInt.read(buf),
             FfiConverterUInt.read(buf),
+            FfiConverterSequenceTypeProxyHop.read(buf),
+            FfiConverterSequenceTypePortKnock.read(buf),
         )
     }
 
@@ -4343,10 +6236,13 @@ public object FfiConverterTypeConnectConfig: FfiConverterRustBuffer<ConnectConfi
             FfiConverterOptionalString.allocationSize(value.`passphrase`) +
             FfiConverterOptionalString.allocationSize(value.`certificate`) +
             FfiConverterBoolean.allocationSize(value.`forceKeyboardInteractive`) +
+            FfiConverterBoolean.allocationSize(value.`tryKeyboard`) +
             FfiConverterBoolean.allocationSize(value.`allowLegacyAlgorithms`) +
             FfiConverterUInt.allocationSize(value.`connectTimeoutSecs`) +
             FfiConverterUInt.allocationSize(value.`keepaliveIntervalSecs`) +
-            FfiConverterUInt.allocationSize(value.`keepaliveCountMax`)
+            FfiConverterUInt.allocationSize(value.`keepaliveCountMax`) +
+            FfiConverterSequenceTypeProxyHop.allocationSize(value.`proxies`) +
+            FfiConverterSequenceTypePortKnock.allocationSize(value.`portKnock`)
     )
 
     override fun write(value: ConnectConfig, buf: ByteBuffer) {
@@ -4358,10 +6254,13 @@ public object FfiConverterTypeConnectConfig: FfiConverterRustBuffer<ConnectConfi
             FfiConverterOptionalString.write(value.`passphrase`, buf)
             FfiConverterOptionalString.write(value.`certificate`, buf)
             FfiConverterBoolean.write(value.`forceKeyboardInteractive`, buf)
+            FfiConverterBoolean.write(value.`tryKeyboard`, buf)
             FfiConverterBoolean.write(value.`allowLegacyAlgorithms`, buf)
             FfiConverterUInt.write(value.`connectTimeoutSecs`, buf)
             FfiConverterUInt.write(value.`keepaliveIntervalSecs`, buf)
             FfiConverterUInt.write(value.`keepaliveCountMax`, buf)
+            FfiConverterSequenceTypeProxyHop.write(value.`proxies`, buf)
+            FfiConverterSequenceTypePortKnock.write(value.`portKnock`, buf)
     }
 }
 
@@ -4411,6 +6310,13 @@ data class ExecResult (
     var `stderr`: kotlin.ByteArray
     , 
     var `exitCode`: kotlin.UInt?
+    , 
+    var `exitSignal`: kotlin.String?
+    , 
+    /**
+     * True when output went past the cap and the rest was dropped.
+     */
+    var `truncated`: kotlin.Boolean
     
 ){
     
@@ -4430,19 +6336,25 @@ public object FfiConverterTypeExecResult: FfiConverterRustBuffer<ExecResult> {
             FfiConverterByteArray.read(buf),
             FfiConverterByteArray.read(buf),
             FfiConverterOptionalUInt.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterBoolean.read(buf),
         )
     }
 
     override fun allocationSize(value: ExecResult) = (
             FfiConverterByteArray.allocationSize(value.`stdout`) +
             FfiConverterByteArray.allocationSize(value.`stderr`) +
-            FfiConverterOptionalUInt.allocationSize(value.`exitCode`)
+            FfiConverterOptionalUInt.allocationSize(value.`exitCode`) +
+            FfiConverterOptionalString.allocationSize(value.`exitSignal`) +
+            FfiConverterBoolean.allocationSize(value.`truncated`)
     )
 
     override fun write(value: ExecResult, buf: ByteBuffer) {
             FfiConverterByteArray.write(value.`stdout`, buf)
             FfiConverterByteArray.write(value.`stderr`, buf)
             FfiConverterOptionalUInt.write(value.`exitCode`, buf)
+            FfiConverterOptionalString.write(value.`exitSignal`, buf)
+            FfiConverterBoolean.write(value.`truncated`, buf)
     }
 }
 
@@ -4457,9 +6369,23 @@ data class FileEntry (
     , 
     var `isSymlink`: kotlin.Boolean
     , 
+    /**
+     * Full st_mode, file type bits included.
+     */
     var `permissions`: kotlin.UInt
     , 
     var `mtime`: kotlin.UInt
+    , 
+    var `atime`: kotlin.UInt
+    , 
+    var `uid`: kotlin.UInt?
+    , 
+    var `gid`: kotlin.UInt?
+    , 
+    /**
+     * Where a symlink points, filled by `list` and `lstat`.
+     */
+    var `linkTarget`: kotlin.String?
     
 ){
     
@@ -4482,6 +6408,10 @@ public object FfiConverterTypeFileEntry: FfiConverterRustBuffer<FileEntry> {
             FfiConverterBoolean.read(buf),
             FfiConverterUInt.read(buf),
             FfiConverterUInt.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterOptionalUInt.read(buf),
+            FfiConverterOptionalUInt.read(buf),
+            FfiConverterOptionalString.read(buf),
         )
     }
 
@@ -4491,7 +6421,11 @@ public object FfiConverterTypeFileEntry: FfiConverterRustBuffer<FileEntry> {
             FfiConverterBoolean.allocationSize(value.`isDir`) +
             FfiConverterBoolean.allocationSize(value.`isSymlink`) +
             FfiConverterUInt.allocationSize(value.`permissions`) +
-            FfiConverterUInt.allocationSize(value.`mtime`)
+            FfiConverterUInt.allocationSize(value.`mtime`) +
+            FfiConverterUInt.allocationSize(value.`atime`) +
+            FfiConverterOptionalUInt.allocationSize(value.`uid`) +
+            FfiConverterOptionalUInt.allocationSize(value.`gid`) +
+            FfiConverterOptionalString.allocationSize(value.`linkTarget`)
     )
 
     override fun write(value: FileEntry, buf: ByteBuffer) {
@@ -4501,6 +6435,10 @@ public object FfiConverterTypeFileEntry: FfiConverterRustBuffer<FileEntry> {
             FfiConverterBoolean.write(value.`isSymlink`, buf)
             FfiConverterUInt.write(value.`permissions`, buf)
             FfiConverterUInt.write(value.`mtime`, buf)
+            FfiConverterUInt.write(value.`atime`, buf)
+            FfiConverterOptionalUInt.write(value.`uid`, buf)
+            FfiConverterOptionalUInt.write(value.`gid`, buf)
+            FfiConverterOptionalString.write(value.`linkTarget`, buf)
     }
 }
 
@@ -4675,6 +6613,81 @@ public object FfiConverterTypeKbdRequest: FfiConverterRustBuffer<KbdRequest> {
 
 
 
+data class KeyInfo (
+    /**
+     * Like `ssh-ed25519` or `rsa-sha2-512`.
+     */
+    var `keyType`: kotlin.String
+    , 
+    var `bits`: kotlin.UInt
+    , 
+    var `sha256`: kotlin.String
+    , 
+    /**
+     * The `authorized_keys` line for this key.
+     */
+    var `publicOpenssh`: kotlin.String
+    , 
+    /**
+     * The text needed a passphrase.
+     */
+    var `encrypted`: kotlin.Boolean
+    , 
+    /**
+     * `openssh`, `pem`, `pkcs8` or `ppk`.
+     */
+    var `format`: kotlin.String
+    , 
+    var `comment`: kotlin.String
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeKeyInfo: FfiConverterRustBuffer<KeyInfo> {
+    override fun read(buf: ByteBuffer): KeyInfo {
+        return KeyInfo(
+            FfiConverterString.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: KeyInfo) = (
+            FfiConverterString.allocationSize(value.`keyType`) +
+            FfiConverterUInt.allocationSize(value.`bits`) +
+            FfiConverterString.allocationSize(value.`sha256`) +
+            FfiConverterString.allocationSize(value.`publicOpenssh`) +
+            FfiConverterBoolean.allocationSize(value.`encrypted`) +
+            FfiConverterString.allocationSize(value.`format`) +
+            FfiConverterString.allocationSize(value.`comment`)
+    )
+
+    override fun write(value: KeyInfo, buf: ByteBuffer) {
+            FfiConverterString.write(value.`keyType`, buf)
+            FfiConverterUInt.write(value.`bits`, buf)
+            FfiConverterString.write(value.`sha256`, buf)
+            FfiConverterString.write(value.`publicOpenssh`, buf)
+            FfiConverterBoolean.write(value.`encrypted`, buf)
+            FfiConverterString.write(value.`format`, buf)
+            FfiConverterString.write(value.`comment`, buf)
+    }
+}
+
+
+
 data class NegotiatedAlgorithms (
     var `kex`: kotlin.String
     , 
@@ -4723,6 +6736,151 @@ public object FfiConverterTypeNegotiatedAlgorithms: FfiConverterRustBuffer<Negot
 
 
 
+data class PortKnock (
+    var `port`: kotlin.UShort
+    , 
+    var `udp`: kotlin.Boolean
+    , 
+    /**
+     * Wait after this knock, like core's default of 100 ms.
+     */
+    var `delayMs`: kotlin.UInt
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypePortKnock: FfiConverterRustBuffer<PortKnock> {
+    override fun read(buf: ByteBuffer): PortKnock {
+        return PortKnock(
+            FfiConverterUShort.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterUInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: PortKnock) = (
+            FfiConverterUShort.allocationSize(value.`port`) +
+            FfiConverterBoolean.allocationSize(value.`udp`) +
+            FfiConverterUInt.allocationSize(value.`delayMs`)
+    )
+
+    override fun write(value: PortKnock, buf: ByteBuffer) {
+            FfiConverterUShort.write(value.`port`, buf)
+            FfiConverterBoolean.write(value.`udp`, buf)
+            FfiConverterUInt.write(value.`delayMs`, buf)
+    }
+}
+
+
+
+/**
+ * One proxy on the way to the host. Several make a chain, first one is dialed directly.
+ */
+data class ProxyHop (
+    var `kind`: ProxyKind
+    , 
+    var `host`: kotlin.String
+    , 
+    var `port`: kotlin.UShort
+    , 
+    var `username`: kotlin.String?
+    , 
+    var `password`: kotlin.String?
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeProxyHop: FfiConverterRustBuffer<ProxyHop> {
+    override fun read(buf: ByteBuffer): ProxyHop {
+        return ProxyHop(
+            FfiConverterTypeProxyKind.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterUShort.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: ProxyHop) = (
+            FfiConverterTypeProxyKind.allocationSize(value.`kind`) +
+            FfiConverterString.allocationSize(value.`host`) +
+            FfiConverterUShort.allocationSize(value.`port`) +
+            FfiConverterOptionalString.allocationSize(value.`username`) +
+            FfiConverterOptionalString.allocationSize(value.`password`)
+    )
+
+    override fun write(value: ProxyHop, buf: ByteBuffer) {
+            FfiConverterTypeProxyKind.write(value.`kind`, buf)
+            FfiConverterString.write(value.`host`, buf)
+            FfiConverterUShort.write(value.`port`, buf)
+            FfiConverterOptionalString.write(value.`username`, buf)
+            FfiConverterOptionalString.write(value.`password`, buf)
+    }
+}
+
+
+
+data class PtySize (
+    var `term`: kotlin.String
+    , 
+    var `cols`: kotlin.UInt
+    , 
+    var `rows`: kotlin.UInt
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypePtySize: FfiConverterRustBuffer<PtySize> {
+    override fun read(buf: ByteBuffer): PtySize {
+        return PtySize(
+            FfiConverterString.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterUInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: PtySize) = (
+            FfiConverterString.allocationSize(value.`term`) +
+            FfiConverterUInt.allocationSize(value.`cols`) +
+            FfiConverterUInt.allocationSize(value.`rows`)
+    )
+
+    override fun write(value: PtySize, buf: ByteBuffer) {
+            FfiConverterString.write(value.`term`, buf)
+            FfiConverterUInt.write(value.`cols`, buf)
+            FfiConverterUInt.write(value.`rows`, buf)
+    }
+}
+
+
+
 data class TransferResult (
     var `bytes`: kotlin.ULong
     , 
@@ -4758,6 +6916,92 @@ public object FfiConverterTypeTransferResult: FfiConverterRustBuffer<TransferRes
             FfiConverterULong.write(value.`millis`, buf)
     }
 }
+
+
+
+/**
+ * Why a session ended.
+ */
+
+enum class DisconnectKind {
+    
+    /**
+     * The server sent a disconnect.
+     */
+    SERVER,
+    /**
+     * Keepalive replies stopped coming.
+     */
+    KEEPALIVE,
+    /**
+     * The socket broke.
+     */
+    NETWORK,
+    /**
+     * This side closed it.
+     */
+    LOCAL;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeDisconnectKind: FfiConverterRustBuffer<DisconnectKind> {
+    override fun read(buf: ByteBuffer) = try {
+        DisconnectKind.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: DisconnectKind) = 4UL
+
+    override fun write(value: DisconnectKind, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+
+enum class ProxyKind {
+    
+    SOCKS4,
+    SOCKS5,
+    HTTP;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeProxyKind: FfiConverterRustBuffer<ProxyKind> {
+    override fun read(buf: ByteBuffer) = try {
+        ProxyKind.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: ProxyKind) = 4UL
+
+    override fun write(value: ProxyKind, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
 
 
 
@@ -4807,7 +7051,30 @@ sealed class SshException: kotlin.Exception() {
             get() = "msg=${ `msg` }"
     }
     
+    /**
+     * Nothing this login has fits what the server accepts.
+     */
+    class AuthMethodNotAvailable(
+        
+        val `msg`: kotlin.String
+        ) : SshException() {
+        override val message
+            get() = "msg=${ `msg` }"
+    }
+    
     class AuthCancelled(
+        ) : SshException() {
+        override val message
+            get() = ""
+    }
+    
+    class Cancelled(
+        ) : SshException() {
+        override val message
+            get() = ""
+    }
+    
+    class Timeout(
         ) : SshException() {
         override val message
             get() = ""
@@ -4874,17 +7141,22 @@ public object FfiConverterTypeSshError : FfiConverterRustBuffer<SshException> {
             6 -> SshException.Auth(
                 FfiConverterString.read(buf),
                 )
-            7 -> SshException.AuthCancelled()
-            8 -> SshException.Channel(
+            7 -> SshException.AuthMethodNotAvailable(
                 FfiConverterString.read(buf),
                 )
-            9 -> SshException.Sftp(
+            8 -> SshException.AuthCancelled()
+            9 -> SshException.Cancelled()
+            10 -> SshException.Timeout()
+            11 -> SshException.Channel(
                 FfiConverterString.read(buf),
                 )
-            10 -> SshException.Io(
+            12 -> SshException.Sftp(
                 FfiConverterString.read(buf),
                 )
-            11 -> SshException.Disconnected()
+            13 -> SshException.Io(
+                FfiConverterString.read(buf),
+                )
+            14 -> SshException.Disconnected()
             else -> throw RuntimeException("invalid error enum value, something is very wrong!!")
         }
     }
@@ -4918,7 +7190,20 @@ public object FfiConverterTypeSshError : FfiConverterRustBuffer<SshException> {
                 4UL
                 + FfiConverterString.allocationSize(value.`msg`)
             )
+            is SshException.AuthMethodNotAvailable -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+                + FfiConverterString.allocationSize(value.`msg`)
+            )
             is SshException.AuthCancelled -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+            )
+            is SshException.Cancelled -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+            )
+            is SshException.Timeout -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
                 4UL
             )
@@ -4973,27 +7258,40 @@ public object FfiConverterTypeSshError : FfiConverterRustBuffer<SshException> {
                 FfiConverterString.write(value.`msg`, buf)
                 Unit
             }
-            is SshException.AuthCancelled -> {
+            is SshException.AuthMethodNotAvailable -> {
                 buf.putInt(7)
+                FfiConverterString.write(value.`msg`, buf)
+                Unit
+            }
+            is SshException.AuthCancelled -> {
+                buf.putInt(8)
+                Unit
+            }
+            is SshException.Cancelled -> {
+                buf.putInt(9)
+                Unit
+            }
+            is SshException.Timeout -> {
+                buf.putInt(10)
                 Unit
             }
             is SshException.Channel -> {
-                buf.putInt(8)
+                buf.putInt(11)
                 FfiConverterString.write(value.`msg`, buf)
                 Unit
             }
             is SshException.Sftp -> {
-                buf.putInt(9)
+                buf.putInt(12)
                 FfiConverterString.write(value.`msg`, buf)
                 Unit
             }
             is SshException.Io -> {
-                buf.putInt(10)
+                buf.putInt(13)
                 FfiConverterString.write(value.`msg`, buf)
                 Unit
             }
             is SshException.Disconnected -> {
-                buf.putInt(11)
+                buf.putInt(14)
                 Unit
             }
         }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
@@ -5071,6 +7369,38 @@ public object FfiConverterOptionalString: FfiConverterRustBuffer<kotlin.String?>
 /**
  * @suppress
  */
+public object FfiConverterOptionalTypeCancelToken: FfiConverterRustBuffer<CancelToken?> {
+    override fun read(buf: ByteBuffer): CancelToken? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeCancelToken.read(buf)
+    }
+
+    override fun allocationSize(value: CancelToken?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeCancelToken.allocationSize(value)
+        }
+    }
+
+    override fun write(value: CancelToken?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeCancelToken.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterOptionalTypeProgressCallback: FfiConverterRustBuffer<ProgressCallback?> {
     override fun read(buf: ByteBuffer): ProgressCallback? {
         if (buf.get().toInt() == 0) {
@@ -5125,6 +7455,38 @@ public object FfiConverterOptionalTypeNegotiatedAlgorithms: FfiConverterRustBuff
         } else {
             buf.put(1)
             FfiConverterTypeNegotiatedAlgorithms.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalTypePtySize: FfiConverterRustBuffer<PtySize?> {
+    override fun read(buf: ByteBuffer): PtySize? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypePtySize.read(buf)
+    }
+
+    override fun allocationSize(value: PtySize?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypePtySize.allocationSize(value)
+        }
+    }
+
+    override fun write(value: PtySize?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypePtySize.write(value, buf)
         }
     }
 }
@@ -5276,6 +7638,62 @@ public object FfiConverterSequenceTypeKbdPrompt: FfiConverterRustBuffer<List<Kbd
 
 
 
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypePortKnock: FfiConverterRustBuffer<List<PortKnock>> {
+    override fun read(buf: ByteBuffer): List<PortKnock> {
+        val len = buf.getInt()
+        return List<PortKnock>(len) {
+            FfiConverterTypePortKnock.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<PortKnock>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypePortKnock.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<PortKnock>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypePortKnock.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeProxyHop: FfiConverterRustBuffer<List<ProxyHop>> {
+    override fun read(buf: ByteBuffer): List<ProxyHop> {
+        val len = buf.getInt()
+        return List<ProxyHop>(len) {
+            FfiConverterTypeProxyHop.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<ProxyHop>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeProxyHop.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<ProxyHop>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeProxyHop.write(it, buf)
+        }
+    }
+}
+
+
+
+
 
 
 
@@ -5294,15 +7712,65 @@ public object FfiConverterSequenceTypeKbdPrompt: FfiConverterRustBuffer<List<Kbd
     
 
         /**
-         * Opens a TCP connection and logs in.
+         * Returns the key as OpenSSH text, so PuTTY, PEM and PKCS8 keys are stored one way.
+         * A non-empty `new_passphrase` encrypts the result.
+         */
+    @Throws(SshException::class) fun `convertKeyToOpenssh`(`text`: kotlin.String, `passphrase`: kotlin.String?, `newPassphrase`: kotlin.String?): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(SshException) { _status ->
+    UniffiLib.uniffi_termix_ssh_core_fn_func_convert_key_to_openssh(
+    
+        
+        FfiConverterString.lower(`text`),
+        FfiConverterOptionalString.lower(`passphrase`),
+        FfiConverterOptionalString.lower(`newPassphrase`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Reads an OpenSSH certificate (`*-cert.pub` text).
+         */
+    @Throws(SshException::class) fun `inspectCertificate`(`text`: kotlin.String): CertInfo {
+            return FfiConverterTypeCertInfo.lift(
+    uniffiRustCallWithError(SshException) { _status ->
+    UniffiLib.uniffi_termix_ssh_core_fn_func_inspect_certificate(
+    
+        
+        FfiConverterString.lower(`text`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Reads a private key. Fails with PassphraseRequired or BadPassphrase when it needs one.
+         */
+    @Throws(SshException::class) fun `inspectKey`(`text`: kotlin.String, `passphrase`: kotlin.String?): KeyInfo {
+            return FfiConverterTypeKeyInfo.lift(
+    uniffiRustCallWithError(SshException) { _status ->
+    UniffiLib.uniffi_termix_ssh_core_fn_func_inspect_key(
+    
+        
+        FfiConverterString.lower(`text`),
+        FfiConverterOptionalString.lower(`passphrase`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Opens a connection (knocking and through proxies when set) and logs in.
          */
     @Throws(SshException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-     suspend fun `connect`(`config`: ConnectConfig, `callbacks`: SessionCallbacks) : Session {
+     suspend fun `connect`(`config`: ConnectConfig, `callbacks`: SessionCallbacks, `cancel`: CancelToken?) : Session {
         return uniffiRustCallAsync(
         UniffiLib.uniffi_termix_ssh_core_fn_func_connect(
         FfiConverterTypeConnectConfig.lower(`config`),
-        FfiConverterTypeSessionCallbacks.lower(`callbacks`),),
+        FfiConverterTypeSessionCallbacks.lower(`callbacks`),
+        FfiConverterOptionalTypeCancelToken.lower(`cancel`),),
         { future, callback, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_poll_u64(future, callback, continuation) },
         { future, continuation -> UniffiLib.ffi_termix_ssh_core_rust_future_complete_u64(future, continuation) },
         { future -> UniffiLib.ffi_termix_ssh_core_rust_future_free_u64(future) },

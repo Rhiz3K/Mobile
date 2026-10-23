@@ -26,7 +26,7 @@ async fn keepalive_detects_dropped_network() {
     c.keepalive_interval_secs = 2;
     c.keepalive_count_max = 2;
     let cb = Cb::new();
-    let s = connect(c.clone(), cb.clone()).await.unwrap();
+    let s = connect(c.clone(), cb.clone(), None).await.unwrap();
     docker(&["pause"]);
     let start = Instant::now();
     while cb.disconnects.lock().unwrap().is_empty() && start.elapsed() < Duration::from_secs(30) {
@@ -38,6 +38,6 @@ async fn keepalive_detects_dropped_network() {
     assert!(seen, "no disconnect within 30s");
     assert!(s.is_closed());
     // A fresh login works once the network is back.
-    connect(c, Cb::new()).await.unwrap();
+    connect(c, Cb::new(), None).await.unwrap();
     record("keepalive.drop", seen, Detail::nums(&[("detect_s", took)]));
 }

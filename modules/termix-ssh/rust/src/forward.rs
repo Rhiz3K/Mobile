@@ -3,32 +3,76 @@ use std::sync::Arc;
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 
+use crate::session::RemoteTarget;
 use crate::{Session, SshError};
 
+/// A running forward. Stopping it closes the listener and every connection it piped.
 #[derive(uniffi::Object)]
 pub struct Forward {
     port: u16,
-    task: JoinHandle<()>,
+    stop: CancellationToken,
+    remote: Option<(Arc<Session>, String)>,
 }
 
-#[uniffi::export]
+#[uniffi::export(async_runtime = "tokio")]
 impl Forward {
-    /// The local port, useful when 0 was asked for.
+    /// The bound port: on the phone for local and dynamic forwards, on the server for remote ones.
     pub fn port(&self) -> u16 {
         self.port
     }
 
     pub fn stop(&self) {
-        self.task.abort();
+        self.stop.cancel();
+        if let Some((session, _)) = &self.remote {
+            session.remote.lock().unwrap().remove(&(self.port as u32));
+        }
+    }
+
+    /// Like `stop`, and for a remote forward also asks the server to stop listening.
+    pub async fn shutdown(&self) -> Result<(), SshError> {
+        self.stop();
+        if let Some((session, addr)) = &self.remote
+            && !session.handle.is_closed() {
+                session.handle.cancel_tcpip_forward(addr.clone(), self.port as u32).await?;
+            }
+        Ok(())
     }
 }
 
 impl Drop for Forward {
     fn drop(&mut self) {
-        self.task.abort();
+        self.stop.cancel();
     }
+}
+
+// Accepts until stopped; each connection runs until it ends or the forward stops.
+fn serve<F, Fut>(listener: TcpListener, stop: CancellationToken, handle: F)
+where
+    F: Fn(TcpStream) -> Fut + Send + 'static,
+    Fut: std::future::Future<Output = ()> + Send + 'static,
+{
+    tokio::spawn(async move {
+        loop {
+            let tcp = tokio::select! {
+                _ = stop.cancelled() => return,
+                r = listener.accept() => match r {
+                    Ok((tcp, _)) => tcp,
+                    Err(_) => return,
+                },
+            };
+            crate::no_sigpipe(&tcp);
+            let conn = handle(tcp);
+            let stop = stop.clone();
+            tokio::spawn(async move {
+                tokio::select! {
+                    _ = stop.cancelled() => {}
+                    _ = conn => {}
+                }
+            });
+        }
+    });
 }
 
 async fn pipe(session: &Session, tcp: TcpStream, host: String, port: u16) -> Result<(), SshError> {
@@ -118,17 +162,15 @@ impl Session {
     ) -> Result<Arc<Forward>, SshError> {
         let listener = TcpListener::bind((bind_host, bind_port)).await?;
         let port = listener.local_addr()?.port();
-        let task = tokio::spawn(async move {
-            while let Ok((tcp, _)) = listener.accept().await {
-                crate::no_sigpipe(&tcp);
-                let s = self.clone();
-                let host = remote_host.clone();
-                tokio::spawn(async move {
-                    pipe(&s, tcp, host, remote_port).await.ok();
-                });
+        let stop = CancellationToken::new();
+        serve(listener, stop.clone(), move |tcp| {
+            let s = self.clone();
+            let host = remote_host.clone();
+            async move {
+                pipe(&s, tcp, host, remote_port).await.ok();
             }
         });
-        Ok(Arc::new(Forward { port, task }))
+        Ok(Arc::new(Forward { port, stop, remote: None }))
     }
 
     /// A SOCKS5 proxy on `bind_host:bind_port` that opens every connection through SSH.
@@ -139,15 +181,32 @@ impl Session {
     ) -> Result<Arc<Forward>, SshError> {
         let listener = TcpListener::bind((bind_host, bind_port)).await?;
         let port = listener.local_addr()?.port();
-        let task = tokio::spawn(async move {
-            while let Ok((tcp, _)) = listener.accept().await {
-                crate::no_sigpipe(&tcp);
-                let s = self.clone();
-                tokio::spawn(async move {
-                    socks5(&s, tcp).await.ok();
-                });
+        let stop = CancellationToken::new();
+        serve(listener, stop.clone(), move |tcp| {
+            let s = self.clone();
+            async move {
+                socks5(&s, tcp).await.ok();
             }
         });
-        Ok(Arc::new(Forward { port, task }))
+        Ok(Arc::new(Forward { port, stop, remote: None }))
+    }
+
+    /// Asks the server to listen on `remote_bind_host:remote_port` (0 lets it pick) and sends each
+    /// connection to `local_host:local_port` as seen from the phone.
+    pub async fn forward_remote(
+        self: Arc<Self>,
+        remote_bind_host: String,
+        remote_port: u16,
+        local_host: String,
+        local_port: u16,
+    ) -> Result<Arc<Forward>, SshError> {
+        let got = self.handle.tcpip_forward(remote_bind_host.clone(), remote_port as u32).await?;
+        let port = if remote_port == 0 { got } else { remote_port as u32 };
+        let stop = CancellationToken::new();
+        self.remote
+            .lock()
+            .unwrap()
+            .insert(port, RemoteTarget { host: local_host, port: local_port, stop: stop.clone() });
+        Ok(Arc::new(Forward { port: port as u16, stop, remote: Some((self, remote_bind_host)) }))
     }
 }

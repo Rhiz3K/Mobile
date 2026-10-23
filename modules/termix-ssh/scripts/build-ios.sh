@@ -4,7 +4,7 @@ set -eu
 here=$(cd "$(dirname "$0")/.." && pwd)
 out=$here/dist
 targets="aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios"
-export IPHONEOS_DEPLOYMENT_TARGET=15.1
+export IPHONEOS_DEPLOYMENT_TARGET=16.4
 cd "$here/rust"
 for t in $targets; do cargo build --release --lib --target "$t"; done
 cargo build --lib

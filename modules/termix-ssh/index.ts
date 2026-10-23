@@ -3,19 +3,24 @@
  *
  * Every call goes to the phone's own engine, no server involved. The local
  * transport in src/core/transport builds on this. Binary data crosses the
- * bridge as base64; this file hides that and the event plumbing.
+ * bridge as base64; this file hides that, the event plumbing and cancelling.
  */
 import { requireOptionalNativeModule } from "expo-modules-core";
 
 import { fromBase64, toBase64, utf8Encode } from "./src/base64";
 import type {
   NativeEvents,
+  NativeExecResult,
+  NativeSessionInfo,
   SshAlgorithms,
+  SshCertInfo,
   SshConnectConfig,
+  SshDisconnect,
   SshErrorKind,
   SshExecResult,
   SshFileEntry,
   SshHostKey,
+  SshKeyInfo,
   SshPrompts,
   SshTransferResult,
   TermixSshNativeModule,
@@ -36,7 +41,10 @@ const ERROR_KINDS: SshErrorKind[] = [
   "badPassphrase",
   "invalidKey",
   "auth",
+  "authMethodNotAvailable",
   "authCancelled",
+  "cancelled",
+  "timeout",
   "channel",
   "sftp",
   "io",
@@ -84,6 +92,14 @@ async function call<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
+function callSync<T>(fn: () => T): T {
+  try {
+    return fn();
+  } catch (err) {
+    throw toSshError(err);
+  }
+}
+
 function on<K extends keyof NativeEvents>(
   event: K,
   listener: (payload: NativeEvents[K]) => void,
@@ -97,13 +113,71 @@ function newId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${counter}`;
 }
 
+/** Ties an AbortSignal to a native op id, so aborting stops the work in Rust. */
+async function cancellable<T>(
+  opId: string,
+  signal: AbortSignal | undefined,
+  run: () => Promise<T>,
+): Promise<T> {
+  if (signal?.aborted) throw new SshError("cancelled", "Cancelled");
+  const onAbort = () => native().cancel(opId);
+  signal?.addEventListener("abort", onAbort);
+  try {
+    return await call(run);
+  } finally {
+    signal?.removeEventListener("abort", onAbort);
+  }
+}
+
+/** Listens for progress of one op while it runs. */
+async function withProgress<T>(
+  opId: string,
+  onProgress: ((done: number, total: number) => void) | undefined,
+  run: () => Promise<T>,
+): Promise<T> {
+  const sub = onProgress
+    ? on("onProgress", (e) => {
+        if (e.opId === opId) onProgress(e.done, e.total);
+      })
+    : null;
+  try {
+    return await run();
+  } finally {
+    sub?.remove();
+  }
+}
+
 export function engineVersion(): string | null {
   return Native?.engineVersion() ?? null;
 }
 
+/** Reads a private key, for the login editor. Throws `passphraseRequired` or `badPassphrase`. */
+export function inspectKey(text: string, passphrase?: string): SshKeyInfo {
+  return callSync(() => native().inspectKey(text, passphrase || null));
+}
+
+/** Turns any supported key (PuTTY PPK too) into OpenSSH text, optionally locked with a new passphrase. */
+export function convertKeyToOpenssh(
+  text: string,
+  passphrase?: string,
+  newPassphrase?: string,
+): string {
+  return callSync(() =>
+    native().convertKeyToOpenssh(
+      text,
+      passphrase || null,
+      newPassphrase || null,
+    ),
+  );
+}
+
+export function inspectCertificate(text: string): SshCertInfo {
+  return callSync(() => native().inspectCertificate(text));
+}
+
 export interface ShellHandlers {
   onData(data: Uint8Array): void;
-  onExit?(exitCode: number | null): void;
+  onExit?(exitCode: number | null, exitSignal: string | null): void;
 }
 
 export class SshShell {
@@ -120,7 +194,7 @@ export class SshShell {
       on("onShellExit", (e) => {
         if (e.shellId !== id) return;
         this.release();
-        handlers.onExit?.(e.exitCode);
+        handlers.onExit?.(e.exitCode, e.exitSignal ?? null);
       }),
     );
   }
@@ -132,6 +206,11 @@ export class SshShell {
 
   resize(cols: number, rows: number): Promise<void> {
     return call(() => native().resizeShell(this.id, cols, rows));
+  }
+
+  /** Like `INT`. Many servers ignore signals; writing Ctrl+C always works. */
+  signal(name: string): Promise<void> {
+    return call(() => native().signalShell(this.id, name));
   }
 
   async close(): Promise<void> {
@@ -149,11 +228,68 @@ export class SshShell {
   }
 }
 
+export interface ExecHandlers {
+  onStdout(data: Uint8Array): void;
+  onStderr?(data: Uint8Array): void;
+  onExit?(exitCode: number | null, exitSignal: string | null): void;
+}
+
+/** A running command whose output streams in. */
+export class SshExec {
+  private subs: { remove(): void }[] = [];
+
+  constructor(
+    readonly id: string,
+    handlers: ExecHandlers,
+  ) {
+    this.subs.push(
+      on("onExecData", (e) => {
+        if (e.execId !== id) return;
+        const bytes = fromBase64(e.data);
+        if (e.stream === "stderr") handlers.onStderr?.(bytes);
+        else handlers.onStdout(bytes);
+      }),
+      on("onExecExit", (e) => {
+        if (e.execId !== id) return;
+        this.release();
+        handlers.onExit?.(e.exitCode, e.exitSignal ?? null);
+      }),
+    );
+  }
+
+  write(data: Uint8Array | string): Promise<void> {
+    const bytes = typeof data === "string" ? utf8Encode(data) : data;
+    return call(() => native().execWrite(this.id, toBase64(bytes)));
+  }
+
+  /** Ends stdin, for commands that read until EOF. */
+  eof(): Promise<void> {
+    return call(() => native().execEof(this.id));
+  }
+
+  signal(name: string): Promise<void> {
+    return call(() => native().execSignal(this.id, name));
+  }
+
+  async close(): Promise<void> {
+    try {
+      await call(() => native().execClose(this.id));
+    } finally {
+      this.release();
+    }
+  }
+
+  release(): void {
+    this.subs.forEach((s) => s.remove());
+    this.subs = [];
+  }
+}
+
 export interface SshForward {
   id: string;
-  /** The bound local port, useful when 0 was asked for. */
+  /** The bound port: on the phone for local and dynamic, on the server for remote. */
   port: number;
-  close(): void;
+  close(): Promise<void>;
 }
 
 export interface ShellOptions {
@@ -163,19 +299,191 @@ export interface ShellOptions {
   env?: Record<string, string>;
 }
 
+export interface ExecOptions {
+  /** 0 or unset means no limit. */
+  timeoutSecs?: number;
+  /** Caps stdout and stderr each. Default 16 MiB. */
+  maxBytes?: number;
+  signal?: AbortSignal;
+}
+
+export interface TransferOptions {
+  /** Resume from this byte. */
+  offset?: number;
+  onProgress?: (done: number, total: number) => void;
+  signal?: AbortSignal;
+}
+
+const DEFAULT_EXEC_MAX = 16 * 1024 * 1024;
+
+/** SFTP on a session. The channel opens on first use and closes with the session. */
+export class SshSftp {
+  constructor(private readonly sessionId: string) {}
+
+  list(path: string): Promise<SshFileEntry[]> {
+    return call(() => native().sftpList(this.sessionId, path));
+  }
+
+  /** Follows symlinks. */
+  stat(path: string): Promise<SshFileEntry> {
+    return call(() => native().sftpStat(this.sessionId, path));
+  }
+
+  /** Describes a symlink itself, with its target. */
+  lstat(path: string): Promise<SshFileEntry> {
+    return call(() => native().sftpLstat(this.sessionId, path));
+  }
+
+  size(path: string): Promise<number> {
+    return call(() => native().sftpSize(this.sessionId, path));
+  }
+
+  /** `.` gives the home folder. */
+  realpath(path: string): Promise<string> {
+    return call(() => native().sftpRealpath(this.sessionId, path));
+  }
+
+  readLink(path: string): Promise<string> {
+    return call(() => native().sftpReadLink(this.sessionId, path));
+  }
+
+  /** Makes `path` a link to `target`. */
+  symlink(path: string, target: string): Promise<void> {
+    return call(() => native().sftpSymlink(this.sessionId, path, target));
+  }
+
+  mkdir(path: string, mode?: number): Promise<void> {
+    return call(() => native().sftpMkdir(this.sessionId, path, mode ?? null));
+  }
+
+  rmdir(path: string): Promise<void> {
+    return call(() => native().sftpRmdir(this.sessionId, path));
+  }
+
+  rename(from: string, to: string): Promise<void> {
+    return call(() => native().sftpRename(this.sessionId, from, to));
+  }
+
+  /** Permission bits like 0o644. */
+  chmod(path: string, mode: number): Promise<void> {
+    return call(() => native().sftpChmod(this.sessionId, path, mode));
+  }
+
+  remove(path: string): Promise<void> {
+    return call(() => native().sftpRemove(this.sessionId, path));
+  }
+
+  /** Deletes a file or folder tree, never following symlinks. Progress reports a count, total 0. */
+  removeRecursive(
+    path: string,
+    options: Omit<TransferOptions, "offset"> = {},
+  ): Promise<number> {
+    const opId = newId("op");
+    return withProgress(opId, options.onProgress, () =>
+      cancellable(opId, options.signal, () =>
+        native().sftpRemoveRecursive(this.sessionId, opId, path),
+      ),
+    );
+  }
+
+  /** Reads a small file. Fails when it is over `maxBytes`. */
+  async readFile(path: string, maxBytes = 1024 * 1024): Promise<Uint8Array> {
+    const data = await call(() =>
+      native().sftpReadFile(this.sessionId, path, maxBytes),
+    );
+    return fromBase64(data);
+  }
+
+  /** Replaces a whole file. `mode` applies to new files. */
+  writeFile(
+    path: string,
+    data: Uint8Array | string,
+    mode?: number,
+  ): Promise<void> {
+    const bytes = typeof data === "string" ? utf8Encode(data) : data;
+    return call(() =>
+      native().sftpWriteFile(
+        this.sessionId,
+        path,
+        toBase64(bytes),
+        mode ?? null,
+      ),
+    );
+  }
+
+  /** Streams a remote file to a local path or file:// URI. */
+  download(
+    remote: string,
+    local: string,
+    options: TransferOptions = {},
+  ): Promise<SshTransferResult> {
+    const opId = newId("op");
+    return withProgress(opId, options.onProgress, () =>
+      cancellable(opId, options.signal, () =>
+        native().sftpDownload(
+          this.sessionId,
+          opId,
+          remote,
+          local,
+          options.offset ?? 0,
+        ),
+      ),
+    );
+  }
+
+  upload(
+    local: string,
+    remote: string,
+    options: TransferOptions = {},
+  ): Promise<SshTransferResult> {
+    const opId = newId("op");
+    return withProgress(opId, options.onProgress, () =>
+      cancellable(opId, options.signal, () =>
+        native().sftpUpload(
+          this.sessionId,
+          opId,
+          local,
+          remote,
+          options.offset ?? 0,
+        ),
+      ),
+    );
+  }
+}
+
+function decodeExec(r: NativeExecResult): SshExecResult {
+  return {
+    stdout: fromBase64(r.stdout),
+    stderr: fromBase64(r.stderr),
+    exitCode: r.exitCode,
+    exitSignal: r.exitSignal ?? null,
+    truncated: r.truncated ?? false,
+  };
+}
+
+function forwardHandle(id: string, port: number): SshForward {
+  return { id, port, close: () => call(() => native().closeForward(id)) };
+}
+
+export interface ConnectOptions {
+  signal?: AbortSignal;
+}
+
 export class SshSession {
-  private disconnectListeners = new Set<(reason: string) => void>();
+  readonly sftp: SshSftp;
+  private disconnectListeners = new Set<(info: SshDisconnect) => void>();
   private sub: { remove(): void } | null;
 
   constructor(
     readonly id: string,
-    readonly hostKey: SshHostKey,
-    readonly algorithms: SshAlgorithms | null,
+    public hostKey: SshHostKey,
+    public algorithms: SshAlgorithms | null,
   ) {
+    this.sftp = new SshSftp(id);
     this.sub = on("onDisconnect", (e) => {
       if (e.sessionId !== id) return;
-      this.disconnectListeners.forEach((l) => l(e.reason));
-      this.release();
+      const info = { kind: e.kind ?? "network", reason: e.reason };
+      this.disconnectListeners.forEach((l) => l(info));
     });
   }
 
@@ -183,7 +491,8 @@ export class SshSession {
     return native().isClosed(this.id);
   }
 
-  onDisconnect(listener: (reason: string) => void): () => void {
+  /** Fires every time the connection drops, including after a reconnect. */
+  onDisconnect(listener: (info: SshDisconnect) => void): () => void {
     this.disconnectListeners.add(listener);
     return () => this.disconnectListeners.delete(listener);
   }
@@ -192,17 +501,64 @@ export class SshSession {
   connectVia(
     config: SshConnectConfig,
     prompts: SshPrompts,
+    options: ConnectOptions = {},
   ): Promise<SshSession> {
-    return connectSession(config, prompts, this.id);
+    return connectSession(config, prompts, this.id, options);
   }
 
-  async exec(command: string): Promise<SshExecResult> {
-    const r = await call(() => native().exec(this.id, command));
-    return {
-      stdout: fromBase64(r.stdout),
-      stderr: fromBase64(r.stderr),
-      exitCode: r.exitCode,
-    };
+  /**
+   * Logs in again with the login kept in native memory, so secrets are not sent again.
+   * Shells, forwards and SFTP from before are gone; open them again.
+   */
+  async reconnect(
+    prompts: SshPrompts,
+    options: ConnectOptions = {},
+  ): Promise<void> {
+    const info = await withPrompts(this.id, prompts, () =>
+      cancellable(this.id, options.signal, () => native().reconnect(this.id)),
+    );
+    this.hostKey = info.hostKey;
+    this.algorithms = info.algorithms;
+  }
+
+  async exec(
+    command: string,
+    options: ExecOptions = {},
+  ): Promise<SshExecResult> {
+    const opId = newId("op");
+    const r = await cancellable(opId, options.signal, () =>
+      native().exec(
+        this.id,
+        opId,
+        command,
+        options.timeoutSecs ?? 0,
+        options.maxBytes ?? DEFAULT_EXEC_MAX,
+      ),
+    );
+    return decodeExec(r);
+  }
+
+  /** Starts a command and streams its output. With `pty` it gets a terminal. */
+  async execStream(
+    command: string,
+    handlers: ExecHandlers,
+    pty?: { term?: string; cols: number; rows: number },
+  ): Promise<SshExec> {
+    const exec = new SshExec(newId("exec"), handlers);
+    try {
+      await call(() =>
+        native().execStream(
+          this.id,
+          exec.id,
+          command,
+          pty ? { term: pty.term ?? "xterm-256color", ...pty } : null,
+        ),
+      );
+    } catch (err) {
+      exec.release();
+      throw err;
+    }
+    return exec;
   }
 
   async openShell(
@@ -226,39 +582,6 @@ export class SshSession {
       throw err;
     }
     return shell;
-  }
-
-  list(path: string): Promise<SshFileEntry[]> {
-    return call(() => native().sftpList(this.id, path));
-  }
-
-  size(path: string): Promise<number> {
-    return call(() => native().sftpSize(this.id, path));
-  }
-
-  /** Streams a remote file to a local path or file:// URI. */
-  download(
-    remote: string,
-    local: string,
-    onProgress?: (done: number, total: number) => void,
-  ): Promise<SshTransferResult> {
-    return this.transfer(onProgress, (id) =>
-      native().sftpDownload(this.id, id, remote, local),
-    );
-  }
-
-  upload(
-    local: string,
-    remote: string,
-    onProgress?: (done: number, total: number) => void,
-  ): Promise<SshTransferResult> {
-    return this.transfer(onProgress, (id) =>
-      native().sftpUpload(this.id, id, local, remote),
-    );
-  }
-
-  remove(path: string): Promise<void> {
-    return call(() => native().sftpRemove(this.id, path));
   }
 
   forwardLocal(
@@ -291,11 +614,32 @@ export class SshSession {
     ).then((port) => forwardHandle(id, port));
   }
 
-  /** Sends a keepalive and waits for the reply, handy after coming back to the foreground. */
-  ping(): Promise<void> {
-    return call(() => native().ping(this.id));
+  /** The server listens on `remotePort` (0 lets it pick) and sends connections to the phone's side. */
+  forwardRemote(
+    remotePort: number,
+    localHost: string,
+    localPort: number,
+    remoteBindHost = "127.0.0.1",
+  ): Promise<SshForward> {
+    const id = newId("fwd");
+    return call(() =>
+      native().forwardRemote(
+        this.id,
+        id,
+        remoteBindHost,
+        remotePort,
+        localHost,
+        localPort,
+      ),
+    ).then((port) => forwardHandle(id, port));
   }
 
+  /** Sends a keepalive and waits for the reply, handy after coming back to the foreground. */
+  ping(timeoutSecs = 10): Promise<void> {
+    return call(() => native().ping(this.id, timeoutSecs));
+  }
+
+  /** Closes the connection and frees everything native keeps for it. */
   async disconnect(): Promise<void> {
     try {
       await call(() => native().disconnect(this.id));
@@ -309,68 +653,61 @@ export class SshSession {
     this.sub = null;
     this.disconnectListeners.clear();
   }
-
-  private async transfer(
-    onProgress: ((done: number, total: number) => void) | undefined,
-    run: (transferId: string) => Promise<SshTransferResult>,
-  ): Promise<SshTransferResult> {
-    const id = newId("xfer");
-    const sub = onProgress
-      ? on("onTransferProgress", (e) => {
-          if (e.transferId === id) onProgress(e.done, e.total);
-        })
-      : null;
-    try {
-      return await call(() => run(id));
-    } finally {
-      sub?.remove();
-    }
-  }
 }
 
-function forwardHandle(id: string, port: number): SshForward {
-  return { id, port, close: () => native().closeForward(id) };
+// Prompt answers are tied to one login of one session, by request id.
+async function withPrompts<T>(
+  sessionId: string,
+  prompts: SshPrompts,
+  run: () => Promise<T>,
+): Promise<T> {
+  const n = native();
+  const subs = [
+    on("onHostKey", (e) => {
+      if (e.sessionId !== sessionId) return;
+      prompts.verifyHostKey(e.hostKey).then(
+        (ok) => n.answerHostKey(e.requestId, ok),
+        () => n.answerHostKey(e.requestId, false),
+      );
+    }),
+    on("onKeyboardInteractive", (e) => {
+      if (e.sessionId !== sessionId) return;
+      prompts.keyboardInteractive(e.request).then(
+        (answers) => n.answerKeyboardInteractive(e.requestId, answers),
+        () => n.answerKeyboardInteractive(e.requestId, null),
+      );
+    }),
+    on("onBanner", (e) => {
+      if (e.sessionId === sessionId) prompts.onBanner?.(e.banner);
+    }),
+  ];
+  try {
+    return await run();
+  } finally {
+    subs.forEach((s) => s.remove());
+  }
 }
 
 async function connectSession(
   config: SshConnectConfig,
   prompts: SshPrompts,
   parentSessionId: string | null,
+  options: ConnectOptions,
 ): Promise<SshSession> {
-  const n = native();
   const id = newId("ssh");
-  // Prompt answers are tied to this login only.
-  const subs = [
-    on("onHostKey", (e) => {
-      if (e.sessionId !== id) return;
-      prompts.verifyHostKey(e.hostKey).then(
-        (ok) => n.answerHostKey(id, ok),
-        () => n.answerHostKey(id, false),
-      );
-    }),
-    on("onKeyboardInteractive", (e) => {
-      if (e.sessionId !== id) return;
-      prompts.keyboardInteractive(e.request).then(
-        (answers) => n.answerKeyboardInteractive(id, answers),
-        () => n.answerKeyboardInteractive(id, null),
-      );
-    }),
-    on("onBanner", (e) => {
-      if (e.sessionId === id) prompts.onBanner?.(e.banner);
-    }),
-  ];
-  try {
-    const info = await call(() => n.connect(id, config, parentSessionId));
-    return new SshSession(id, info.hostKey, info.algorithms);
-  } finally {
-    subs.forEach((s) => s.remove());
-  }
+  const info: NativeSessionInfo = await withPrompts(id, prompts, () =>
+    cancellable(id, options.signal, () =>
+      native().connect(id, config, parentSessionId),
+    ),
+  );
+  return new SshSession(id, info.hostKey, info.algorithms);
 }
 
-/** Opens a TCP connection, checks the host key and logs in. */
+/** Opens a connection, checks the host key and logs in. */
 export function connect(
   config: SshConnectConfig,
   prompts: SshPrompts,
+  options: ConnectOptions = {},
 ): Promise<SshSession> {
-  return connectSession(config, prompts, null);
+  return connectSession(config, prompts, null, options);
 }

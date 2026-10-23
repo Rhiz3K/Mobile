@@ -12,7 +12,7 @@ const TARGET: u16 = 2222;
 const JUMP: u16 = 2223;
 
 async fn exec_text(s: &Session, cmd: &str) -> String {
-    let r = s.exec(cmd.into()).await.unwrap();
+    let r = s.exec(cmd.into(), 30, 0, None).await.unwrap();
     String::from_utf8_lossy(&r.stdout).trim().to_string()
 }
 
@@ -20,10 +20,10 @@ async fn exec_text(s: &Session, cmd: &str) -> String {
 async fn auth_password() {
     let mut c = config("pw", TARGET);
     c.password = Some("termix-pass".into());
-    let s = connect(c.clone(), Cb::new()).await.unwrap();
+    let s = connect(c.clone(), Cb::new(), None).await.unwrap();
     assert_eq!(exec_text(&s, "whoami").await, "pw");
     c.password = Some("nope".into());
-    let err = connect(c, Cb::new()).await.err().unwrap();
+    let err = connect(c, Cb::new(), None).await.err().unwrap();
     assert!(matches!(err, SshError::Auth { .. }), "{err:?}");
     record("auth.password", true, Detail::none());
 }
@@ -33,7 +33,7 @@ async fn auth_key_types() {
     for name in ["id_ed25519", "id_rsa", "id_ecdsa256", "id_ecdsa384", "id_ecdsa521", "id_rsa.ppk", "id_ed25519.ppk"] {
         let mut c = config("key", TARGET);
         c.private_key = Some(key(name));
-        let res = connect(c, Cb::new()).await;
+        let res = connect(c, Cb::new(), None).await;
         let ok = res.is_ok();
         record(&format!("auth.key.{name}"), ok, Detail::text(&format!("{:?}", res.err())));
         assert!(ok, "{name}");
@@ -45,13 +45,13 @@ async fn auth_key_passphrase() {
     for name in ["id_ed25519_pass", "id_rsa_pass"] {
         let mut c = config("key", TARGET);
         c.private_key = Some(key(name));
-        let err = connect(c.clone(), Cb::new()).await.err().unwrap();
+        let err = connect(c.clone(), Cb::new(), None).await.err().unwrap();
         assert!(matches!(err, SshError::PassphraseRequired), "{err:?}");
         c.passphrase = Some("wrong".into());
-        let err = connect(c.clone(), Cb::new()).await.err().unwrap();
+        let err = connect(c.clone(), Cb::new(), None).await.err().unwrap();
         assert!(matches!(err, SshError::BadPassphrase), "{name}: {err:?}");
         c.passphrase = Some("termix-key".into());
-        connect(c, Cb::new()).await.unwrap();
+        connect(c, Cb::new(), None).await.unwrap();
     }
     record("auth.key.passphrase", true, Detail::none());
 }
@@ -61,14 +61,14 @@ async fn auth_key_then_password() {
     let mut c = config("kp", TARGET);
     c.private_key = Some(key("id_ed25519"));
     c.password = Some("termix-pass".into());
-    connect(c, Cb::new()).await.unwrap();
+    connect(c, Cb::new(), None).await.unwrap();
     record("auth.key+password", true, Detail::none());
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn auth_keyboard_interactive_two_rounds() {
     let cb = Cb::new();
-    connect(config("kbd", TARGET), cb.clone()).await.unwrap();
+    connect(config("kbd", TARGET), cb.clone(), None).await.unwrap();
     let rounds = cb.rounds.lock().unwrap();
     assert_eq!(rounds.len(), 2, "{:?}", *rounds);
     assert!(rounds[1].prompts[0].prompt.to_lowercase().contains("verification"));
@@ -82,17 +82,17 @@ async fn auth_password_sent_through_kbd() {
     let mut c = config("kbd", TARGET);
     c.password = Some("termix-pass".into());
     c.force_keyboard_interactive = true;
-    connect(c, Cb::new()).await.unwrap();
+    connect(c, Cb::new(), None).await.unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn auth_certificate() {
     let mut c = config("cert", TARGET);
     c.private_key = Some(key("id_cert"));
-    let err = connect(c.clone(), Cb::new()).await.err();
+    let err = connect(c.clone(), Cb::new(), None).await.err();
     assert!(err.is_some(), "plain key must be refused for cert user");
     c.certificate = Some(key("id_cert-cert.pub"));
-    connect(c, Cb::new()).await.unwrap();
+    connect(c, Cb::new(), None).await.unwrap();
     record("auth.cert", true, Detail::none());
 }
 
@@ -101,7 +101,7 @@ async fn host_key_reported_and_rejected() {
     let mut c = config("pw", TARGET);
     c.password = Some("termix-pass".into());
     let cb = Cb::new();
-    let s = connect(c.clone(), cb.clone()).await.unwrap();
+    let s = connect(c.clone(), cb.clone(), None).await.unwrap();
     let info = s.host_key();
     assert!(info.is_certificate, "{info:?}");
     assert!(info.key_type.contains("cert-v01"));
@@ -115,7 +115,7 @@ async fn host_key_reported_and_rejected() {
     assert_eq!(info.blob_hex, hex::encode(host.to_bytes().unwrap()));
 
     let cb = std::sync::Arc::new(Cb { reject: true, ..Default::default() });
-    let err = connect(c, cb.clone()).await.err().unwrap();
+    let err = connect(c, cb.clone(), None).await.err().unwrap();
     assert!(matches!(err, SshError::HostKeyRejected), "{err:?}");
     assert!(cb.rounds.lock().unwrap().is_empty());
     record("hostkey", true, Detail::text(&info.key_type));
@@ -125,7 +125,7 @@ async fn host_key_reported_and_rejected() {
 async fn shell_pty_resize_and_exec() {
     let mut c = config("key", TARGET);
     c.private_key = Some(key("id_ed25519"));
-    let s = connect(c, Cb::new()).await.unwrap();
+    let s = connect(c, Cb::new(), None).await.unwrap();
     let out = std::sync::Arc::new(Out::default());
     let env = vec![EnvVar { name: "LANG".into(), value: "C.UTF-8".into() }];
     let sh = s.open_shell("xterm-256color".into(), 80, 24, env, out.clone()).await.unwrap();
@@ -144,7 +144,7 @@ async fn shell_pty_resize_and_exec() {
     }
     assert_eq!(*out.exit.lock().unwrap(), Some(Some(0)));
 
-    let r = s.exec("echo out; echo err >&2; exit 3".into()).await.unwrap();
+    let r = s.exec("echo out; echo err >&2; exit 3".into(), 30, 0, None).await.unwrap();
     assert_eq!(String::from_utf8_lossy(&r.stdout).trim(), "out");
     assert_eq!(String::from_utf8_lossy(&r.stderr).trim(), "err");
     assert_eq!(r.exit_code, Some(3));
@@ -155,7 +155,7 @@ async fn shell_pty_resize_and_exec() {
 async fn sftp_big_file_roundtrip() {
     let mut c = config("key", TARGET);
     c.private_key = Some(key("id_ed25519"));
-    let s = connect(c, Cb::new()).await.unwrap();
+    let s = connect(c, Cb::new(), None).await.unwrap();
     let want = exec_text(&s, "cat /data/big.sha256").await;
     let sftp = s.open_sftp().await.unwrap();
     assert!(sftp.list("/data".into()).await.unwrap().iter().any(|e| e.name == "big.bin"));
@@ -164,7 +164,7 @@ async fn sftp_big_file_roundtrip() {
     std::fs::create_dir_all(&dir).unwrap();
     let local = dir.join("big.bin");
     let down = sftp
-        .download("/data/big.bin".into(), local.to_string_lossy().into(), None)
+        .download("/data/big.bin".into(), local.to_string_lossy().into(), 0, None, None)
         .await
         .unwrap();
     let mut file = std::fs::File::open(&local).unwrap();
@@ -173,7 +173,7 @@ async fn sftp_big_file_roundtrip() {
     assert_eq!(hex::encode(h.finalize()), want);
 
     let up = sftp
-        .upload(local.to_string_lossy().into(), "/home/key/up.bin".into(), None)
+        .upload(local.to_string_lossy().into(), "/home/key/up.bin".into(), 0, None, None)
         .await
         .unwrap();
     let got = exec_text(&s, "sha256sum /home/key/up.bin | cut -d' ' -f1").await;
@@ -193,7 +193,7 @@ async fn sftp_big_file_roundtrip() {
 async fn forward_local_and_socks() {
     let mut c = config("key", TARGET);
     c.private_key = Some(key("id_ed25519"));
-    let s = connect(c, Cb::new()).await.unwrap();
+    let s = connect(c, Cb::new(), None).await.unwrap();
 
     let fwd = s.clone().forward_local("127.0.0.1".into(), 0, "127.0.0.1".into(), 7000).await.unwrap();
     let mut tcp = tokio::net::TcpStream::connect(("127.0.0.1", fwd.port())).await.unwrap();
@@ -228,12 +228,12 @@ async fn forward_local_and_socks() {
 async fn jump_host() {
     let mut j = config("key", JUMP);
     j.private_key = Some(key("id_ed25519"));
-    let jump = connect(j, Cb::new()).await.unwrap();
+    let jump = connect(j, Cb::new(), None).await.unwrap();
     let mut t = config("pw", 22);
     t.host = "target".into();
     t.password = Some("termix-pass".into());
     let start = Instant::now();
-    let target = jump.connect_via(t, Cb::new()).await.unwrap();
+    let target = jump.clone().connect_via(t, Cb::new(), None).await.unwrap();
     let ms = start.elapsed().as_millis() as f64;
     // /data only exists on the target container
     assert_eq!(exec_text(&target, "test -f /data/big.bin && echo yes").await, "yes");
@@ -255,12 +255,12 @@ async fn algorithm_matrix() {
         let mut c = config("pw", port);
         c.password = Some("termix-pass".into());
         c.allow_legacy_algorithms = true;
-        let res = connect(c.clone(), Cb::new()).await;
+        let res = connect(c.clone(), Cb::new(), None).await;
         let ok = res.is_ok();
         let mut detail = format!("{:?}", res.err());
         if legacy && ok {
             c.allow_legacy_algorithms = false;
-            let off = connect(c, Cb::new()).await.is_err();
+            let off = connect(c, Cb::new(), None).await.is_err();
             detail = format!("blocked when legacy off: {off}");
         }
         record(&format!("algo.{id}"), ok, Detail::text(&detail));

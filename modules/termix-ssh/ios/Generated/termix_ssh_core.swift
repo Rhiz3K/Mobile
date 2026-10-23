@@ -607,16 +607,629 @@ fileprivate struct FfiConverterData: FfiConverterRustBuffer {
 
 
 
+/**
+ * Passed into long calls; `cancel()` from any thread stops them with `SshError::Cancelled`.
+ */
+public protocol CancelTokenProtocol: AnyObject, Sendable {
+    
+    func cancel() 
+    
+    func isCancelled()  -> Bool
+    
+}
+/**
+ * Passed into long calls; `cancel()` from any thread stops them with `SshError::Cancelled`.
+ */
+open class CancelToken: CancelTokenProtocol, @unchecked Sendable {
+    fileprivate let handle: UInt64
+
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoHandle {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noHandle: NoHandle) {
+        self.handle = 0
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_termix_ssh_core_fn_clone_canceltoken(self.handle, $0) }
+    }
+public convenience init() {
+    let handle =
+        try! rustCall() {
+        uniffiCallStatus in
+    uniffi_termix_ssh_core_fn_constructor_canceltoken_new(uniffiCallStatus
+    )
+}
+    self.init(unsafeFromHandle: handle)
+}
+
+    deinit {
+        if handle == 0 {
+            // Mock objects have handle=0 don't try to free them
+            return
+        }
+
+        try! rustCall { uniffi_termix_ssh_core_fn_free_canceltoken(handle, $0) }
+    }
+
+    
+
+    
+open func cancel()  {try! rustCall() {
+        uniffiCallStatus in
+    uniffi_termix_ssh_core_fn_method_canceltoken_cancel(
+            self.uniffiCloneHandle(),uniffiCallStatus
+    )
+}
+}
+    
+open func isCancelled() -> Bool  {
+    return try!  FfiConverterBool.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_termix_ssh_core_fn_method_canceltoken_is_cancelled(
+            self.uniffiCloneHandle(),uniffiCallStatus
+    )
+})
+}
+    
+
+    
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCancelToken: FfiConverter {
+    typealias FfiType = UInt64
+    typealias SwiftType = CancelToken
+
+    public static func lift(_ handle: UInt64) throws -> CancelToken {
+        return CancelToken(unsafeFromHandle: handle)
+    }
+
+    public static func lower(_ value: CancelToken) -> UInt64 {
+        return value.uniffiCloneHandle()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CancelToken {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func write(_ value: CancelToken, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCancelToken_lift(_ handle: UInt64) throws -> CancelToken {
+    return try FfiConverterTypeCancelToken.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCancelToken_lower(_ value: CancelToken) -> UInt64 {
+    return FfiConverterTypeCancelToken.lower(value)
+}
+
+
+
+
+
+
+public protocol ExecCallbacks: AnyObject, Sendable {
+    
+    func onStdout(data: Data) 
+    
+    func onStderr(data: Data) 
+    
+    func onExit(exitCode: UInt32?, exitSignal: String?) 
+    
+}
+open class ExecCallbacksImpl: ExecCallbacks, @unchecked Sendable {
+    fileprivate let handle: UInt64
+
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoHandle {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noHandle: NoHandle) {
+        self.handle = 0
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_termix_ssh_core_fn_clone_execcallbacks(self.handle, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        if handle == 0 {
+            // Mock objects have handle=0 don't try to free them
+            return
+        }
+
+        try! rustCall { uniffi_termix_ssh_core_fn_free_execcallbacks(handle, $0) }
+    }
+
+    
+
+    
+open func onStdout(data: Data)  {try! rustCall() {
+        uniffiCallStatus in
+    uniffi_termix_ssh_core_fn_method_execcallbacks_on_stdout(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(data),uniffiCallStatus
+    )
+}
+}
+    
+open func onStderr(data: Data)  {try! rustCall() {
+        uniffiCallStatus in
+    uniffi_termix_ssh_core_fn_method_execcallbacks_on_stderr(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(data),uniffiCallStatus
+    )
+}
+}
+    
+open func onExit(exitCode: UInt32?, exitSignal: String?)  {try! rustCall() {
+        uniffiCallStatus in
+    uniffi_termix_ssh_core_fn_method_execcallbacks_on_exit(
+            self.uniffiCloneHandle(),
+        FfiConverterOptionUInt32.lower(exitCode),
+        FfiConverterOptionString.lower(exitSignal),uniffiCallStatus
+    )
+}
+}
+    
+
+    
+}
+
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceExecCallbacks {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    //
+    // Store the vtable directly.
+    static let vtable: UniffiVTableCallbackInterfaceExecCallbacks = UniffiVTableCallbackInterfaceExecCallbacks(
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            do {
+                try FfiConverterTypeExecCallbacks.handleMap.remove(handle: uniffiHandle)
+            } catch {
+                print("Uniffi callback interface ExecCallbacks: handle missing in uniffiFree")
+            }
+        },
+        uniffiClone: { (uniffiHandle: UInt64) -> UInt64 in
+            do {
+                return try FfiConverterTypeExecCallbacks.handleMap.clone(handle: uniffiHandle)
+            } catch {
+                fatalError("Uniffi callback interface ExecCallbacks: handle missing in uniffiClone")
+            }
+        },
+        onStdout: { (
+            uniffiHandle: UInt64,
+            data: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterTypeExecCallbacks.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onStdout(
+                     data: try FfiConverterData.lift(data)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        },
+        onStderr: { (
+            uniffiHandle: UInt64,
+            data: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterTypeExecCallbacks.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onStderr(
+                     data: try FfiConverterData.lift(data)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        },
+        onExit: { (
+            uniffiHandle: UInt64,
+            exitCode: RustBuffer,
+            exitSignal: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterTypeExecCallbacks.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onExit(
+                     exitCode: try FfiConverterOptionUInt32.lift(exitCode),
+                     exitSignal: try FfiConverterOptionString.lift(exitSignal)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        }
+    )
+
+    // Rust stores this pointer for future callback invocations, so it must live
+    // for the process lifetime (not just for the init function call).
+    //
+    // `nonisolated(unsafe)` is needed under Swift 6 strict concurrency.
+    // This is safe because the pointee is initialized once during static init
+    // and never mutated by either side of the FFI.  Its fields are C function pointers.
+    nonisolated(unsafe) static let vtablePtr: UnsafePointer<UniffiVTableCallbackInterfaceExecCallbacks> = {
+        let ptr = UnsafeMutablePointer<UniffiVTableCallbackInterfaceExecCallbacks>.allocate(capacity: 1)
+        ptr.initialize(to: vtable)
+        return UnsafePointer(ptr)
+    }()
+}
+
+private func uniffiCallbackInitExecCallbacks() {
+    uniffi_termix_ssh_core_fn_init_callback_vtable_execcallbacks(UniffiCallbackInterfaceExecCallbacks.vtablePtr)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeExecCallbacks: FfiConverter {
+    fileprivate static let handleMap = UniffiHandleMap<ExecCallbacks>()
+
+    typealias FfiType = UInt64
+    typealias SwiftType = ExecCallbacks
+
+    public static func lift(_ handle: UInt64) throws -> ExecCallbacks {
+        if ((handle & 1) == 0) {
+            // Rust-generated handle, construct a new class that uses the handle to implement the
+            // interface
+            return ExecCallbacksImpl(unsafeFromHandle: handle)
+        } else {
+            // Swift-generated handle, get the object from the handle map
+            return try handleMap.remove(handle: handle)
+        }
+    }
+
+    public static func lower(_ value: ExecCallbacks) -> UInt64 {
+         if let rustImpl = value as? ExecCallbacksImpl {
+             // Rust-implemented object.  Clone the handle and return it
+            return rustImpl.uniffiCloneHandle()
+         } else {
+            // Swift object, generate a new vtable handle and return that.
+            return handleMap.insert(obj: value)
+         }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ExecCallbacks {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func write(_ value: ExecCallbacks, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExecCallbacks_lift(_ handle: UInt64) throws -> ExecCallbacks {
+    return try FfiConverterTypeExecCallbacks.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExecCallbacks_lower(_ value: ExecCallbacks) -> UInt64 {
+    return FfiConverterTypeExecCallbacks.lower(value)
+}
+
+
+
+
+
+
+/**
+ * A running command whose output streams to callbacks.
+ */
+public protocol ExecHandleProtocol: AnyObject, Sendable {
+    
+    func end() async throws 
+    
+    /**
+     * Ends stdin, for commands that read until EOF.
+     */
+    func eof() async throws 
+    
+    func signal(name: String) async throws 
+    
+    func write(data: Data) async throws 
+    
+}
+/**
+ * A running command whose output streams to callbacks.
+ */
+open class ExecHandle: ExecHandleProtocol, @unchecked Sendable {
+    fileprivate let handle: UInt64
+
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoHandle {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noHandle: NoHandle) {
+        self.handle = 0
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_termix_ssh_core_fn_clone_exechandle(self.handle, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        if handle == 0 {
+            // Mock objects have handle=0 don't try to free them
+            return
+        }
+
+        try! rustCall { uniffi_termix_ssh_core_fn_free_exechandle(handle, $0) }
+    }
+
+    
+
+    
+open func end()async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_termix_ssh_core_fn_method_exechandle_end(
+                        self.uniffiCloneHandle()
+                )
+            },
+            pollFunc: ffi_termix_ssh_core_rust_future_poll_void,
+            completeFunc: ffi_termix_ssh_core_rust_future_complete_void,
+            freeFunc: ffi_termix_ssh_core_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeSshError_lift
+        )
+}
+    
+    /**
+     * Ends stdin, for commands that read until EOF.
+     */
+open func eof()async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_termix_ssh_core_fn_method_exechandle_eof(
+                        self.uniffiCloneHandle()
+                )
+            },
+            pollFunc: ffi_termix_ssh_core_rust_future_poll_void,
+            completeFunc: ffi_termix_ssh_core_rust_future_complete_void,
+            freeFunc: ffi_termix_ssh_core_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeSshError_lift
+        )
+}
+    
+open func signal(name: String)async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_termix_ssh_core_fn_method_exechandle_signal(
+                        self.uniffiCloneHandle(),FfiConverterString.lower(name)
+                )
+            },
+            pollFunc: ffi_termix_ssh_core_rust_future_poll_void,
+            completeFunc: ffi_termix_ssh_core_rust_future_complete_void,
+            freeFunc: ffi_termix_ssh_core_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeSshError_lift
+        )
+}
+    
+open func write(data: Data)async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_termix_ssh_core_fn_method_exechandle_write(
+                        self.uniffiCloneHandle(),FfiConverterData.lower(data)
+                )
+            },
+            pollFunc: ffi_termix_ssh_core_rust_future_poll_void,
+            completeFunc: ffi_termix_ssh_core_rust_future_complete_void,
+            freeFunc: ffi_termix_ssh_core_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeSshError_lift
+        )
+}
+    
+
+    
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeExecHandle: FfiConverter {
+    typealias FfiType = UInt64
+    typealias SwiftType = ExecHandle
+
+    public static func lift(_ handle: UInt64) throws -> ExecHandle {
+        return ExecHandle(unsafeFromHandle: handle)
+    }
+
+    public static func lower(_ value: ExecHandle) -> UInt64 {
+        return value.uniffiCloneHandle()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ExecHandle {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func write(_ value: ExecHandle, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExecHandle_lift(_ handle: UInt64) throws -> ExecHandle {
+    return try FfiConverterTypeExecHandle.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExecHandle_lower(_ value: ExecHandle) -> UInt64 {
+    return FfiConverterTypeExecHandle.lower(value)
+}
+
+
+
+
+
+
+/**
+ * A running forward. Stopping it closes the listener and every connection it piped.
+ */
 public protocol ForwardProtocol: AnyObject, Sendable {
     
     /**
-     * The local port, useful when 0 was asked for.
+     * The bound port: on the phone for local and dynamic forwards, on the server for remote ones.
      */
     func port()  -> UInt16
+    
+    /**
+     * Like `stop`, and for a remote forward also asks the server to stop listening.
+     */
+    func shutdown() async throws 
     
     func stop() 
     
 }
+/**
+ * A running forward. Stopping it closes the listener and every connection it piped.
+ */
 open class Forward: ForwardProtocol, @unchecked Sendable {
     fileprivate let handle: UInt64
 
@@ -671,7 +1284,7 @@ open class Forward: ForwardProtocol, @unchecked Sendable {
 
     
     /**
-     * The local port, useful when 0 was asked for.
+     * The bound port: on the phone for local and dynamic forwards, on the server for remote ones.
      */
 open func port() -> UInt16  {
     return try!  FfiConverterUInt16.lift(try! rustCall() {
@@ -680,6 +1293,25 @@ open func port() -> UInt16  {
             self.uniffiCloneHandle(),uniffiCallStatus
     )
 })
+}
+    
+    /**
+     * Like `stop`, and for a remote forward also asks the server to stop listening.
+     */
+open func shutdown()async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_termix_ssh_core_fn_method_forward_shutdown(
+                        self.uniffiCloneHandle()
+                )
+            },
+            pollFunc: ffi_termix_ssh_core_rust_future_poll_void,
+            completeFunc: ffi_termix_ssh_core_rust_future_complete_void,
+            freeFunc: ffi_termix_ssh_core_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeSshError_lift
+        )
 }
     
 open func stop()  {try! rustCall() {
@@ -944,6 +1576,17 @@ public func FfiConverterTypeProgressCallback_lower(_ value: ProgressCallback) ->
 public protocol SessionProtocol: AnyObject, Sendable {
     
     /**
+     * Runs a command and collects its output. `max_bytes` caps stdout and stderr each;
+     * `timeout_secs` of 0 means no limit. The channel closes on timeout or cancel.
+     */
+    func exec(command: String, timeoutSecs: UInt32, maxBytes: UInt64, cancel: CancelToken?) async throws  -> ExecResult
+    
+    /**
+     * Starts a command and streams its output. With `pty` the command gets a terminal of that size.
+     */
+    func execStream(command: String, pty: PtySize?, callbacks: ExecCallbacks) async throws  -> ExecHandle
+    
+    /**
      * A SOCKS5 proxy on `bind_host:bind_port` that opens every connection through SSH.
      */
     func forwardDynamic(bindHost: String, bindPort: UInt16) async throws  -> Forward
@@ -953,16 +1596,20 @@ public protocol SessionProtocol: AnyObject, Sendable {
      */
     func forwardLocal(bindHost: String, bindPort: UInt16, remoteHost: String, remotePort: UInt16) async throws  -> Forward
     
+    /**
+     * Asks the server to listen on `remote_bind_host:remote_port` (0 lets it pick) and sends each
+     * connection to `local_host:local_port` as seen from the phone.
+     */
+    func forwardRemote(remoteBindHost: String, remotePort: UInt16, localHost: String, localPort: UInt16) async throws  -> Forward
+    
     func algorithms()  -> NegotiatedAlgorithms?
     
     /**
      * Logs in to another host through this one (a jump host hop).
      */
-    func connectVia(config: ConnectConfig, callbacks: SessionCallbacks) async throws  -> Session
+    func connectVia(config: ConnectConfig, callbacks: SessionCallbacks, cancel: CancelToken?) async throws  -> Session
     
     func disconnect() async throws 
-    
-    func exec(command: String) async throws  -> ExecResult
     
     func hostKey()  -> HostKeyInfo
     
@@ -971,7 +1618,13 @@ public protocol SessionProtocol: AnyObject, Sendable {
     /**
      * Sends a keepalive and waits for the reply. Useful after the app comes back to the foreground.
      */
-    func ping() async throws 
+    func ping(timeoutSecs: UInt32) async throws 
+    
+    /**
+     * Logs in again with the same config and callbacks, so the app never resends secrets.
+     * A hop reconnects through its parent, which must still be open.
+     */
+    func reconnect(cancel: CancelToken?) async throws  -> Session
     
     func openSftp() async throws  -> Sftp
     
@@ -1035,6 +1688,45 @@ open class Session: SessionProtocol, @unchecked Sendable {
 
     
     /**
+     * Runs a command and collects its output. `max_bytes` caps stdout and stderr each;
+     * `timeout_secs` of 0 means no limit. The channel closes on timeout or cancel.
+     */
+open func exec(command: String, timeoutSecs: UInt32, maxBytes: UInt64, cancel: CancelToken?)async throws  -> ExecResult  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_termix_ssh_core_fn_method_session_exec(
+                        self.uniffiCloneHandle(),FfiConverterString.lower(command),FfiConverterUInt32.lower(timeoutSecs),FfiConverterUInt64.lower(maxBytes),FfiConverterOptionTypeCancelToken.lower(cancel)
+                )
+            },
+            pollFunc: ffi_termix_ssh_core_rust_future_poll_rust_buffer,
+            completeFunc: ffi_termix_ssh_core_rust_future_complete_rust_buffer,
+            freeFunc: ffi_termix_ssh_core_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterTypeExecResult_lift,
+            errorHandler: FfiConverterTypeSshError_lift
+        )
+}
+    
+    /**
+     * Starts a command and streams its output. With `pty` the command gets a terminal of that size.
+     */
+open func execStream(command: String, pty: PtySize?, callbacks: ExecCallbacks)async throws  -> ExecHandle  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_termix_ssh_core_fn_method_session_exec_stream(
+                        self.uniffiCloneHandle(),FfiConverterString.lower(command),FfiConverterOptionTypePtySize.lower(pty),FfiConverterTypeExecCallbacks_lower(callbacks)
+                )
+            },
+            pollFunc: ffi_termix_ssh_core_rust_future_poll_u64,
+            completeFunc: ffi_termix_ssh_core_rust_future_complete_u64,
+            freeFunc: ffi_termix_ssh_core_rust_future_free_u64,
+            liftFunc: FfiConverterTypeExecHandle_lift,
+            errorHandler: FfiConverterTypeSshError_lift
+        )
+}
+    
+    /**
      * A SOCKS5 proxy on `bind_host:bind_port` that opens every connection through SSH.
      */
 open func forwardDynamic(bindHost: String, bindPort: UInt16)async throws  -> Forward  {
@@ -1072,6 +1764,26 @@ open func forwardLocal(bindHost: String, bindPort: UInt16, remoteHost: String, r
         )
 }
     
+    /**
+     * Asks the server to listen on `remote_bind_host:remote_port` (0 lets it pick) and sends each
+     * connection to `local_host:local_port` as seen from the phone.
+     */
+open func forwardRemote(remoteBindHost: String, remotePort: UInt16, localHost: String, localPort: UInt16)async throws  -> Forward  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_termix_ssh_core_fn_method_session_forward_remote(
+                        self.uniffiCloneHandle(),FfiConverterString.lower(remoteBindHost),FfiConverterUInt16.lower(remotePort),FfiConverterString.lower(localHost),FfiConverterUInt16.lower(localPort)
+                )
+            },
+            pollFunc: ffi_termix_ssh_core_rust_future_poll_u64,
+            completeFunc: ffi_termix_ssh_core_rust_future_complete_u64,
+            freeFunc: ffi_termix_ssh_core_rust_future_free_u64,
+            liftFunc: FfiConverterTypeForward_lift,
+            errorHandler: FfiConverterTypeSshError_lift
+        )
+}
+    
 open func algorithms() -> NegotiatedAlgorithms?  {
     return try!  FfiConverterOptionTypeNegotiatedAlgorithms.lift(try! rustCall() {
         uniffiCallStatus in
@@ -1084,12 +1796,12 @@ open func algorithms() -> NegotiatedAlgorithms?  {
     /**
      * Logs in to another host through this one (a jump host hop).
      */
-open func connectVia(config: ConnectConfig, callbacks: SessionCallbacks)async throws  -> Session  {
+open func connectVia(config: ConnectConfig, callbacks: SessionCallbacks, cancel: CancelToken?)async throws  -> Session  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_termix_ssh_core_fn_method_session_connect_via(
-                        self.uniffiCloneHandle(),FfiConverterTypeConnectConfig_lower(config),FfiConverterTypeSessionCallbacks_lower(callbacks)
+                        self.uniffiCloneHandle(),FfiConverterTypeConnectConfig_lower(config),FfiConverterTypeSessionCallbacks_lower(callbacks),FfiConverterOptionTypeCancelToken.lower(cancel)
                 )
             },
             pollFunc: ffi_termix_ssh_core_rust_future_poll_u64,
@@ -1116,22 +1828,6 @@ open func disconnect()async throws   {
         )
 }
     
-open func exec(command: String)async throws  -> ExecResult  {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_termix_ssh_core_fn_method_session_exec(
-                        self.uniffiCloneHandle(),FfiConverterString.lower(command)
-                )
-            },
-            pollFunc: ffi_termix_ssh_core_rust_future_poll_rust_buffer,
-            completeFunc: ffi_termix_ssh_core_rust_future_complete_rust_buffer,
-            freeFunc: ffi_termix_ssh_core_rust_future_free_rust_buffer,
-            liftFunc: FfiConverterTypeExecResult_lift,
-            errorHandler: FfiConverterTypeSshError_lift
-        )
-}
-    
 open func hostKey() -> HostKeyInfo  {
     return try!  FfiConverterTypeHostKeyInfo_lift(try! rustCall() {
         uniffiCallStatus in
@@ -1153,18 +1849,38 @@ open func isClosed() -> Bool  {
     /**
      * Sends a keepalive and waits for the reply. Useful after the app comes back to the foreground.
      */
-open func ping()async throws   {
+open func ping(timeoutSecs: UInt32)async throws   {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_termix_ssh_core_fn_method_session_ping(
-                        self.uniffiCloneHandle()
+                        self.uniffiCloneHandle(),FfiConverterUInt32.lower(timeoutSecs)
                 )
             },
             pollFunc: ffi_termix_ssh_core_rust_future_poll_void,
             completeFunc: ffi_termix_ssh_core_rust_future_complete_void,
             freeFunc: ffi_termix_ssh_core_rust_future_free_void,
             liftFunc: { $0 },
+            errorHandler: FfiConverterTypeSshError_lift
+        )
+}
+    
+    /**
+     * Logs in again with the same config and callbacks, so the app never resends secrets.
+     * A hop reconnects through its parent, which must still be open.
+     */
+open func reconnect(cancel: CancelToken?)async throws  -> Session  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_termix_ssh_core_fn_method_session_reconnect(
+                        self.uniffiCloneHandle(),FfiConverterOptionTypeCancelToken.lower(cancel)
+                )
+            },
+            pollFunc: ffi_termix_ssh_core_rust_future_poll_u64,
+            completeFunc: ffi_termix_ssh_core_rust_future_complete_u64,
+            freeFunc: ffi_termix_ssh_core_rust_future_free_u64,
+            liftFunc: FfiConverterTypeSession_lift,
             errorHandler: FfiConverterTypeSshError_lift
         )
 }
@@ -1268,7 +1984,7 @@ public protocol SessionCallbacks: AnyObject, Sendable {
     
     func onBanner(banner: String) 
     
-    func onDisconnect(reason: String) 
+    func onDisconnect(kind: DisconnectKind, reason: String) 
     
 }
 /**
@@ -1373,10 +2089,11 @@ open func onBanner(banner: String)  {try! rustCall() {
 }
 }
     
-open func onDisconnect(reason: String)  {try! rustCall() {
+open func onDisconnect(kind: DisconnectKind, reason: String)  {try! rustCall() {
         uniffiCallStatus in
     uniffi_termix_ssh_core_fn_method_sessioncallbacks_on_disconnect(
             self.uniffiCloneHandle(),
+        FfiConverterTypeDisconnectKind_lower(kind),
         FfiConverterString.lower(reason),uniffiCallStatus
     )
 }
@@ -1520,6 +2237,7 @@ fileprivate struct UniffiCallbackInterfaceSessionCallbacks {
         },
         onDisconnect: { (
             uniffiHandle: UInt64,
+            kind: RustBuffer,
             reason: RustBuffer,
             uniffiOutReturn: UnsafeMutableRawPointer,
             uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
@@ -1530,6 +2248,7 @@ fileprivate struct UniffiCallbackInterfaceSessionCallbacks {
                     throw UniffiInternalError.unexpectedStaleHandle
                 }
                 return uniffiObj.onDisconnect(
+                     kind: try FfiConverterTypeDisconnectKind_lift(kind),
                      reason: try FfiConverterString.lift(reason)
                 )
             }
@@ -1624,19 +2343,72 @@ public func FfiConverterTypeSessionCallbacks_lower(_ value: SessionCallbacks) ->
 public protocol SftpProtocol: AnyObject, Sendable {
     
     /**
-     * Streams a remote file to a local path in fixed chunks, never the whole file in memory.
+     * Sets permission bits (like 0o644); file type bits are ignored.
      */
-    func download(remote: String, local: String, progress: ProgressCallback?) async throws  -> TransferResult
+    func chmod(path: String, mode: UInt32) async throws 
+    
+    /**
+     * Streams a remote file to a local path in fixed chunks, never the whole file in memory.
+     * With `offset` > 0 it resumes: the local file is kept up to there and appended to.
+     */
+    func download(remote: String, local: String, offset: UInt64, progress: ProgressCallback?, cancel: CancelToken?) async throws  -> TransferResult
     
     func list(path: String) async throws  -> [FileEntry]
     
+    /**
+     * Describes a symlink itself, with its target.
+     */
+    func lstat(path: String) async throws  -> FileEntry
+    
+    func mkdir(path: String, mode: UInt32?) async throws 
+    
+    /**
+     * Reads a small file into memory. Fails when it is bigger than `max_bytes`.
+     */
+    func readFile(path: String, maxBytes: UInt64) async throws  -> Data
+    
+    func readLink(path: String) async throws  -> String
+    
+    /**
+     * Absolute path with `.` and `..` resolved. `.` gives the home folder.
+     */
+    func realpath(path: String) async throws  -> String
+    
     func remove(path: String) async throws 
+    
+    /**
+     * Deletes a file or a whole folder. Symlinks are removed, never followed.
+     * Progress reports the count removed so far, with a total of 0.
+     */
+    func removeRecursive(path: String, progress: ProgressCallback?, cancel: CancelToken?) async throws  -> UInt64
+    
+    func rename(from: String, to: String) async throws 
+    
+    func rmdir(path: String) async throws 
     
     func shutdown() async throws 
     
     func size(path: String) async throws  -> UInt64
     
-    func upload(local: String, remote: String, progress: ProgressCallback?) async throws  -> TransferResult
+    /**
+     * Follows symlinks.
+     */
+    func stat(path: String) async throws  -> FileEntry
+    
+    /**
+     * Makes `path` a link to `target`.
+     */
+    func symlink(path: String, target: String) async throws 
+    
+    /**
+     * Streams a local file up. With `offset` > 0 it resumes into the existing remote file.
+     */
+    func upload(local: String, remote: String, offset: UInt64, progress: ProgressCallback?, cancel: CancelToken?) async throws  -> TransferResult
+    
+    /**
+     * Writes a whole file, replacing it. `mode` applies to new files.
+     */
+    func writeFile(path: String, data: Data, mode: UInt32?) async throws 
     
 }
 open class Sftp: SftpProtocol, @unchecked Sendable {
@@ -1693,14 +2465,34 @@ open class Sftp: SftpProtocol, @unchecked Sendable {
 
     
     /**
-     * Streams a remote file to a local path in fixed chunks, never the whole file in memory.
+     * Sets permission bits (like 0o644); file type bits are ignored.
      */
-open func download(remote: String, local: String, progress: ProgressCallback?)async throws  -> TransferResult  {
+open func chmod(path: String, mode: UInt32)async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_termix_ssh_core_fn_method_sftp_chmod(
+                        self.uniffiCloneHandle(),FfiConverterString.lower(path),FfiConverterUInt32.lower(mode)
+                )
+            },
+            pollFunc: ffi_termix_ssh_core_rust_future_poll_void,
+            completeFunc: ffi_termix_ssh_core_rust_future_complete_void,
+            freeFunc: ffi_termix_ssh_core_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeSshError_lift
+        )
+}
+    
+    /**
+     * Streams a remote file to a local path in fixed chunks, never the whole file in memory.
+     * With `offset` > 0 it resumes: the local file is kept up to there and appended to.
+     */
+open func download(remote: String, local: String, offset: UInt64, progress: ProgressCallback?, cancel: CancelToken?)async throws  -> TransferResult  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_termix_ssh_core_fn_method_sftp_download(
-                        self.uniffiCloneHandle(),FfiConverterString.lower(remote),FfiConverterString.lower(local),FfiConverterOptionTypeProgressCallback.lower(progress)
+                        self.uniffiCloneHandle(),FfiConverterString.lower(remote),FfiConverterString.lower(local),FfiConverterUInt64.lower(offset),FfiConverterOptionTypeProgressCallback.lower(progress),FfiConverterOptionTypeCancelToken.lower(cancel)
                 )
             },
             pollFunc: ffi_termix_ssh_core_rust_future_poll_rust_buffer,
@@ -1727,11 +2519,152 @@ open func list(path: String)async throws  -> [FileEntry]  {
         )
 }
     
+    /**
+     * Describes a symlink itself, with its target.
+     */
+open func lstat(path: String)async throws  -> FileEntry  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_termix_ssh_core_fn_method_sftp_lstat(
+                        self.uniffiCloneHandle(),FfiConverterString.lower(path)
+                )
+            },
+            pollFunc: ffi_termix_ssh_core_rust_future_poll_rust_buffer,
+            completeFunc: ffi_termix_ssh_core_rust_future_complete_rust_buffer,
+            freeFunc: ffi_termix_ssh_core_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterTypeFileEntry_lift,
+            errorHandler: FfiConverterTypeSshError_lift
+        )
+}
+    
+open func mkdir(path: String, mode: UInt32?)async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_termix_ssh_core_fn_method_sftp_mkdir(
+                        self.uniffiCloneHandle(),FfiConverterString.lower(path),FfiConverterOptionUInt32.lower(mode)
+                )
+            },
+            pollFunc: ffi_termix_ssh_core_rust_future_poll_void,
+            completeFunc: ffi_termix_ssh_core_rust_future_complete_void,
+            freeFunc: ffi_termix_ssh_core_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeSshError_lift
+        )
+}
+    
+    /**
+     * Reads a small file into memory. Fails when it is bigger than `max_bytes`.
+     */
+open func readFile(path: String, maxBytes: UInt64)async throws  -> Data  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_termix_ssh_core_fn_method_sftp_read_file(
+                        self.uniffiCloneHandle(),FfiConverterString.lower(path),FfiConverterUInt64.lower(maxBytes)
+                )
+            },
+            pollFunc: ffi_termix_ssh_core_rust_future_poll_rust_buffer,
+            completeFunc: ffi_termix_ssh_core_rust_future_complete_rust_buffer,
+            freeFunc: ffi_termix_ssh_core_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterData.lift,
+            errorHandler: FfiConverterTypeSshError_lift
+        )
+}
+    
+open func readLink(path: String)async throws  -> String  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_termix_ssh_core_fn_method_sftp_read_link(
+                        self.uniffiCloneHandle(),FfiConverterString.lower(path)
+                )
+            },
+            pollFunc: ffi_termix_ssh_core_rust_future_poll_rust_buffer,
+            completeFunc: ffi_termix_ssh_core_rust_future_complete_rust_buffer,
+            freeFunc: ffi_termix_ssh_core_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterString.lift,
+            errorHandler: FfiConverterTypeSshError_lift
+        )
+}
+    
+    /**
+     * Absolute path with `.` and `..` resolved. `.` gives the home folder.
+     */
+open func realpath(path: String)async throws  -> String  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_termix_ssh_core_fn_method_sftp_realpath(
+                        self.uniffiCloneHandle(),FfiConverterString.lower(path)
+                )
+            },
+            pollFunc: ffi_termix_ssh_core_rust_future_poll_rust_buffer,
+            completeFunc: ffi_termix_ssh_core_rust_future_complete_rust_buffer,
+            freeFunc: ffi_termix_ssh_core_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterString.lift,
+            errorHandler: FfiConverterTypeSshError_lift
+        )
+}
+    
 open func remove(path: String)async throws   {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_termix_ssh_core_fn_method_sftp_remove(
+                        self.uniffiCloneHandle(),FfiConverterString.lower(path)
+                )
+            },
+            pollFunc: ffi_termix_ssh_core_rust_future_poll_void,
+            completeFunc: ffi_termix_ssh_core_rust_future_complete_void,
+            freeFunc: ffi_termix_ssh_core_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeSshError_lift
+        )
+}
+    
+    /**
+     * Deletes a file or a whole folder. Symlinks are removed, never followed.
+     * Progress reports the count removed so far, with a total of 0.
+     */
+open func removeRecursive(path: String, progress: ProgressCallback?, cancel: CancelToken?)async throws  -> UInt64  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_termix_ssh_core_fn_method_sftp_remove_recursive(
+                        self.uniffiCloneHandle(),FfiConverterString.lower(path),FfiConverterOptionTypeProgressCallback.lower(progress),FfiConverterOptionTypeCancelToken.lower(cancel)
+                )
+            },
+            pollFunc: ffi_termix_ssh_core_rust_future_poll_u64,
+            completeFunc: ffi_termix_ssh_core_rust_future_complete_u64,
+            freeFunc: ffi_termix_ssh_core_rust_future_free_u64,
+            liftFunc: FfiConverterUInt64.lift,
+            errorHandler: FfiConverterTypeSshError_lift
+        )
+}
+    
+open func rename(from: String, to: String)async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_termix_ssh_core_fn_method_sftp_rename(
+                        self.uniffiCloneHandle(),FfiConverterString.lower(from),FfiConverterString.lower(to)
+                )
+            },
+            pollFunc: ffi_termix_ssh_core_rust_future_poll_void,
+            completeFunc: ffi_termix_ssh_core_rust_future_complete_void,
+            freeFunc: ffi_termix_ssh_core_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeSshError_lift
+        )
+}
+    
+open func rmdir(path: String)async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_termix_ssh_core_fn_method_sftp_rmdir(
                         self.uniffiCloneHandle(),FfiConverterString.lower(path)
                 )
             },
@@ -1775,18 +2708,78 @@ open func size(path: String)async throws  -> UInt64  {
         )
 }
     
-open func upload(local: String, remote: String, progress: ProgressCallback?)async throws  -> TransferResult  {
+    /**
+     * Follows symlinks.
+     */
+open func stat(path: String)async throws  -> FileEntry  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_termix_ssh_core_fn_method_sftp_stat(
+                        self.uniffiCloneHandle(),FfiConverterString.lower(path)
+                )
+            },
+            pollFunc: ffi_termix_ssh_core_rust_future_poll_rust_buffer,
+            completeFunc: ffi_termix_ssh_core_rust_future_complete_rust_buffer,
+            freeFunc: ffi_termix_ssh_core_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterTypeFileEntry_lift,
+            errorHandler: FfiConverterTypeSshError_lift
+        )
+}
+    
+    /**
+     * Makes `path` a link to `target`.
+     */
+open func symlink(path: String, target: String)async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_termix_ssh_core_fn_method_sftp_symlink(
+                        self.uniffiCloneHandle(),FfiConverterString.lower(path),FfiConverterString.lower(target)
+                )
+            },
+            pollFunc: ffi_termix_ssh_core_rust_future_poll_void,
+            completeFunc: ffi_termix_ssh_core_rust_future_complete_void,
+            freeFunc: ffi_termix_ssh_core_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeSshError_lift
+        )
+}
+    
+    /**
+     * Streams a local file up. With `offset` > 0 it resumes into the existing remote file.
+     */
+open func upload(local: String, remote: String, offset: UInt64, progress: ProgressCallback?, cancel: CancelToken?)async throws  -> TransferResult  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_termix_ssh_core_fn_method_sftp_upload(
-                        self.uniffiCloneHandle(),FfiConverterString.lower(local),FfiConverterString.lower(remote),FfiConverterOptionTypeProgressCallback.lower(progress)
+                        self.uniffiCloneHandle(),FfiConverterString.lower(local),FfiConverterString.lower(remote),FfiConverterUInt64.lower(offset),FfiConverterOptionTypeProgressCallback.lower(progress),FfiConverterOptionTypeCancelToken.lower(cancel)
                 )
             },
             pollFunc: ffi_termix_ssh_core_rust_future_poll_rust_buffer,
             completeFunc: ffi_termix_ssh_core_rust_future_complete_rust_buffer,
             freeFunc: ffi_termix_ssh_core_rust_future_free_rust_buffer,
             liftFunc: FfiConverterTypeTransferResult_lift,
+            errorHandler: FfiConverterTypeSshError_lift
+        )
+}
+    
+    /**
+     * Writes a whole file, replacing it. `mode` applies to new files.
+     */
+open func writeFile(path: String, data: Data, mode: UInt32?)async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_termix_ssh_core_fn_method_sftp_write_file(
+                        self.uniffiCloneHandle(),FfiConverterString.lower(path),FfiConverterData.lower(data),FfiConverterOptionUInt32.lower(mode)
+                )
+            },
+            pollFunc: ffi_termix_ssh_core_rust_future_poll_void,
+            completeFunc: ffi_termix_ssh_core_rust_future_complete_void,
+            freeFunc: ffi_termix_ssh_core_rust_future_free_void,
+            liftFunc: { $0 },
             errorHandler: FfiConverterTypeSshError_lift
         )
 }
@@ -1846,6 +2839,11 @@ public protocol ShellProtocol: AnyObject, Sendable {
     func end() async throws 
     
     func resize(cols: UInt32, rows: UInt32) async throws 
+    
+    /**
+     * Like `INT` or `TERM`. Many servers ignore signals; Ctrl+C as input always works.
+     */
+    func signal(name: String) async throws 
     
     func write(data: Data) async throws 
     
@@ -1935,6 +2933,25 @@ open func resize(cols: UInt32, rows: UInt32)async throws   {
         )
 }
     
+    /**
+     * Like `INT` or `TERM`. Many servers ignore signals; Ctrl+C as input always works.
+     */
+open func signal(name: String)async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_termix_ssh_core_fn_method_shell_signal(
+                        self.uniffiCloneHandle(),FfiConverterString.lower(name)
+                )
+            },
+            pollFunc: ffi_termix_ssh_core_rust_future_poll_void,
+            completeFunc: ffi_termix_ssh_core_rust_future_complete_void,
+            freeFunc: ffi_termix_ssh_core_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeSshError_lift
+        )
+}
+    
 open func write(data: Data)async throws   {
     return
         try  await uniffiRustCallAsync(
@@ -2005,7 +3022,7 @@ public protocol ShellCallbacks: AnyObject, Sendable {
     
     func onData(data: Data) 
     
-    func onExit(exitCode: UInt32?) 
+    func onExit(exitCode: UInt32?, exitSignal: String?) 
     
 }
 open class ShellCallbacksImpl: ShellCallbacks, @unchecked Sendable {
@@ -2070,11 +3087,12 @@ open func onData(data: Data)  {try! rustCall() {
 }
 }
     
-open func onExit(exitCode: UInt32?)  {try! rustCall() {
+open func onExit(exitCode: UInt32?, exitSignal: String?)  {try! rustCall() {
         uniffiCallStatus in
     uniffi_termix_ssh_core_fn_method_shellcallbacks_on_exit(
             self.uniffiCloneHandle(),
-        FfiConverterOptionUInt32.lower(exitCode),uniffiCallStatus
+        FfiConverterOptionUInt32.lower(exitCode),
+        FfiConverterOptionString.lower(exitSignal),uniffiCallStatus
     )
 }
 }
@@ -2134,6 +3152,7 @@ fileprivate struct UniffiCallbackInterfaceShellCallbacks {
         onExit: { (
             uniffiHandle: UInt64,
             exitCode: RustBuffer,
+            exitSignal: RustBuffer,
             uniffiOutReturn: UnsafeMutableRawPointer,
             uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
         ) in
@@ -2143,7 +3162,8 @@ fileprivate struct UniffiCallbackInterfaceShellCallbacks {
                     throw UniffiInternalError.unexpectedStaleHandle
                 }
                 return uniffiObj.onExit(
-                     exitCode: try FfiConverterOptionUInt32.lift(exitCode)
+                     exitCode: try FfiConverterOptionUInt32.lift(exitCode),
+                     exitSignal: try FfiConverterOptionString.lift(exitSignal)
                 )
             }
 
@@ -2232,6 +3252,90 @@ public func FfiConverterTypeShellCallbacks_lower(_ value: ShellCallbacks) -> UIn
 
 
 
+public struct CertInfo: Equatable, Hashable {
+    public var keyType: String
+    public var keyId: String
+    public var serial: UInt64
+    public var principals: [String]
+    /**
+     * Unix seconds. `valid_before` is u64::MAX for "forever".
+     */
+    public var validAfter: UInt64
+    public var validBefore: UInt64
+    public var caSha256: String
+    public var isHost: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(keyType: String, keyId: String, serial: UInt64, principals: [String], 
+        /**
+         * Unix seconds. `valid_before` is u64::MAX for "forever".
+         */validAfter: UInt64, validBefore: UInt64, caSha256: String, isHost: Bool) {
+        self.keyType = keyType
+        self.keyId = keyId
+        self.serial = serial
+        self.principals = principals
+        self.validAfter = validAfter
+        self.validBefore = validBefore
+        self.caSha256 = caSha256
+        self.isHost = isHost
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension CertInfo: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCertInfo: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CertInfo {
+        return
+            try CertInfo(
+                keyType: FfiConverterString.read(from: &buf), 
+                keyId: FfiConverterString.read(from: &buf), 
+                serial: FfiConverterUInt64.read(from: &buf), 
+                principals: FfiConverterSequenceString.read(from: &buf), 
+                validAfter: FfiConverterUInt64.read(from: &buf), 
+                validBefore: FfiConverterUInt64.read(from: &buf), 
+                caSha256: FfiConverterString.read(from: &buf), 
+                isHost: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: CertInfo, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.keyType, into: &buf)
+        FfiConverterString.write(value.keyId, into: &buf)
+        FfiConverterUInt64.write(value.serial, into: &buf)
+        FfiConverterSequenceString.write(value.principals, into: &buf)
+        FfiConverterUInt64.write(value.validAfter, into: &buf)
+        FfiConverterUInt64.write(value.validBefore, into: &buf)
+        FfiConverterString.write(value.caSha256, into: &buf)
+        FfiConverterBool.write(value.isHost, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCertInfo_lift(_ buf: RustBuffer) throws -> CertInfo {
+    return try FfiConverterTypeCertInfo.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCertInfo_lower(_ value: CertInfo) -> RustBuffer {
+    return FfiConverterTypeCertInfo.lower(value)
+}
+
+
 public struct ConnectConfig: Equatable, Hashable {
     public var host: String
     public var port: UInt16
@@ -2243,14 +3347,21 @@ public struct ConnectConfig: Equatable, Hashable {
     public var privateKey: String?
     public var passphrase: String?
     /**
-     * OpenSSH user certificate (`*-cert.pub` text) for `private_key`.
+     * OpenSSH user certificate (`*-cert.pub` text) for `private_key`. Like core, a certificate
+     * login tries only the certificate.
      */
     public var certificate: String?
     public var forceKeyboardInteractive: Bool
+    /**
+     * Ask keyboard-interactive prompts when the server offers them.
+     */
+    public var tryKeyboard: Bool
     public var allowLegacyAlgorithms: Bool
     public var connectTimeoutSecs: UInt32
     public var keepaliveIntervalSecs: UInt32
     public var keepaliveCountMax: UInt32
+    public var proxies: [ProxyHop]
+    public var portKnock: [PortKnock]
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -2259,8 +3370,12 @@ public struct ConnectConfig: Equatable, Hashable {
          * OpenSSH, PEM, PKCS8 or PuTTY PPK text.
          */privateKey: String?, passphrase: String?, 
         /**
-         * OpenSSH user certificate (`*-cert.pub` text) for `private_key`.
-         */certificate: String?, forceKeyboardInteractive: Bool, allowLegacyAlgorithms: Bool, connectTimeoutSecs: UInt32, keepaliveIntervalSecs: UInt32, keepaliveCountMax: UInt32) {
+         * OpenSSH user certificate (`*-cert.pub` text) for `private_key`. Like core, a certificate
+         * login tries only the certificate.
+         */certificate: String?, forceKeyboardInteractive: Bool, 
+        /**
+         * Ask keyboard-interactive prompts when the server offers them.
+         */tryKeyboard: Bool, allowLegacyAlgorithms: Bool, connectTimeoutSecs: UInt32, keepaliveIntervalSecs: UInt32, keepaliveCountMax: UInt32, proxies: [ProxyHop], portKnock: [PortKnock]) {
         self.host = host
         self.port = port
         self.username = username
@@ -2269,10 +3384,13 @@ public struct ConnectConfig: Equatable, Hashable {
         self.passphrase = passphrase
         self.certificate = certificate
         self.forceKeyboardInteractive = forceKeyboardInteractive
+        self.tryKeyboard = tryKeyboard
         self.allowLegacyAlgorithms = allowLegacyAlgorithms
         self.connectTimeoutSecs = connectTimeoutSecs
         self.keepaliveIntervalSecs = keepaliveIntervalSecs
         self.keepaliveCountMax = keepaliveCountMax
+        self.proxies = proxies
+        self.portKnock = portKnock
     }
 
     
@@ -2299,10 +3417,13 @@ public struct FfiConverterTypeConnectConfig: FfiConverterRustBuffer {
                 passphrase: FfiConverterOptionString.read(from: &buf), 
                 certificate: FfiConverterOptionString.read(from: &buf), 
                 forceKeyboardInteractive: FfiConverterBool.read(from: &buf), 
+                tryKeyboard: FfiConverterBool.read(from: &buf), 
                 allowLegacyAlgorithms: FfiConverterBool.read(from: &buf), 
                 connectTimeoutSecs: FfiConverterUInt32.read(from: &buf), 
                 keepaliveIntervalSecs: FfiConverterUInt32.read(from: &buf), 
-                keepaliveCountMax: FfiConverterUInt32.read(from: &buf)
+                keepaliveCountMax: FfiConverterUInt32.read(from: &buf), 
+                proxies: FfiConverterSequenceTypeProxyHop.read(from: &buf), 
+                portKnock: FfiConverterSequenceTypePortKnock.read(from: &buf)
         )
     }
 
@@ -2315,10 +3436,13 @@ public struct FfiConverterTypeConnectConfig: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.passphrase, into: &buf)
         FfiConverterOptionString.write(value.certificate, into: &buf)
         FfiConverterBool.write(value.forceKeyboardInteractive, into: &buf)
+        FfiConverterBool.write(value.tryKeyboard, into: &buf)
         FfiConverterBool.write(value.allowLegacyAlgorithms, into: &buf)
         FfiConverterUInt32.write(value.connectTimeoutSecs, into: &buf)
         FfiConverterUInt32.write(value.keepaliveIntervalSecs, into: &buf)
         FfiConverterUInt32.write(value.keepaliveCountMax, into: &buf)
+        FfiConverterSequenceTypeProxyHop.write(value.proxies, into: &buf)
+        FfiConverterSequenceTypePortKnock.write(value.portKnock, into: &buf)
     }
 }
 
@@ -2396,13 +3520,23 @@ public struct ExecResult: Equatable, Hashable {
     public var stdout: Data
     public var stderr: Data
     public var exitCode: UInt32?
+    public var exitSignal: String?
+    /**
+     * True when output went past the cap and the rest was dropped.
+     */
+    public var truncated: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(stdout: Data, stderr: Data, exitCode: UInt32?) {
+    public init(stdout: Data, stderr: Data, exitCode: UInt32?, exitSignal: String?, 
+        /**
+         * True when output went past the cap and the rest was dropped.
+         */truncated: Bool) {
         self.stdout = stdout
         self.stderr = stderr
         self.exitCode = exitCode
+        self.exitSignal = exitSignal
+        self.truncated = truncated
     }
 
     
@@ -2423,7 +3557,9 @@ public struct FfiConverterTypeExecResult: FfiConverterRustBuffer {
             try ExecResult(
                 stdout: FfiConverterData.read(from: &buf), 
                 stderr: FfiConverterData.read(from: &buf), 
-                exitCode: FfiConverterOptionUInt32.read(from: &buf)
+                exitCode: FfiConverterOptionUInt32.read(from: &buf), 
+                exitSignal: FfiConverterOptionString.read(from: &buf), 
+                truncated: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -2431,6 +3567,8 @@ public struct FfiConverterTypeExecResult: FfiConverterRustBuffer {
         FfiConverterData.write(value.stdout, into: &buf)
         FfiConverterData.write(value.stderr, into: &buf)
         FfiConverterOptionUInt32.write(value.exitCode, into: &buf)
+        FfiConverterOptionString.write(value.exitSignal, into: &buf)
+        FfiConverterBool.write(value.truncated, into: &buf)
     }
 }
 
@@ -2455,18 +3593,38 @@ public struct FileEntry: Equatable, Hashable {
     public var size: UInt64
     public var isDir: Bool
     public var isSymlink: Bool
+    /**
+     * Full st_mode, file type bits included.
+     */
     public var permissions: UInt32
     public var mtime: UInt32
+    public var atime: UInt32
+    public var uid: UInt32?
+    public var gid: UInt32?
+    /**
+     * Where a symlink points, filled by `list` and `lstat`.
+     */
+    public var linkTarget: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(name: String, size: UInt64, isDir: Bool, isSymlink: Bool, permissions: UInt32, mtime: UInt32) {
+    public init(name: String, size: UInt64, isDir: Bool, isSymlink: Bool, 
+        /**
+         * Full st_mode, file type bits included.
+         */permissions: UInt32, mtime: UInt32, atime: UInt32, uid: UInt32?, gid: UInt32?, 
+        /**
+         * Where a symlink points, filled by `list` and `lstat`.
+         */linkTarget: String?) {
         self.name = name
         self.size = size
         self.isDir = isDir
         self.isSymlink = isSymlink
         self.permissions = permissions
         self.mtime = mtime
+        self.atime = atime
+        self.uid = uid
+        self.gid = gid
+        self.linkTarget = linkTarget
     }
 
     
@@ -2490,7 +3648,11 @@ public struct FfiConverterTypeFileEntry: FfiConverterRustBuffer {
                 isDir: FfiConverterBool.read(from: &buf), 
                 isSymlink: FfiConverterBool.read(from: &buf), 
                 permissions: FfiConverterUInt32.read(from: &buf), 
-                mtime: FfiConverterUInt32.read(from: &buf)
+                mtime: FfiConverterUInt32.read(from: &buf), 
+                atime: FfiConverterUInt32.read(from: &buf), 
+                uid: FfiConverterOptionUInt32.read(from: &buf), 
+                gid: FfiConverterOptionUInt32.read(from: &buf), 
+                linkTarget: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -2501,6 +3663,10 @@ public struct FfiConverterTypeFileEntry: FfiConverterRustBuffer {
         FfiConverterBool.write(value.isSymlink, into: &buf)
         FfiConverterUInt32.write(value.permissions, into: &buf)
         FfiConverterUInt32.write(value.mtime, into: &buf)
+        FfiConverterUInt32.write(value.atime, into: &buf)
+        FfiConverterOptionUInt32.write(value.uid, into: &buf)
+        FfiConverterOptionUInt32.write(value.gid, into: &buf)
+        FfiConverterOptionString.write(value.linkTarget, into: &buf)
     }
 }
 
@@ -2744,6 +3910,104 @@ public func FfiConverterTypeKbdRequest_lower(_ value: KbdRequest) -> RustBuffer 
 }
 
 
+public struct KeyInfo: Equatable, Hashable {
+    /**
+     * Like `ssh-ed25519` or `rsa-sha2-512`.
+     */
+    public var keyType: String
+    public var bits: UInt32
+    public var sha256: String
+    /**
+     * The `authorized_keys` line for this key.
+     */
+    public var publicOpenssh: String
+    /**
+     * The text needed a passphrase.
+     */
+    public var encrypted: Bool
+    /**
+     * `openssh`, `pem`, `pkcs8` or `ppk`.
+     */
+    public var format: String
+    public var comment: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Like `ssh-ed25519` or `rsa-sha2-512`.
+         */keyType: String, bits: UInt32, sha256: String, 
+        /**
+         * The `authorized_keys` line for this key.
+         */publicOpenssh: String, 
+        /**
+         * The text needed a passphrase.
+         */encrypted: Bool, 
+        /**
+         * `openssh`, `pem`, `pkcs8` or `ppk`.
+         */format: String, comment: String) {
+        self.keyType = keyType
+        self.bits = bits
+        self.sha256 = sha256
+        self.publicOpenssh = publicOpenssh
+        self.encrypted = encrypted
+        self.format = format
+        self.comment = comment
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension KeyInfo: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeKeyInfo: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> KeyInfo {
+        return
+            try KeyInfo(
+                keyType: FfiConverterString.read(from: &buf), 
+                bits: FfiConverterUInt32.read(from: &buf), 
+                sha256: FfiConverterString.read(from: &buf), 
+                publicOpenssh: FfiConverterString.read(from: &buf), 
+                encrypted: FfiConverterBool.read(from: &buf), 
+                format: FfiConverterString.read(from: &buf), 
+                comment: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: KeyInfo, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.keyType, into: &buf)
+        FfiConverterUInt32.write(value.bits, into: &buf)
+        FfiConverterString.write(value.sha256, into: &buf)
+        FfiConverterString.write(value.publicOpenssh, into: &buf)
+        FfiConverterBool.write(value.encrypted, into: &buf)
+        FfiConverterString.write(value.format, into: &buf)
+        FfiConverterString.write(value.comment, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeKeyInfo_lift(_ buf: RustBuffer) throws -> KeyInfo {
+    return try FfiConverterTypeKeyInfo.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeKeyInfo_lower(_ value: KeyInfo) -> RustBuffer {
+    return FfiConverterTypeKeyInfo.lower(value)
+}
+
+
 public struct NegotiatedAlgorithms: Equatable, Hashable {
     public var kex: String
     public var hostKey: String
@@ -2806,6 +4070,197 @@ public func FfiConverterTypeNegotiatedAlgorithms_lower(_ value: NegotiatedAlgori
 }
 
 
+public struct PortKnock: Equatable, Hashable {
+    public var port: UInt16
+    public var udp: Bool
+    /**
+     * Wait after this knock, like core's default of 100 ms.
+     */
+    public var delayMs: UInt32
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(port: UInt16, udp: Bool, 
+        /**
+         * Wait after this knock, like core's default of 100 ms.
+         */delayMs: UInt32) {
+        self.port = port
+        self.udp = udp
+        self.delayMs = delayMs
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension PortKnock: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypePortKnock: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PortKnock {
+        return
+            try PortKnock(
+                port: FfiConverterUInt16.read(from: &buf), 
+                udp: FfiConverterBool.read(from: &buf), 
+                delayMs: FfiConverterUInt32.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: PortKnock, into buf: inout [UInt8]) {
+        FfiConverterUInt16.write(value.port, into: &buf)
+        FfiConverterBool.write(value.udp, into: &buf)
+        FfiConverterUInt32.write(value.delayMs, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePortKnock_lift(_ buf: RustBuffer) throws -> PortKnock {
+    return try FfiConverterTypePortKnock.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePortKnock_lower(_ value: PortKnock) -> RustBuffer {
+    return FfiConverterTypePortKnock.lower(value)
+}
+
+
+/**
+ * One proxy on the way to the host. Several make a chain, first one is dialed directly.
+ */
+public struct ProxyHop: Equatable, Hashable {
+    public var kind: ProxyKind
+    public var host: String
+    public var port: UInt16
+    public var username: String?
+    public var password: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(kind: ProxyKind, host: String, port: UInt16, username: String?, password: String?) {
+        self.kind = kind
+        self.host = host
+        self.port = port
+        self.username = username
+        self.password = password
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension ProxyHop: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeProxyHop: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ProxyHop {
+        return
+            try ProxyHop(
+                kind: FfiConverterTypeProxyKind.read(from: &buf), 
+                host: FfiConverterString.read(from: &buf), 
+                port: FfiConverterUInt16.read(from: &buf), 
+                username: FfiConverterOptionString.read(from: &buf), 
+                password: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ProxyHop, into buf: inout [UInt8]) {
+        FfiConverterTypeProxyKind.write(value.kind, into: &buf)
+        FfiConverterString.write(value.host, into: &buf)
+        FfiConverterUInt16.write(value.port, into: &buf)
+        FfiConverterOptionString.write(value.username, into: &buf)
+        FfiConverterOptionString.write(value.password, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeProxyHop_lift(_ buf: RustBuffer) throws -> ProxyHop {
+    return try FfiConverterTypeProxyHop.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeProxyHop_lower(_ value: ProxyHop) -> RustBuffer {
+    return FfiConverterTypeProxyHop.lower(value)
+}
+
+
+public struct PtySize: Equatable, Hashable {
+    public var term: String
+    public var cols: UInt32
+    public var rows: UInt32
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(term: String, cols: UInt32, rows: UInt32) {
+        self.term = term
+        self.cols = cols
+        self.rows = rows
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension PtySize: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypePtySize: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PtySize {
+        return
+            try PtySize(
+                term: FfiConverterString.read(from: &buf), 
+                cols: FfiConverterUInt32.read(from: &buf), 
+                rows: FfiConverterUInt32.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: PtySize, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.term, into: &buf)
+        FfiConverterUInt32.write(value.cols, into: &buf)
+        FfiConverterUInt32.write(value.rows, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePtySize_lift(_ buf: RustBuffer) throws -> PtySize {
+    return try FfiConverterTypePtySize.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePtySize_lower(_ value: PtySize) -> RustBuffer {
+    return FfiConverterTypePtySize.lower(value)
+}
+
+
 public struct TransferResult: Equatable, Hashable {
     public var bytes: UInt64
     public var millis: UInt64
@@ -2860,6 +4315,174 @@ public func FfiConverterTypeTransferResult_lower(_ value: TransferResult) -> Rus
 }
 
 
+/**
+ * Why a session ended.
+ */
+
+public enum DisconnectKind: Equatable, Hashable {
+    
+    /**
+     * The server sent a disconnect.
+     */
+    case server
+    /**
+     * Keepalive replies stopped coming.
+     */
+    case keepalive
+    /**
+     * The socket broke.
+     */
+    case network
+    /**
+     * This side closed it.
+     */
+    case local
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension DisconnectKind: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeDisconnectKind: FfiConverterRustBuffer {
+    typealias SwiftType = DisconnectKind
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DisconnectKind {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .server
+        
+        case 2: return .keepalive
+        
+        case 3: return .network
+        
+        case 4: return .local
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: DisconnectKind, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .server:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .keepalive:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .network:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .local:
+            writeInt(&buf, Int32(4))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDisconnectKind_lift(_ buf: RustBuffer) throws -> DisconnectKind {
+    return try FfiConverterTypeDisconnectKind.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDisconnectKind_lower(_ value: DisconnectKind) -> RustBuffer {
+    return FfiConverterTypeDisconnectKind.lower(value)
+}
+
+
+
+
+public enum ProxyKind: Equatable, Hashable {
+    
+    case socks4
+    case socks5
+    case http
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension ProxyKind: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeProxyKind: FfiConverterRustBuffer {
+    typealias SwiftType = ProxyKind
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ProxyKind {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .socks4
+        
+        case 2: return .socks5
+        
+        case 3: return .http
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: ProxyKind, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .socks4:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .socks5:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .http:
+            writeInt(&buf, Int32(3))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeProxyKind_lift(_ buf: RustBuffer) throws -> ProxyKind {
+    return try FfiConverterTypeProxyKind.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeProxyKind_lower(_ value: ProxyKind) -> RustBuffer {
+    return FfiConverterTypeProxyKind.lower(value)
+}
+
+
+
 public 
 enum SshError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
 
@@ -2874,7 +4497,14 @@ enum SshError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
     )
     case Auth(msg: String
     )
+    /**
+     * Nothing this login has fits what the server accepts.
+     */
+    case AuthMethodNotAvailable(msg: String
+    )
     case AuthCancelled
+    case Cancelled
+    case Timeout
     case Channel(msg: String
     )
     case Sftp(msg: String
@@ -2923,17 +4553,22 @@ public struct FfiConverterTypeSshError: FfiConverterRustBuffer {
         case 6: return .Auth(
             msg: try FfiConverterString.read(from: &buf)
             )
-        case 7: return .AuthCancelled
-        case 8: return .Channel(
+        case 7: return .AuthMethodNotAvailable(
             msg: try FfiConverterString.read(from: &buf)
             )
-        case 9: return .Sftp(
+        case 8: return .AuthCancelled
+        case 9: return .Cancelled
+        case 10: return .Timeout
+        case 11: return .Channel(
             msg: try FfiConverterString.read(from: &buf)
             )
-        case 10: return .Io(
+        case 12: return .Sftp(
             msg: try FfiConverterString.read(from: &buf)
             )
-        case 11: return .Disconnected
+        case 13: return .Io(
+            msg: try FfiConverterString.read(from: &buf)
+            )
+        case 14: return .Disconnected
 
          default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -2973,27 +4608,40 @@ public struct FfiConverterTypeSshError: FfiConverterRustBuffer {
             FfiConverterString.write(msg, into: &buf)
             
         
-        case .AuthCancelled:
+        case let .AuthMethodNotAvailable(msg):
             writeInt(&buf, Int32(7))
+            FfiConverterString.write(msg, into: &buf)
+            
+        
+        case .AuthCancelled:
+            writeInt(&buf, Int32(8))
+        
+        
+        case .Cancelled:
+            writeInt(&buf, Int32(9))
+        
+        
+        case .Timeout:
+            writeInt(&buf, Int32(10))
         
         
         case let .Channel(msg):
-            writeInt(&buf, Int32(8))
+            writeInt(&buf, Int32(11))
             FfiConverterString.write(msg, into: &buf)
             
         
         case let .Sftp(msg):
-            writeInt(&buf, Int32(9))
+            writeInt(&buf, Int32(12))
             FfiConverterString.write(msg, into: &buf)
             
         
         case let .Io(msg):
-            writeInt(&buf, Int32(10))
+            writeInt(&buf, Int32(13))
             FfiConverterString.write(msg, into: &buf)
             
         
         case .Disconnected:
-            writeInt(&buf, Int32(11))
+            writeInt(&buf, Int32(14))
         
         }
     }
@@ -3065,6 +4713,30 @@ fileprivate struct FfiConverterOptionString: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeCancelToken: FfiConverterRustBuffer {
+    typealias SwiftType = CancelToken?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeCancelToken.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeCancelToken.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeProgressCallback: FfiConverterRustBuffer {
     typealias SwiftType = ProgressCallback?
 
@@ -3105,6 +4777,30 @@ fileprivate struct FfiConverterOptionTypeNegotiatedAlgorithms: FfiConverterRustB
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeNegotiatedAlgorithms.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypePtySize: FfiConverterRustBuffer {
+    typealias SwiftType = PtySize?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypePtySize.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypePtySize.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -3229,6 +4925,56 @@ fileprivate struct FfiConverterSequenceTypeKbdPrompt: FfiConverterRustBuffer {
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeKbdPrompt.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypePortKnock: FfiConverterRustBuffer {
+    typealias SwiftType = [PortKnock]
+
+    public static func write(_ value: [PortKnock], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypePortKnock.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [PortKnock] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [PortKnock]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypePortKnock.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeProxyHop: FfiConverterRustBuffer {
+    typealias SwiftType = [ProxyHop]
+
+    public static func write(_ value: [ProxyHop], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeProxyHop.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [ProxyHop] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [ProxyHop]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeProxyHop.read(from: &buf))
         }
         return seq
     }
@@ -3382,13 +5128,50 @@ public func engineVersion() -> String  {
 })
 }
 /**
- * Opens a TCP connection and logs in.
+ * Returns the key as OpenSSH text, so PuTTY, PEM and PKCS8 keys are stored one way.
+ * A non-empty `new_passphrase` encrypts the result.
  */
-public func connect(config: ConnectConfig, callbacks: SessionCallbacks)async throws  -> Session  {
+public func convertKeyToOpenssh(text: String, passphrase: String?, newPassphrase: String?)throws  -> String  {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeSshError_lift) {
+        uniffiCallStatus in
+    uniffi_termix_ssh_core_fn_func_convert_key_to_openssh(
+        FfiConverterString.lower(text),
+        FfiConverterOptionString.lower(passphrase),
+        FfiConverterOptionString.lower(newPassphrase),uniffiCallStatus
+    )
+})
+}
+/**
+ * Reads an OpenSSH certificate (`*-cert.pub` text).
+ */
+public func inspectCertificate(text: String)throws  -> CertInfo  {
+    return try  FfiConverterTypeCertInfo_lift(try rustCallWithError(FfiConverterTypeSshError_lift) {
+        uniffiCallStatus in
+    uniffi_termix_ssh_core_fn_func_inspect_certificate(
+        FfiConverterString.lower(text),uniffiCallStatus
+    )
+})
+}
+/**
+ * Reads a private key. Fails with PassphraseRequired or BadPassphrase when it needs one.
+ */
+public func inspectKey(text: String, passphrase: String?)throws  -> KeyInfo  {
+    return try  FfiConverterTypeKeyInfo_lift(try rustCallWithError(FfiConverterTypeSshError_lift) {
+        uniffiCallStatus in
+    uniffi_termix_ssh_core_fn_func_inspect_key(
+        FfiConverterString.lower(text),
+        FfiConverterOptionString.lower(passphrase),uniffiCallStatus
+    )
+})
+}
+/**
+ * Opens a connection (knocking and through proxies when set) and logs in.
+ */
+public func connect(config: ConnectConfig, callbacks: SessionCallbacks, cancel: CancelToken?)async throws  -> Session  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
-                uniffi_termix_ssh_core_fn_func_connect(FfiConverterTypeConnectConfig_lower(config),FfiConverterTypeSessionCallbacks_lower(callbacks)
+                uniffi_termix_ssh_core_fn_func_connect(FfiConverterTypeConnectConfig_lower(config),FfiConverterTypeSessionCallbacks_lower(callbacks),FfiConverterOptionTypeCancelToken.lower(cancel)
                 )
             },
             pollFunc: ffi_termix_ssh_core_rust_future_poll_u64,
@@ -3417,7 +5200,25 @@ private let initializationResult: InitializationResult = {
     if (uniffi_termix_ssh_core_checksum_func_engine_version() != 33488) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_termix_ssh_core_checksum_func_connect() != 7922) {
+    if (uniffi_termix_ssh_core_checksum_func_convert_key_to_openssh() != 11626) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_func_inspect_certificate() != 41445) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_func_inspect_key() != 38327) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_func_connect() != 5080) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_execcallbacks_on_stdout() != 32055) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_execcallbacks_on_stderr() != 30185) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_execcallbacks_on_exit() != 41475) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_termix_ssh_core_checksum_method_progresscallback_on_progress() != 27852) {
@@ -3432,19 +5233,46 @@ private let initializationResult: InitializationResult = {
     if (uniffi_termix_ssh_core_checksum_method_sessioncallbacks_on_banner() != 14288) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_termix_ssh_core_checksum_method_sessioncallbacks_on_disconnect() != 23040) {
+    if (uniffi_termix_ssh_core_checksum_method_sessioncallbacks_on_disconnect() != 29852) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_termix_ssh_core_checksum_method_shellcallbacks_on_data() != 53188) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_termix_ssh_core_checksum_method_shellcallbacks_on_exit() != 19097) {
+    if (uniffi_termix_ssh_core_checksum_method_shellcallbacks_on_exit() != 50067) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_termix_ssh_core_checksum_method_forward_port() != 29998) {
+    if (uniffi_termix_ssh_core_checksum_method_canceltoken_cancel() != 35693) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_canceltoken_is_cancelled() != 54838) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_exechandle_end() != 56423) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_exechandle_eof() != 7767) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_exechandle_signal() != 31333) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_exechandle_write() != 59711) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_forward_port() != 22279) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_forward_shutdown() != 22346) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_termix_ssh_core_checksum_method_forward_stop() != 2633) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_session_exec() != 2934) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_session_exec_stream() != 51936) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_termix_ssh_core_checksum_method_session_forward_dynamic() != 61529) {
@@ -3453,16 +5281,16 @@ private let initializationResult: InitializationResult = {
     if (uniffi_termix_ssh_core_checksum_method_session_forward_local() != 41196) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_termix_ssh_core_checksum_method_session_forward_remote() != 38130) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_termix_ssh_core_checksum_method_session_algorithms() != 49707) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_termix_ssh_core_checksum_method_session_connect_via() != 52915) {
+    if (uniffi_termix_ssh_core_checksum_method_session_connect_via() != 18926) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_termix_ssh_core_checksum_method_session_disconnect() != 5467) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_termix_ssh_core_checksum_method_session_exec() != 22479) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_termix_ssh_core_checksum_method_session_host_key() != 64742) {
@@ -3471,7 +5299,10 @@ private let initializationResult: InitializationResult = {
     if (uniffi_termix_ssh_core_checksum_method_session_is_closed() != 33781) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_termix_ssh_core_checksum_method_session_ping() != 664) {
+    if (uniffi_termix_ssh_core_checksum_method_session_ping() != 15966) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_session_reconnect() != 44892) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_termix_ssh_core_checksum_method_session_open_sftp() != 39640) {
@@ -3480,13 +5311,40 @@ private let initializationResult: InitializationResult = {
     if (uniffi_termix_ssh_core_checksum_method_session_open_shell() != 31884) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_termix_ssh_core_checksum_method_sftp_download() != 58604) {
+    if (uniffi_termix_ssh_core_checksum_method_sftp_chmod() != 8107) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_sftp_download() != 48218) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_termix_ssh_core_checksum_method_sftp_list() != 3492) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_termix_ssh_core_checksum_method_sftp_lstat() != 49377) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_sftp_mkdir() != 52954) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_sftp_read_file() != 44081) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_sftp_read_link() != 60858) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_sftp_realpath() != 5579) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_termix_ssh_core_checksum_method_sftp_remove() != 5948) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_sftp_remove_recursive() != 44650) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_sftp_rename() != 7058) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_sftp_rmdir() != 3851) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_termix_ssh_core_checksum_method_sftp_shutdown() != 4984) {
@@ -3495,7 +5353,16 @@ private let initializationResult: InitializationResult = {
     if (uniffi_termix_ssh_core_checksum_method_sftp_size() != 51437) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_termix_ssh_core_checksum_method_sftp_upload() != 4867) {
+    if (uniffi_termix_ssh_core_checksum_method_sftp_stat() != 28980) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_sftp_symlink() != 39787) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_sftp_upload() != 6209) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_sftp_write_file() != 33418) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_termix_ssh_core_checksum_method_shell_end() != 21084) {
@@ -3504,10 +5371,17 @@ private let initializationResult: InitializationResult = {
     if (uniffi_termix_ssh_core_checksum_method_shell_resize() != 30553) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_termix_ssh_core_checksum_method_shell_signal() != 34912) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_termix_ssh_core_checksum_method_shell_write() != 39054) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_termix_ssh_core_checksum_constructor_canceltoken_new() != 54914) {
+        return InitializationResult.apiChecksumMismatch
+    }
 
+    uniffiCallbackInitExecCallbacks()
     uniffiCallbackInitProgressCallback()
     uniffiCallbackInitSessionCallbacks()
     uniffiCallbackInitShellCallbacks()

@@ -10,14 +10,16 @@ mkuser() {
   install -d -m 700 -o "$1" -g "$1" "/home/$1/.ssh"
   install -m 600 -o "$1" -g "$1" "$keys/authorized_keys" "/home/$1/.ssh/authorized_keys"
 }
-for u in pw key kbd cert kp; do mkuser "$u"; done
+for u in pw key kbd cert kp nopw; do mkuser "$u"; done
+# nopw: empty password, so the "none" method logs in like a Tailscale or open host
+passwd -d nopw >/dev/null
 rm -f /home/cert/.ssh/authorized_keys
 
 # kbd: password round, then a TOTP round
 printf '%s\n" TOTP_AUTH\n' "$(cat $keys/totp_secret)" > /home/kbd/.google_authenticator
 chown kbd:kbd /home/kbd/.google_authenticator && chmod 400 /home/kbd/.google_authenticator
 cat > /etc/pam.d/sshd <<PAM
-auth required pam_unix.so
+auth required pam_unix.so nullok
 auth required pam_google_authenticator.so nullok
 account include common-account
 session include common-session
@@ -53,6 +55,9 @@ Match User kbd
   AuthenticationMethods keyboard-interactive
 Match User cert
   AuthenticationMethods publickey
+Match User nopw
+  PermitEmptyPasswords yes
+  AuthenticationMethods none
 Match User kp
   AuthenticationMethods publickey,password
 CONF

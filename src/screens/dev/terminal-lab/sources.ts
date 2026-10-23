@@ -213,7 +213,7 @@ export class SshSource implements LabSource {
         },
         onExit: () => this.onStatus("Shell closed"),
       });
-      this.session.onDisconnect((reason) => this.onStatus(reason));
+      this.session.onDisconnect((info) => this.onStatus(info.reason));
     } catch (e) {
       write(b64(`\r\nFailed: ${(e as Error).message}\r\n`));
     }
