@@ -575,6 +575,20 @@ export default function Settings() {
                 onChange={handleAppLockToggle}
               />
             </SettingRow>
+            <Pressable
+              onPress={() => router.push("/tabs/settings/LocalData" as any)}
+              className="flex-row items-center justify-between border-t border-border/40 py-3"
+            >
+              <View>
+                <Text weight="medium" className="text-sm text-foreground">
+                  Local data
+                </Text>
+                <Text className="mt-0.5 text-[11px] text-muted-foreground">
+                  Backup, restore and delete what is saved on this phone
+                </Text>
+              </View>
+              <ChevronRight size={16} color={color("muted-foreground")} />
+            </Pressable>
           </View>
         </AccordionSection>
 
