@@ -26,6 +26,8 @@ import { WidgetDeepLinkHost } from "@/widgets";
 import { registerBuiltInFeatures } from "@/features";
 import { AccountSwitcher } from "@/screens/accounts/AccountSwitcher";
 import { LabLaunch } from "@/screens/dev/terminal-lab/LabLaunch";
+// Defines the background sync task, which must exist when the app loads.
+import "@/core/sync/background";
 
 registerBuiltInFeatures();
 

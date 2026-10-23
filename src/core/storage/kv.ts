@@ -54,25 +54,45 @@ export const DEVICE_ONLY: SecureStore.SecureStoreOptions = {
   keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
 };
 
+/**
+ * Also device only, but readable while the phone is locked once it has been
+ * unlocked after a restart. Linked servers use it so background sync can run.
+ */
+export const AFTER_FIRST_UNLOCK: SecureStore.SecureStoreOptions = {
+  keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
+};
+
+/** Which Keychain setting an account's secrets use. This device stays strict. */
+export const secureOptionsFor = (accountId: string) =>
+  accountId === "local" ? DEVICE_ONLY : AFTER_FIRST_UNLOCK;
+
 // SecureStore keys only allow letters, digits, ".", "-" and "_".
 const secureKey = (key: string) => key.replace(/[^A-Za-z0-9._-]/g, "_");
 
+function secureStoreWith(options: SecureStore.SecureStoreOptions): JsonKV {
+  return withJson({
+    async get(key) {
+      try {
+        return await SecureStore.getItemAsync(secureKey(key), options);
+      } catch {
+        return null;
+      }
+    },
+    async set(key, value) {
+      await SecureStore.setItemAsync(secureKey(key), value, options);
+    },
+    async remove(key) {
+      await SecureStore.deleteItemAsync(secureKey(key), options);
+    },
+  });
+}
+
 /** Keychain or Keystore backed storage for tokens, passwords and certificates. */
-export const secureStore: JsonKV = withJson({
-  async get(key) {
-    try {
-      return await SecureStore.getItemAsync(secureKey(key), DEVICE_ONLY);
-    } catch {
-      return null;
-    }
-  },
-  async set(key, value) {
-    await SecureStore.setItemAsync(secureKey(key), value, DEVICE_ONLY);
-  },
-  async remove(key) {
-    await SecureStore.deleteItemAsync(secureKey(key), DEVICE_ONLY);
-  },
-});
+export const secureStore: JsonKV = secureStoreWith(DEVICE_ONLY);
+
+/** Same, readable by background sync after the first unlock. */
+export const backgroundSecureStore: JsonKV =
+  secureStoreWith(AFTER_FIRST_UNLOCK);
 
 /** Prefixes every key, so two accounts never read each other's data. */
 export function namespaced(kv: JsonKV, prefix: string): JsonKV {
@@ -95,7 +115,10 @@ export interface AccountStorage {
 
 export function accountStorage(accountId: string): AccountStorage {
   const data = namespaced(plainStore, `acct.${accountId}`);
-  const secrets = namespaced(secureStore, `acct.${accountId}`);
+  const secrets = namespaced(
+    accountId === "local" ? secureStore : backgroundSecureStore,
+    `acct.${accountId}`,
+  );
   return {
     data,
     secrets,

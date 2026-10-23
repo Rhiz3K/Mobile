@@ -14,6 +14,7 @@ jest.mock("expo-secure-store", () => {
     }),
     WHEN_UNLOCKED: 0,
     WHEN_UNLOCKED_THIS_DEVICE_ONLY: 6,
+    AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY: 2,
     __reset: () => store.clear(),
   };
 });

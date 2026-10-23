@@ -19,3 +19,10 @@ test("deleting a key makes a new one next time", async () => {
   await deleteDbKey("local");
   expect(await getDbKey("local")).not.toBe(a);
 });
+
+test("a linked server's key is readable after the first unlock", async () => {
+  const key = await getDbKey("acct1");
+  expect(SecureStore.setItemAsync).toHaveBeenCalledWith("db.key.acct1", key, {
+    keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
+  });
+});

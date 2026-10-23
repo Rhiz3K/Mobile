@@ -15,11 +15,21 @@ test("each account reads only its own keys", async () => {
 });
 
 test("secrets go to device only secure storage, never to plain storage", async () => {
+  await accountStorage("local").secrets.set("session", "tok");
+  expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
+    "acct.local.session",
+    "tok",
+    { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY },
+  );
+  expect(await AsyncStorage.getAllKeys()).toEqual([]);
+});
+
+test("a linked server's secrets stay readable for background sync", async () => {
   await accountStorage("a").secrets.set("session", "tok");
   expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
     "acct.a.session",
     "tok",
-    { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY },
+    { keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY },
   );
   expect(await AsyncStorage.getAllKeys()).toEqual([]);
 });
