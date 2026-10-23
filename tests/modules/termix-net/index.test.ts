@@ -1,0 +1,67 @@
+import {
+  importClientCert,
+  isNetAvailable,
+  NativeSocket,
+  nativeStream,
+} from "@/modules/termix-net";
+import { clearFakeNet, fakeNet } from "../../helpers/net";
+
+afterEach(clearFakeNet);
+
+test("without the module nothing is available and imports say why", async () => {
+  clearFakeNet();
+  expect(isNetAvailable()).toBe(false);
+  expect(() => importClientCert("a", "h", "x", "y")).toThrow(
+    "This build can't use client certificates.",
+  );
+});
+
+test("a native socket acts like a WebSocket", () => {
+  const net = fakeNet({ nativeRequests: true });
+  const socket = new NativeSocket("wss://h/x", ["termix.jwt.t"], { A: "1" });
+  const [id, url, protocols, headers] = (net.openSocket as jest.Mock).mock
+    .calls[0];
+  expect([url, protocols, headers]).toEqual([
+    "wss://h/x",
+    ["termix.jwt.t"],
+    { A: "1" },
+  ]);
+
+  const events: string[] = [];
+  socket.onopen = () => events.push("open");
+  socket.onmessage = (e) => events.push(`msg:${e.data}`);
+  socket.onclose = (e) => events.push(`close:${e.code}`);
+
+  socket.send("early");
+  expect(net.sendSocket).not.toHaveBeenCalled();
+  net.emit("onSocket", { id, type: "open", protocol: "termix.jwt.t" });
+  expect(socket.readyState).toBe(NativeSocket.OPEN);
+  socket.send("hi");
+  expect(net.sendSocket).toHaveBeenCalledWith(id, "hi", null);
+  net.emit("onSocket", { id, type: "message", data: "out", binary: false });
+  net.emit("onSocket", { id: "other", type: "message", data: "no" });
+  socket.close();
+  expect(net.closeSocket).toHaveBeenCalledWith(id, 1000, "");
+  net.emit("onSocket", { id, type: "close", code: 1000, reason: "" });
+  expect(events).toEqual(["open", "msg:out", "close:1000"]);
+  expect(socket.readyState).toBe(NativeSocket.CLOSED);
+});
+
+test("a native stream passes chunks and ends once", () => {
+  const net = fakeNet({ nativeRequests: true });
+  const chunks: string[] = [];
+  const ends: (string | undefined)[] = [];
+  const stop = nativeStream(
+    { url: "https://h/events", headers: { A: "1" } },
+    { onData: (c) => chunks.push(c), onEnd: (e) => ends.push(e) },
+  );
+  const [id, request] = (net.startStream as jest.Mock).mock.calls[0];
+  expect(request).toMatchObject({ url: "https://h/events", method: "GET" });
+  net.emit("onStream", { id, type: "data", chunk: "event: ready\n\n" });
+  net.emit("onStream", { id, type: "error", message: "lost" });
+  net.emit("onStream", { id, type: "data", chunk: "late" });
+  expect(chunks).toEqual(["event: ready\n\n"]);
+  expect(ends).toEqual(["lost"]);
+  stop();
+  expect(net.cancelStream).not.toHaveBeenCalled();
+});
