@@ -1,6 +1,11 @@
 import type { ComponentType, Ref, RefObject } from "react";
 import type { Account } from "@/core/accounts/types";
 import type { AccountClient } from "@/core/api/AccountClient";
+import type { ConnectionOrigin } from "@/core/transport/origin";
+import type {
+  TransportCapability,
+  TransportKind,
+} from "@/core/transport/types";
 import type { SSHHost } from "@/types";
 
 /**
@@ -39,6 +44,8 @@ export interface SessionLike {
   instanceId: string;
   restoredSessionId?: string | null;
   remoteProtocol?: string;
+  /** Overrides the host's saved origin for this tab. */
+  origin?: ConnectionOrigin;
 }
 
 export interface SessionTabProps {
@@ -47,6 +54,8 @@ export interface SessionTabProps {
   onClose: () => void;
   /** Reports the server session id so other devices can attach to it. */
   onBackendSessionId: (backendId: string | null) => void;
+  /** Reports which way the tab's connection went (relay tabs are listed for other devices). */
+  onTransportResolved?: (kind: TransportKind) => void;
   /** Lets the shell read the tab's background color. */
   onBackgroundColorChange?: (color: string) => void;
 }
@@ -83,6 +92,11 @@ export interface SessionTabDef {
     session: Pick<SessionLike, "remoteProtocol">,
   ) => FeatureRequirement;
   capabilities?: SessionCapability[];
+  /**
+   * What the tab needs from the way a host connects. A host whose origin
+   * can't do it shows a message instead of opening.
+   */
+  needs?: TransportCapability[];
   // Each tab has its own handle type, so the ref stays loose here.
   component: ComponentType<SessionTabProps & { ref?: Ref<any> }>;
 }
@@ -90,7 +104,10 @@ export interface SessionTabDef {
 // Hosts
 
 export interface HostActionContext extends FeatureContext {
-  openSession: (type: string, opts?: { remoteProtocol?: string }) => void;
+  openSession: (
+    type: string,
+    opts?: { remoteProtocol?: string },
+  ) => void | Promise<void>;
   close: () => void;
 }
 

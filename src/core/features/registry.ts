@@ -1,3 +1,4 @@
+import type { TransportCapability } from "@/core/transport/types";
 import type {
   Capability,
   FeatureContext,
@@ -81,6 +82,24 @@ export class FeatureRegistry {
       if (tab) return tab;
     }
     return null;
+  }
+
+  /** The feature that owns a session tab type. */
+  sessionFeature(type: string): FeatureDef | null {
+    for (const def of this.defs.values()) {
+      if (def.sessionTabs?.some((t) => t.type === type)) return def;
+    }
+    return null;
+  }
+
+  /** What tabs of this type need from the host's transport. */
+  sessionNeeds(type: string): TransportCapability[] {
+    return this.sessionTab(type)?.needs ?? [];
+  }
+
+  /** Tabs that only ever run through a server (other devices can list them at once). */
+  serverOnly(type: string): boolean {
+    return this.sessionNeeds(type).some((n) => n === "server" || n === "guacd");
   }
 
   /** Whether tabs of this type have a session screen capability. */

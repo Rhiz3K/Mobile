@@ -48,6 +48,7 @@ export const hostMetricsFeature: FeatureDef = {
       icon: Activity,
       titleSuffix: () => "Metrics",
       shortLabel: () => "Metrics",
+      needs: ["server"],
       serverTabTypes: ["host-metrics", "stats"],
       // 2.9+ web names this tab after its plugin.
       toServerTabType: (_s, client) =>

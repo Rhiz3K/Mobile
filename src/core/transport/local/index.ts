@@ -8,28 +8,42 @@ import { closeAll, openChain } from "./chain";
 import { autoAnswer } from "./kbd";
 import { LocalShell } from "./LocalShell";
 
-const REASON =
+export const NO_ENGINE =
   "This build has no SSH engine. Use the app from the store, or link a Termix server to connect.";
+export const NO_DEVICE_STORE = "The hosts on this phone are not open yet.";
+export const NO_SERVER_COPY =
+  "This server's hosts are not on this phone yet. Sync the server to connect from the phone.";
 
 const deviceRepo = (): HostConnectRepository | undefined =>
   repositoriesFor({ id: LOCAL_ACCOUNT_ID, kind: "local" }, null).connect;
 
-/** The phone opening SSH itself, through modules/termix-ssh. */
+/**
+ * The phone opening SSH itself, through modules/termix-ssh. `repo` is the
+ * account's local store; without one there is nothing to connect with.
+ */
 export function createLocalTransport(
-  available: boolean,
+  engine: boolean,
   repo: () => HostConnectRepository | undefined = deviceRepo,
+  noStoreReason = NO_DEVICE_STORE,
 ): Transport {
-  const refuse = () => new AppError(REASON, "TRANSPORT_UNAVAILABLE");
+  const reason = () =>
+    !engine ? NO_ENGINE : repo() ? undefined : noStoreReason;
+  const refuse = () => new AppError(reason() ?? "", "TRANSPORT_UNAVAILABLE");
   return {
     kind: "local",
-    available,
-    unavailableReason: available ? undefined : REASON,
+    provides: ["shell", "exec", "sftp"],
+    get available() {
+      return !reason();
+    },
+    get unavailableReason() {
+      return reason();
+    },
     openShell(options) {
-      if (!available) throw refuse();
+      if (reason()) throw refuse();
       return new LocalShell(options, repo);
     },
     async openSession(host, options = {}): Promise<HostSession> {
-      if (!available) throw refuse();
+      if (reason()) throw refuse();
       // Nobody to ask: only saved logins and a trusted (or first seen) host key.
       const chain = await openChain(repo(), host, null, {
         askHostKey: null,

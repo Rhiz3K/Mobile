@@ -1,5 +1,9 @@
 import { AccountClient } from "@/core/api/AccountClient";
-import { emptyRepositories, repositoriesFor } from "@/core/data/repositories";
+import {
+  emptyRepositories,
+  repositoriesFor,
+  serverRepositories,
+} from "@/core/data/repositories";
 import { localStores } from "@/core/db/stores";
 import { accountStorage } from "@/core/storage/kv";
 import { fakeServer, resetStorage } from "../../helpers/http";
@@ -59,4 +63,56 @@ test("linked servers read through the account client and signal writes", async (
   expect(repositoriesFor({ id: "a", kind: "server" } as any, client)).toBe(
     repos,
   );
+});
+
+test("a server keeps a host's origin, or the phone does when it can't", async () => {
+  let refuse = false;
+  const seen = fakeServer((req) =>
+    req.method === "PUT" && refuse
+      ? { status: 400, data: { error: "connectFrom is not declared" } }
+      : { data: {} },
+  );
+  const client = new AccountClient({
+    accountId: "b",
+    serverUrl: "https://t.example",
+    storage: accountStorage("b"),
+  });
+  client.apiGeneration = "plugin";
+  const repos = repositoriesFor({ id: "b", kind: "server" } as any, client);
+  const changed = jest.fn();
+  repos.hosts.subscribe(changed);
+
+  await repos.origins.set(4, "device");
+  const put = seen.find((r) => r.method === "PUT")!;
+  expect(put.url).toBe(
+    "https://t.example/plugins/ssh-terminal/settings/host/4",
+  );
+  expect(put.data).toEqual({ connectFrom: "device" });
+  expect(changed).toHaveBeenCalledTimes(1);
+  expect(await repos.origins.get({ id: 4 })).toBe("device");
+  expect(await accountStorage("b").data.getJson("hostOrigins")).toEqual({});
+
+  // An older ssh-terminal refuses the key; the phone keeps the choice.
+  refuse = true;
+  await repos.origins.set(5, "server");
+  expect(await accountStorage("b").data.getJson("hostOrigins")).toEqual({
+    "5": "server",
+  });
+  expect(await repos.origins.get({ id: 5 })).toBe("server");
+
+  // Another repos instance (after a restart) reads the phone copy, and the
+  // server's own value wins when the host carries one.
+  const fresh = serverRepositories(client, accountStorage("b").data);
+  expect(await fresh.origins.get({ id: 5 })).toBe("server");
+  expect(await fresh.origins.get({ id: 6, connectFrom: "auto" })).toBe("auto");
+  expect(await fresh.origins.get({ id: 7 })).toBeUndefined();
+});
+
+test("with no store an origin can't be saved", async () => {
+  localStores.setDriver(null);
+  const repos = repositoriesFor({ id: "local", kind: "local" }, null);
+  expect(await repos.origins.get({ id: 1 })).toBeUndefined();
+  await expect(repos.origins.set(1, "auto")).rejects.toMatchObject({
+    code: "NO_LOCAL_STORE",
+  });
 });

@@ -197,3 +197,36 @@ test.each([null, "", "   "])(
     m.destroy();
   },
 );
+
+test("failures say which step failed, using the server's last error", async () => {
+  const failures: any[] = [];
+  const { m } = manager(fakeClient(), {
+    onConnectionFailed: (_m: string, f: unknown) => failures.push(f),
+  });
+  await m.connect(80, 24);
+  const socket = FakeSocket.all[0];
+  socket.readyState = FakeSocket.OPEN;
+  (socket as any).onopen?.();
+  socket.onmessage?.({
+    data: JSON.stringify({
+      type: "error",
+      message: "connect ECONNREFUSED 10.0.0.5:22",
+    }),
+  });
+  socket.onclose?.({ code: 1000 });
+  expect(failures).toEqual([
+    expect.objectContaining({
+      stage: "network",
+      message: "connect ECONNREFUSED 10.0.0.5:22",
+      origin: "relay",
+    }),
+  ]);
+  m.destroy();
+
+  const signedOut: any[] = [];
+  const out = manager(fakeClient("https://termix.example/", null), {
+    onConnectionFailed: (_m: string, f: unknown) => signedOut.push(f),
+  });
+  await out.m.connect(80, 24);
+  expect(signedOut[0]).toMatchObject({ stage: "server", origin: "relay" });
+});

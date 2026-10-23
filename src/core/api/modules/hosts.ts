@@ -383,8 +383,32 @@ export function createHostsApi(c: AccountClient) {
     }
   }
 
+  /**
+   * Saves where the mobile app connects this host from. False when the server
+   * can't keep it: an older ssh-terminal plugin, or no edit access.
+   */
+  async function setConnectFrom(
+    hostId: number,
+    connectFrom: string,
+  ): Promise<boolean> {
+    if (c.apiGeneration !== "plugin" || !c.isPluginEnabled("ssh-terminal")) {
+      return false;
+    }
+    try {
+      await c.http.auth.put(`/plugins/ssh-terminal/settings/host/${hostId}`, {
+        connectFrom,
+      });
+      return true;
+    } catch (err) {
+      const status = axios.isAxiosError(err) ? err.response?.status : undefined;
+      if (status && [400, 403, 404, 503].includes(status)) return false;
+      throw err;
+    }
+  }
+
   return {
     normalizeSSHHost,
+    setConnectFrom,
     getSSHHosts,
     createSSHHost,
     updateSSHHost,

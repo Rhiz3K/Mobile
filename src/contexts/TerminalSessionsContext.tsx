@@ -14,8 +14,13 @@ import { toast } from "@/utils/toast";
 import { accounts, clientFor, useActiveAccount } from "@/core/accounts";
 import type { AccountClient } from "@/core/api/AccountClient";
 import type { OpenTabRecord } from "@/core/api/types";
-import { transportFor } from "@/core/transport";
-import { features } from "@/core/features";
+import type {
+  Blocked,
+  ConnectionOrigin,
+  TransportKind,
+} from "@/core/transport";
+import { checkOpen, features } from "@/core/features";
+import { isSshHost } from "@/utils/hosts";
 
 /** Session tab type. The registry knows which feature owns each one. */
 export type SessionType = string;
@@ -37,6 +42,10 @@ export interface TerminalSession {
   restoredSessionId?: string | null;
   /** Protocol for tabs that open more than one, like remote desktop. */
   remoteProtocol?: string;
+  /** Overrides the host's origin, like a tab reopened from another device. */
+  origin?: ConnectionOrigin;
+  /** Whether the server lists this tab for other devices (relay only). */
+  listed?: boolean;
 }
 
 function getSessionTypeLabel(type: SessionType, remoteProtocol?: string) {
@@ -87,6 +96,7 @@ interface TerminalSessionsContextType {
       instanceId?: string;
       restoredSessionId?: string | null;
       remoteProtocol?: string;
+      origin?: ConnectionOrigin;
     },
   ) => string;
   removeSession: (sessionId: string) => void;
@@ -94,13 +104,16 @@ interface TerminalSessionsContextType {
   clearAllSessions: () => void;
   /** Persist the backend session id created/attached for a tab (cross-device). */
   setBackendSessionId: (sessionId: string, backendId: string | null) => void;
+  /** A tab's connection picked its way; relay tabs get listed for other devices. */
+  setSessionTransport: (sessionId: string, kind: TransportKind) => void;
   /** Forget a server-side background tab record. */
   forgetBackgroundTab: (recordId: string) => void;
+  /** Opens a tab and the sessions screen. Resolves to why it can't, if it can't. */
   navigateToSessions: (
     host?: SSHHost,
     type?: SessionType,
-    opts?: { remoteProtocol?: string },
-  ) => void;
+    opts?: { remoteProtocol?: string; quiet?: boolean },
+  ) => Promise<Blocked | null>;
   isCustomKeyboardVisible: boolean;
   toggleCustomKeyboard: () => void;
   lastKeyboardHeight: number;
@@ -157,6 +170,7 @@ export const TerminalSessionsProvider: React.FC<
         instanceId?: string;
         restoredSessionId?: string | null;
         remoteProtocol?: string;
+        origin?: ConnectionOrigin;
       },
     ): string => {
       const instanceId = opts?.instanceId ?? uuid();
@@ -189,17 +203,25 @@ export const TerminalSessionsProvider: React.FC<
           backendSessionId: opts?.restoredSessionId ?? null,
           restoredSessionId: opts?.restoredSessionId ?? null,
           remoteProtocol: opts?.remoteProtocol,
+          // A server session from another device can only attach through it.
+          origin:
+            opts?.origin ?? (opts?.restoredSessionId ? "server" : undefined),
         };
 
         // Persist this tab server-side for cross-device awareness.
-        client?.api.openTabs.addOpenTab({
-          id: instanceId,
-          tabType: toTabType(type, opts?.remoteProtocol, client),
-          hostId: host.id,
-          label: title,
-          tabOrder: prev.length,
-          backendSessionId: opts?.restoredSessionId ?? null,
-        });
+        // Server-only tabs are listed for other devices right away. A shell
+        // waits until it knows whether it goes through the server.
+        if (client && features.serverOnly(type)) {
+          newSession.listed = true;
+          client.api.openTabs.addOpenTab({
+            id: instanceId,
+            tabType: toTabType(type, opts?.remoteProtocol, client),
+            hostId: host.id,
+            label: title,
+            tabOrder: prev.length,
+            backendSessionId: opts?.restoredSessionId ?? null,
+          });
+        }
 
         const updatedSessions = prev.map((session) => ({
           ...session,
@@ -222,9 +244,11 @@ export const TerminalSessionsProvider: React.FC<
       if (!sessionToRemove) return prev;
 
       // Forget the server-side record for this tab.
-      clientFor(sessionToRemove.accountId)?.api.openTabs.deleteOpenTab(
-        sessionToRemove.instanceId,
-      );
+      if (sessionToRemove.listed) {
+        clientFor(sessionToRemove.accountId)?.api.openTabs.deleteOpenTab(
+          sessionToRemove.instanceId,
+        );
+      }
 
       let updatedSessions = prev.filter((session) => session.id !== sessionId);
 
@@ -312,10 +336,12 @@ export const TerminalSessionsProvider: React.FC<
       setSessions((prev) => {
         const target = prev.find((s) => s.id === sessionId);
         if (!target) return prev;
-        clientFor(target.accountId)?.api.openTabs.patchOpenTab(
-          target.instanceId,
-          { backendSessionId: backendId },
-        );
+        if (target.listed) {
+          clientFor(target.accountId)?.api.openTabs.patchOpenTab(
+            target.instanceId,
+            { backendSessionId: backendId },
+          );
+        }
         return prev.map((s) =>
           s.id === sessionId
             ? { ...s, backendSessionId: backendId, restoredSessionId: null }
@@ -326,34 +352,65 @@ export const TerminalSessionsProvider: React.FC<
     [],
   );
 
+  const setSessionTransport = useCallback(
+    (sessionId: string, kind: TransportKind) => {
+      setSessions((prev) => {
+        const target = prev.find((s) => s.id === sessionId);
+        if (!target) return prev;
+        const client = clientFor(target.accountId);
+        const listed = kind === "relay" && !!client;
+        if (listed === !!target.listed) return prev;
+        if (client && listed) {
+          client.api.openTabs.addOpenTab({
+            id: target.instanceId,
+            tabType: toTabType(target.type, target.remoteProtocol, client),
+            hostId: target.host.id,
+            label: target.title,
+            tabOrder: prev.indexOf(target),
+            backendSessionId: target.backendSessionId ?? null,
+          });
+        } else {
+          client?.api.openTabs.deleteOpenTab(target.instanceId);
+        }
+        return prev.map((s) => (s.id === sessionId ? { ...s, listed } : s));
+      });
+    },
+    [],
+  );
+
   const forgetBackgroundTab = useCallback((recordId: string) => {
     setBackgroundTabRecords((prev) => prev.filter((r) => r.id !== recordId));
   }, []);
 
   const navigateToSessions = useCallback(
-    (
+    async (
       host?: SSHHost,
       type: SessionType = features.defaultSessionType(),
-      opts?: { remoteProtocol?: string },
-    ) => {
+      opts?: { remoteProtocol?: string; quiet?: boolean },
+    ): Promise<Blocked | null> => {
       if (host) {
-        const transport = transportFor(accounts.active().id);
-        if (!transport.available) {
-          toast.error(transport.unavailableReason ?? "Can't connect yet.");
-          return;
-        }
+        const accountId = accounts.active().id;
         const ctx = {
           account: accounts.active(),
           client: accounts.activeClient(),
         };
         const remoteProtocol = opts?.remoteProtocol ?? host.connectionType;
         if (!features.canOpen(type, { remoteProtocol }, ctx)) {
-          toast.error("This feature is turned off on the server.");
-          return;
+          const blocked = {
+            reason: "This feature is turned off on the server.",
+          };
+          if (!opts?.quiet) toast.error(blocked.reason);
+          return blocked;
         }
-        addSession(host, type, opts);
+        const check = await checkOpen(accountId, host, isSshHost(host), type);
+        if (check.blocked) {
+          if (!opts?.quiet) toast.error(check.blocked.reason);
+          return check.blocked;
+        }
+        addSession(host, type, { remoteProtocol: opts?.remoteProtocol });
       }
       router.push("/(tabs)/sessions");
+      return null;
     },
     [addSession],
   );
@@ -410,6 +467,7 @@ export const TerminalSessionsProvider: React.FC<
         setActiveSession,
         clearAllSessions,
         setBackendSessionId,
+        setSessionTransport,
         forgetBackgroundTab,
         navigateToSessions,
         isCustomKeyboardVisible,

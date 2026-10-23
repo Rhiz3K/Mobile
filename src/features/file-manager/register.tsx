@@ -27,6 +27,7 @@ export const fileManagerFeature: FeatureDef = {
       icon: Folder,
       titleSuffix: () => "Files",
       shortLabel: () => "Files",
+      needs: ["server"],
       serverTabTypes: ["files", "sftp"],
       toServerTabType: () => "files",
       capabilities: ["keyboard-cover"],

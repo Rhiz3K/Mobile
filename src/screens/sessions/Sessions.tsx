@@ -63,6 +63,7 @@ export default function Sessions() {
     setActiveSession,
     removeSession,
     setBackendSessionId,
+    setSessionTransport,
     isCustomKeyboardVisible,
     toggleCustomKeyboard,
     lastKeyboardHeight,
@@ -561,6 +562,7 @@ export default function Sessions() {
         onBackendSessionId={(backendId) =>
           setBackendSessionId(session.id, backendId)
         }
+        onTransportResolved={(kind) => setSessionTransport(session.id, kind)}
         onBackgroundColorChange={(color) => {
           setTerminalBackgroundColors((prev) => ({
             ...prev,

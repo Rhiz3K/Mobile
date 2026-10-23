@@ -8,6 +8,7 @@ import {
   type SshSession,
   type SshShell,
 } from "@/modules/termix-ssh";
+import { fromError, type ConnectFailure } from "../errors";
 import type { HostKeyData, ShellChannel, ShellOptions } from "../types";
 import {
   closeAll,
@@ -87,10 +88,14 @@ export class LocalShell implements ShellChannel {
     this.options.onConnectionLog?.({ level, stage, message });
   }
 
-  private fail(message: string) {
+  private fail(message: string, failure: ConnectFailure) {
     if (this.failed || this.destroyed) return;
     this.failed = true;
-    this.options.onConnectionFailed(`${this.name}: ${message}`);
+    this.options.onConnectionFailed(`${this.name}: ${message}`, {
+      ...failure,
+      message,
+      origin: "local",
+    });
   }
 
   private askHostKey = (
@@ -179,6 +184,7 @@ export class LocalShell implements ShellChannel {
           askKbd: this.askKbd,
           onBanner: this.onBanner,
           signal: abort.signal,
+          connectTimeoutSecs: this.options.connectTimeoutSecs,
         },
       );
     } catch (err) {
@@ -196,7 +202,8 @@ export class LocalShell implements ShellChannel {
       await this.openShell(chain);
     } catch (err) {
       this.teardown();
-      this.fail(err instanceof Error ? err.message : String(err));
+      const failure = fromError(err);
+      this.fail(failure.message, failure);
       return;
     }
     this.dropped = false;
@@ -219,6 +226,7 @@ export class LocalShell implements ShellChannel {
         ? err
         : new AppError(String(err), "UNKNOWN");
     const kind = e instanceof SshError ? e.kind : "app";
+    const failure = fromError(e);
     const authType = this.overrides ? "set" : this.options.hostConfig.authType;
     switch (kind) {
       case "passphraseRequired":
@@ -236,14 +244,14 @@ export class LocalShell implements ShellChannel {
           this.options.onAuthDialogNeeded("no_keyboard");
           return;
         }
-        this.fail(`Authentication failed: ${e.message}`);
+        this.fail(`Authentication failed: ${e.message}`, failure);
         return;
       case "hostKeyRejected":
-        this.fail("The host key was not trusted.");
+        this.fail("The host key was not trusted.", failure);
         return;
       case "authCancelled":
       case "cancelled":
-        this.fail("Login cancelled.");
+        this.fail("Login cancelled.", failure);
         return;
       case "connect":
       case "timeout":
@@ -256,7 +264,7 @@ export class LocalShell implements ShellChannel {
         }
         break;
     }
-    this.fail(e.message);
+    this.fail(e.message, failure);
   }
 
   private async openShell(chain: Chain) {

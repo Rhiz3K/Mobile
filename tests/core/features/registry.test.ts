@@ -130,3 +130,30 @@ test("capabilities come from available features only", async () => {
   const on = await serverCtx([{ id: "wake-on-lan" }]);
   expect(r.hasCapability("host.wake", on)).toBe(true);
 });
+
+test("session tabs name their feature and what they need from the transport", () => {
+  const r = new FeatureRegistry();
+  r.register(
+    feature("files", {
+      title: "File Manager",
+      sessionTabs: [
+        {
+          type: "fm",
+          icon: Dummy,
+          titleSuffix: () => "",
+          shortLabel: () => "",
+          serverTabTypes: [],
+          toServerTabType: () => "fm",
+          needs: ["server"],
+          component: Dummy,
+        },
+      ],
+    }),
+  );
+  expect(r.sessionFeature("fm")?.title).toBe("File Manager");
+  expect(r.sessionNeeds("fm")).toEqual(["server"]);
+  expect(r.sessionFeature("missing")).toBeNull();
+  expect(r.sessionNeeds("missing")).toEqual([]);
+  expect(r.serverOnly("fm")).toBe(true);
+  expect(r.serverOnly("missing")).toBe(false);
+});

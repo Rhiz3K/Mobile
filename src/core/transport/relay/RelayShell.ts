@@ -1,4 +1,5 @@
 import type { AccountClient } from "@/core/api/AccountClient";
+import { fromRelayMessage } from "../errors";
 import type {
   HostKeyData,
   ShellChannel,
@@ -34,6 +35,8 @@ export class RelayShell implements ShellChannel {
   private serverSessionId: string | null = null;
   private pendingReattach = false;
   private awaitingAuthCredentials = false;
+  // The last error the server sent, so a close after it says why.
+  private lastServerError: string | null = null;
 
   constructor(config: RelayShellConfig) {
     this.config = config;
@@ -58,17 +61,13 @@ export class RelayShell implements ShellChannel {
     const { client } = this.config;
     const serverUrl = client.serverUrl;
     if (!serverUrl) {
-      this.config.onConnectionFailed(
-        "No server URL found - please configure a server first",
-      );
+      this.notifyFailureOnce("No server URL found. Link the server again.");
       return;
     }
 
     const jwtToken = client.token();
     if (!jwtToken || jwtToken.trim() === "") {
-      this.config.onConnectionFailed(
-        "Authentication required - please log in again",
-      );
+      this.notifyFailureOnce("Signed out of this server. Log in again.");
       return;
     }
 
@@ -493,6 +492,7 @@ export class RelayShell implements ShellChannel {
             return;
           }
 
+          this.lastServerError = message;
           if (this.isUnrecoverableError(message)) {
             this.shouldNotReconnect = true;
             this.notifyFailureOnce("Authentication failed: " + message);
@@ -502,6 +502,7 @@ export class RelayShell implements ShellChannel {
             return;
           }
         } else if (msg.type === "connected") {
+          this.lastServerError = null;
           const isReattach = this.pendingReattach;
           this.pendingReattach = false;
           this.config.onStateChange("connected", {
@@ -572,12 +573,12 @@ export class RelayShell implements ShellChannel {
       if (this.destroyed) return;
 
       if (this.shouldNotReconnect) {
-        this.notifyFailureOnce("Connection closed");
+        this.notifyFailureOnce(this.lastServerError ?? "Connection closed");
         return;
       }
 
       if (event.code === 1000 || event.code === 1001) {
-        this.notifyFailureOnce("Connection closed");
+        this.notifyFailureOnce(this.lastServerError ?? "Connection closed");
         return;
       }
 
@@ -664,6 +665,7 @@ export class RelayShell implements ShellChannel {
     this.hasNotifiedFailure = true;
     this.config.onConnectionFailed(
       `${this.config.hostConfig.name}: ${message}`,
+      { ...fromRelayMessage(message), origin: "relay" },
     );
   }
 

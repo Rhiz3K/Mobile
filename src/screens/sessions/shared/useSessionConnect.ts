@@ -4,6 +4,7 @@ import { SSHHost, SessionAuthOverrides } from "@/types";
 import { getCurrentUserId } from "@/utils/user";
 import { useConnectionLog } from "./useConnectionLog";
 import { extractConnectionLogs } from "@/core/api/errors";
+import { fromRelayMessage, type ConnectFailure } from "@/core/transport";
 
 export type SessionConnectState =
   "idle" | "connecting" | "connected" | "totp" | "warpgate" | "auth" | "error";
@@ -51,6 +52,10 @@ export function useSessionConnect(
   const log = useConnectionLog();
   const [state, setState] = useState<SessionConnectState>("idle");
   const [errorMessage, setErrorMessage] = useState<string>("");
+  // What failed and what to try, for the shared error panel.
+  const failure: ConnectFailure | null = errorMessage
+    ? { ...fromRelayMessage(errorMessage), origin: "relay" }
+    : null;
   const [browserSignIn, setBrowserSignIn] = useState<{
     url: string;
     securityKey: string;
@@ -258,6 +263,7 @@ export function useSessionConnect(
   return {
     state,
     errorMessage,
+    failure,
     sessionId: sessionIdRef,
     logEntries: log.entries,
     logClear: log.clear,

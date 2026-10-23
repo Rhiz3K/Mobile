@@ -45,6 +45,7 @@ export const remoteDesktopFeature: FeatureDef = {
       titleSuffix: (s) =>
         s.remoteProtocol ? s.remoteProtocol.toUpperCase() : "Remote",
       shortLabel: (s) => SHORT[asProtocol(s.remoteProtocol)],
+      needs: ["guacd"],
       serverTabTypes: PROTOCOLS,
       toServerTabType: (s) => asProtocol(s.remoteProtocol),
       fromServerTabType: (tabType) => ({ remoteProtocol: tabType }),

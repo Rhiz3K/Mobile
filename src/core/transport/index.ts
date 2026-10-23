@@ -1,20 +1,33 @@
-import { accounts, useClient } from "@/core/accounts";
-import { useSessionAccountId } from "@/core/accounts/session";
+import { accounts } from "@/core/accounts";
+import type { Account } from "@/core/accounts/types";
 import type { AccountClient } from "@/core/api/AccountClient";
-import { localTransport } from "./local";
+import { repositoriesFor } from "@/core/data/repositories";
+import { isSshEngineAvailable } from "@/modules/termix-ssh";
+import { createLocalTransport, localTransport, NO_SERVER_COPY } from "./local";
+import {
+  planConnection,
+  readOrigin,
+  type ConnectionOrigin,
+  type ConnectionPlan,
+  type OriginInputs,
+} from "./origin";
 import { createRelayTransport } from "./relay";
 import type { Transport } from "./types";
 
 export * from "./types";
+export * from "./origin";
+export * from "./errors";
+export { HostConnection } from "./connection";
+export type {
+  ConnectionPrompt,
+  ConnectionSnapshot,
+  ConnectionStatus,
+} from "./connection";
 
 const relays = new WeakMap<AccountClient, Transport>();
+const serverLocals = new Map<string, Transport>();
 
-/**
- * This device connects on its own, a linked server relays. Hosts will be able
- * to pick per host later; for now the account decides.
- */
-export function pickTransport(client: AccountClient | null): Transport {
-  if (!client) return localTransport;
+function relayFor(client: AccountClient): Transport {
   let relay = relays.get(client);
   if (!relay) {
     relay = createRelayTransport(client);
@@ -23,11 +36,75 @@ export function pickTransport(client: AccountClient | null): Transport {
   return relay;
 }
 
-export function transportFor(accountId: string): Transport {
-  return pickTransport(accounts.client(accountId));
+function localFor(account: Account): Transport {
+  if (account.kind === "local") return localTransport;
+  let local = serverLocals.get(account.id);
+  if (!local) {
+    // A linked server's hosts reach the phone through sync (B3).
+    local = createLocalTransport(
+      isSshEngineAvailable,
+      () => repositoriesFor(account, accounts.client(account.id)).connect,
+      NO_SERVER_COPY,
+    );
+    serverLocals.set(account.id, local);
+  }
+  return local;
 }
 
-/** Transport of the account that owns the surrounding session. */
-export function useSessionTransport(): Transport {
-  return pickTransport(useClient(useSessionAccountId()));
+/** The ways an account can connect: the phone, and its server if it has one. */
+export function transportsFor(accountId: string | null): {
+  account: Account;
+  local: Transport;
+  relay: Transport | null;
+} {
+  const account = (accountId && accounts.find(accountId)) || accounts.active();
+  const client = account.kind === "server" ? accounts.client(account.id) : null;
+  return {
+    account,
+    local: localFor(account),
+    relay: client ? relayFor(client) : null,
+  };
+}
+
+export function originInputs(
+  accountId: string | null,
+  isSsh: boolean,
+): OriginInputs {
+  const { account, local, relay } = transportsFor(accountId);
+  return { accountKind: account.kind, local, relay, isSsh };
+}
+
+/** The host's saved origin, from its account's store. */
+export async function originOf(
+  accountId: string | null,
+  host: { id: number; connectFrom?: string },
+): Promise<ConnectionOrigin> {
+  const { account } = transportsFor(accountId);
+  const repos = repositoriesFor(account, accounts.client(account.id));
+  const saved = await repos.origins.get(host).catch(() => undefined);
+  return readOrigin(saved, host.connectFrom);
+}
+
+/** How a host would connect right now, from its saved origin or `override`. */
+export async function planFor(
+  accountId: string | null,
+  host: { id: number; connectFrom?: string },
+  isSsh: boolean,
+  override?: ConnectionOrigin,
+): Promise<ConnectionPlan> {
+  const origin = override ?? (await originOf(accountId, host));
+  return planConnection(origin, originInputs(accountId, isSsh));
+}
+
+/** Saves a host's origin in its account's store (and on the server when it can). */
+export async function saveOrigin(
+  accountId: string | null,
+  hostId: number,
+  origin: ConnectionOrigin,
+): Promise<void> {
+  const { account } = transportsFor(accountId);
+  await repositoriesFor(account, accounts.client(account.id)).origins.set(
+    hostId,
+    origin,
+  );
 }

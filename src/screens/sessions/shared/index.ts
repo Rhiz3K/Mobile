@@ -9,3 +9,6 @@ export {
   type SessionConnectState,
 } from "./useSessionConnect";
 export { AuthDialogs } from "./AuthDialogs";
+export { useHostConnection } from "./useHostConnection";
+export { ConnectionPrompts } from "./ConnectionPrompts";
+export { ConnectionError } from "./ConnectionError";

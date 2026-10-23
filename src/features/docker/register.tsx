@@ -18,6 +18,7 @@ export const dockerFeature: FeatureDef = {
       icon: Container,
       titleSuffix: () => "Docker",
       shortLabel: () => "Docker",
+      needs: ["server"],
       serverTabTypes: ["docker"],
       toServerTabType: () => "docker",
       component: DockerTab,

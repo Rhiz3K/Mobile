@@ -6,7 +6,16 @@ import { RelayShell } from "./RelayShell";
 export function createRelayTransport(client: AccountClient): Transport {
   return {
     kind: "relay",
-    available: true,
+    // Whether the server runs a feature's plugin is checked by the registry.
+    provides: ["shell", "server", "guacd"],
+    get available() {
+      return client.isAuthenticated();
+    },
+    get unavailableReason() {
+      return client.isAuthenticated()
+        ? undefined
+        : "You are signed out of this server. Sign in to connect through it.";
+    },
     openShell: (options) => new RelayShell({ ...options, client }),
   };
 }

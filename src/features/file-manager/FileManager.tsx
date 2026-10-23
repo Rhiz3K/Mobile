@@ -730,6 +730,7 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
           status={frameStatus}
           loadingLabel={`Connecting to ${host.name}…`}
           errorMessage={conn.errorMessage}
+          failure={conn.state === "error" ? conn.failure : null}
           onRetry={conn.state === "error" ? conn.retry : undefined}
           logEntries={conn.logEntries}
           isConnecting={conn.state === "connecting" || conn.state === "idle"}

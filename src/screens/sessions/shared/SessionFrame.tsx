@@ -3,6 +3,8 @@ import { AlertCircle, RotateCcw } from "lucide-react-native";
 import { Text, Button } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { ConnectionLog } from "./useConnectionLog";
+import { ConnectionError } from "./ConnectionError";
+import type { ConnectFailure } from "@/core/transport";
 import type { ConnectionLogEntry } from "@/types";
 
 export type SessionFrameStatus = "loading" | "ready" | "error" | "empty";
@@ -24,6 +26,7 @@ export function SessionFrame({
   status = "ready",
   loadingLabel = "Connecting…",
   errorMessage,
+  failure,
   emptyMessage = "Nothing to show",
   emptyIcon,
   onRetry,
@@ -42,6 +45,8 @@ export function SessionFrame({
   status?: SessionFrameStatus;
   loadingLabel?: string;
   errorMessage?: string;
+  /** A failed connection; shown with what to try instead of a bare message. */
+  failure?: ConnectFailure | null;
   emptyMessage?: string;
   emptyIcon?: React.ReactNode;
   onRetry?: () => void;
@@ -110,6 +115,8 @@ export function SessionFrame({
           <ActivityIndicator size="large" color={color("accent-brand")} />
           <Text className="text-sm text-muted-foreground">{loadingLabel}</Text>
         </View>
+      ) : status === "error" && failure ? (
+        <ConnectionError failure={failure} onRetry={onRetry} />
       ) : status === "error" ? (
         <View className="flex-1 items-center justify-center gap-3 px-8">
           <AlertCircle size={36} color={color("destructive")} />

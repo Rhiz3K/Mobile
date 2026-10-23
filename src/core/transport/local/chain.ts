@@ -33,6 +33,8 @@ export interface ChainHandlers {
   ): Promise<string[] | null>;
   onBanner?(banner: string, login: ResolvedLogin): void;
   signal?: AbortSignal;
+  /** Overrides the connect timeout, except for Tailscale's browser check. */
+  connectTimeoutSecs?: number;
 }
 
 /** Secrets typed into a dialog for this attempt, over what is saved. */
@@ -78,6 +80,11 @@ export function closeAll(sessions: SshSession[]): void {
   [...sessions].reverse().forEach((s) => s.disconnect().catch(() => {}));
 }
 
+function withTimeout(login: ResolvedLogin, secs?: number): ResolvedLogin {
+  if (!secs || login.authType === "tailscale") return login;
+  return { ...login, config: { ...login.config, connectTimeoutSecs: secs } };
+}
+
 function promptsFor(
   login: ResolvedLogin,
   hop: HopInfo | null,
@@ -107,7 +114,10 @@ export async function openChain(
   h: ChainHandlers,
 ): Promise<Chain> {
   const profile = host.id > 0 && repo ? await repo.profile(host.id) : null;
-  const login = applyOverrides(resolveLogin(profile, host), overrides);
+  const login = withTimeout(
+    applyOverrides(resolveLogin(profile, host), overrides),
+    h.connectTimeoutSecs,
+  );
   const hops: SshSession[] = [];
   const opts = { signal: h.signal };
   try {
@@ -120,7 +130,10 @@ export async function openChain(
           "JUMP_HOST_MISSING",
         );
       }
-      const hopLogin = resolveLogin(p, host, { jump: true });
+      const hopLogin = withTimeout(
+        resolveLogin(p, host, { jump: true }),
+        h.connectTimeoutSecs,
+      );
       const hop = { index, total, ip: hopLogin.config.host };
       const prompts = promptsFor(hopLogin, hop, h, repo);
       const prev = hops[hops.length - 1];

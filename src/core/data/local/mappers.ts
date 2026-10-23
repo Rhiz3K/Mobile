@@ -114,10 +114,11 @@ export function hostToRow(
     return typeof value === "string" ? orNull(value) : null;
   };
 
-  const pluginSettings = {
-    ...parseJson<Json>(current?.pluginSettings, {}),
-    ...buildPluginHostSettings(data),
-  };
+  // Merged per plugin, so keys the form doesn't edit (like connectFrom) stay.
+  const pluginSettings = parseJson<Json>(current?.pluginSettings, {});
+  for (const [id, values] of Object.entries(buildPluginHostSettings(data))) {
+    pluginSettings[id] = { ...(pluginSettings[id] ?? {}), ...values };
+  }
   const stats = parseJson<Json>(
     typeof data.statsConfig === "string"
       ? data.statsConfig

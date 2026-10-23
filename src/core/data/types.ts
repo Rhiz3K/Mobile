@@ -112,6 +112,12 @@ export interface HostConnectRepository {
   touchHostKey(id: number): Promise<void>;
 }
 
+/** Where each host connects from (the ssh-terminal `connectFrom` setting). */
+export interface HostOriginRepository {
+  get(host: Pick<SSHHost, "id" | "connectFrom">): Promise<string | undefined>;
+  set(hostId: number, origin: string): Promise<void>;
+}
+
 /** Where an account keeps its data. */
 export interface DataRepositories {
   /** "local" for the encrypted store on this phone, "server" for the server. */
@@ -123,6 +129,7 @@ export interface DataRepositories {
   snippetFolders: SnippetFolderRepository;
   commandHistory: CommandHistoryRepository;
   recentActivity: RecentActivityRepository;
+  origins: HostOriginRepository;
   /** Only on This device, where the phone opens SSH itself. */
   connect?: HostConnectRepository;
 }

@@ -447,6 +447,40 @@ export function localRepositories(
       },
     },
 
+    origins: {
+      async get(host) {
+        const row = (await db())
+          .select({ pluginSettings: hosts.pluginSettings })
+          .from(hosts)
+          .where(eq(hosts.id, host.id))
+          .get();
+        const settings = parseJson<Record<string, Record<string, unknown>>>(
+          row?.pluginSettings,
+          {},
+        );
+        const value = settings["ssh-terminal"]?.connectFrom;
+        return typeof value === "string" ? value : host.connectFrom;
+      },
+      async set(hostId, origin) {
+        const d = await db();
+        const row = d.select().from(hosts).where(eq(hosts.id, hostId)).get();
+        if (!row) throw notFound("host");
+        const settings = parseJson<Record<string, Record<string, unknown>>>(
+          row.pluginSettings,
+          {},
+        );
+        settings["ssh-terminal"] = {
+          ...(settings["ssh-terminal"] ?? {}),
+          connectFrom: origin,
+        };
+        d.update(hosts)
+          .set({ pluginSettings: JSON.stringify(settings), updatedAt: now() })
+          .where(eq(hosts.id, hostId))
+          .run();
+        touched(hosts);
+      },
+    },
+
     connect: {
       async profile(id) {
         const d = await db();

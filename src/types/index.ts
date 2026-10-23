@@ -47,6 +47,8 @@ export interface SSHHost {
   quickActions?: QuickAction[];
   statsConfig?: string;
   terminalConfig?: TerminalConfig;
+  /** Where the app connects from: "auto", "device" or "server". */
+  connectFrom?: string;
   createdAt: string;
   updatedAt: string;
 

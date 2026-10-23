@@ -414,3 +414,32 @@ test("host keys save like the server and count changes", async () => {
     repos.connect!.saveHostKey(9999, key, false),
   ).rejects.toMatchObject({ code: "NOT_FOUND" });
 });
+
+test("a host's origin saves in its ssh-terminal settings and survives an edit", async () => {
+  const { repos, stores } = setup();
+  const host = await repos.hosts.create(fullHost);
+  expect(await repos.origins.get(host)).toBeUndefined();
+
+  await repos.origins.set(host.id, "server");
+  expect(await repos.origins.get({ id: host.id })).toBe("server");
+  const { db } = await stores.get("local");
+  const settings = JSON.parse(
+    db.select().from(hostsTable).get()!.pluginSettings!,
+  );
+  expect(settings["ssh-terminal"]).toEqual({
+    enableTerminal: true,
+    connectFrom: "server",
+  });
+
+  // The host editor rewrites the block, but keeps keys it doesn't edit.
+  await repos.hosts.update(host.id, { ...fullHost, enableTerminal: false });
+  const after = JSON.parse(db.select().from(hostsTable).get()!.pluginSettings!);
+  expect(after["ssh-terminal"]).toEqual({
+    enableTerminal: false,
+    connectFrom: "server",
+  });
+  expect((await repos.hosts.get(host.id))!.connectFrom).toBe("server");
+  await expect(repos.origins.set(9999, "auto")).rejects.toMatchObject({
+    code: "NOT_FOUND",
+  });
+});

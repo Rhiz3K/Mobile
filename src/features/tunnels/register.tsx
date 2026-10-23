@@ -35,6 +35,7 @@ export const tunnelsFeature: FeatureDef = {
       icon: Network,
       titleSuffix: () => "Tunnels",
       shortLabel: () => "Tunnel",
+      needs: ["server"],
       serverTabTypes: ["tunnel"],
       toServerTabType: () => "tunnel",
       component: TunnelsTab,

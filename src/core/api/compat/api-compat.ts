@@ -108,6 +108,7 @@ export function flattenPluginSettings<T extends Record<string, any>>(
 
   const terminal = settings["ssh-terminal"];
   set("enableTerminal", terminal ? terminal.enableTerminal !== false : false);
+  if (terminal?.connectFrom) set("connectFrom", terminal.connectFrom);
 
   const files = settings["file-manager"];
   set("enableFileManager", files ? files.enableFileManager !== false : false);

@@ -12,13 +12,18 @@ const TerminalTab = forwardRef<TerminalHandle, SessionTabProps>(
       isVisible,
       onClose,
       onBackendSessionId,
+      onTransportResolved,
       onBackgroundColorChange,
     },
     ref,
   ) => (
     <Terminal
       ref={ref}
+      host={session.host}
       hostConfig={toTerminalHostConfig(session.host)}
+      type={session.type}
+      origin={session.origin}
+      onTransportResolved={onTransportResolved}
       isVisible={isVisible}
       title={session.title}
       tabInstanceId={session.instanceId}
@@ -44,6 +49,7 @@ export const terminalFeature: FeatureDef = {
       icon: SquareTerminal,
       titleSuffix: () => "",
       shortLabel: () => "SSH",
+      needs: ["shell"],
       serverTabTypes: ["terminal"],
       toServerTabType: () => "terminal",
       capabilities: ["terminal-input"],

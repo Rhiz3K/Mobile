@@ -1,6 +1,7 @@
 import type { Account } from "@/core/accounts/types";
 import type { AccountClient } from "@/core/api/AccountClient";
 import { localStores } from "@/core/db/stores";
+import { accountStorage } from "@/core/storage/kv";
 import { AppError } from "@/core/errors";
 import { localRepositories } from "./local";
 import { serverRepositories } from "./server";
@@ -52,6 +53,10 @@ export const emptyRepositories: DataRepositories = {
     list: async () => [],
     add: async () => {},
   },
+  origins: {
+    get: async () => undefined,
+    set: refuse("hosts"),
+  },
 };
 
 const cache = new Map<string, DataRepositories>();
@@ -68,7 +73,7 @@ export function repositoriesFor(
   if (account.kind === "server" && client) {
     let repos = serverCache.get(client);
     if (!repos) {
-      repos = serverRepositories(client);
+      repos = serverRepositories(client, accountStorage(account.id).data);
       serverCache.set(client, repos);
     }
     return repos;

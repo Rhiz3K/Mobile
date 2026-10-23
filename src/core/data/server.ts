@@ -1,4 +1,5 @@
 import type { AccountClient } from "@/core/api/AccountClient";
+import type { JsonKV } from "@/core/storage/kv";
 import type { Credential, Snippet, SnippetFolder } from "@/types";
 import type { DataRepositories } from "./types";
 
@@ -28,11 +29,16 @@ function signal() {
 }
 
 /** A linked server, read and written live until sync fills its local copy. */
-export function serverRepositories(client: AccountClient): DataRepositories {
+export function serverRepositories(
+  client: AccountClient,
+  // Keeps an origin the server can't, like an older ssh-terminal plugin.
+  phone?: JsonKV,
+): DataRepositories {
   const { hosts, credentials, snippets, folders, terminal } = client.api;
   const hostChanges = signal();
   const credentialChanges = signal();
   const snippetChanges = signal();
+  const recentOrigins = new Map<number, string>();
 
   return {
     source: "server",
@@ -113,6 +119,30 @@ export function serverRepositories(client: AccountClient): DataRepositories {
       subscribe: () => () => {},
       list: async () => [],
       add: async () => {},
+    },
+    origins: {
+      async get(host) {
+        // A choice made here wins over a host row loaded before it.
+        const recent = recentOrigins.get(host.id);
+        if (recent) return recent;
+        if (host.connectFrom) return host.connectFrom;
+        const saved =
+          await phone?.getJson<Record<string, string>>("hostOrigins");
+        return saved?.[String(host.id)];
+      },
+      set: (hostId, origin) =>
+        hostChanges.after(
+          (async () => {
+            recentOrigins.set(hostId, origin);
+            const kept = await hosts.setConnectFrom(hostId, origin);
+            const saved =
+              (await phone?.getJson<Record<string, string>>("hostOrigins")) ??
+              {};
+            if (kept) delete saved[String(hostId)];
+            else saved[String(hostId)] = origin;
+            await phone?.setJson("hostOrigins", saved);
+          })(),
+        ),
     },
   };
 }

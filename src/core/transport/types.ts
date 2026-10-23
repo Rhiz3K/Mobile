@@ -1,4 +1,5 @@
 import type { ExecOptions, SshExecResult, SshSftp } from "@/modules/termix-ssh";
+import type { ConnectFailure } from "./errors";
 
 /**
  * How the app reaches a host. "relay" goes through a linked Termix server,
@@ -6,6 +7,17 @@ import type { ExecOptions, SshExecResult, SshSftp } from "@/modules/termix-ssh";
  * never build server URLs on their own.
  */
 export type TransportKind = "relay" | "local";
+
+/**
+ * What a way of connecting can do. Features list what they need, so a host
+ * whose origin can't do it shows a message instead of trying.
+ * - `shell`: an interactive terminal
+ * - `exec`, `sftp`: commands and files opened by the app itself
+ * - `server`: the server's own routes (file manager, docker, metrics, ...)
+ * - `guacd`: remote desktop through the server
+ */
+export type TransportCapability =
+  "shell" | "exec" | "sftp" | "server" | "guacd";
 
 export interface TerminalHostConfig {
   id: number;
@@ -60,7 +72,8 @@ export interface ShellEvents {
   onBrowserCheckCompleted?: () => void;
   onPostConnectionSetup: () => void;
   onDisconnected: (hostName: string) => void;
-  onConnectionFailed: (message: string) => void;
+  /** `failure` says which step failed and what to try. */
+  onConnectionFailed: (message: string, failure?: ConnectFailure) => void;
   /** Fired when the backend session id is created/attached/cleared. */
   onSessionIdChange?: (sessionId: string | null) => void;
   /** Fired for each connection log line. */
@@ -77,6 +90,8 @@ export interface ShellOptions extends ShellEvents {
   tabInstanceId?: string;
   /** Backend session id to attach to on first connect (reviving a tab). */
   initialSessionId?: string | null;
+  /** Shorter connect timeout, for a try that has another way to fall back on. */
+  connectTimeoutSecs?: number;
 }
 
 /** A live shell on a host. */
@@ -107,6 +122,7 @@ export interface HostSession {
 
 export interface Transport {
   kind: TransportKind;
+  provides: TransportCapability[];
   /** False when this transport can't connect yet, with the reason in `unavailableReason`. */
   available: boolean;
   unavailableReason?: string;

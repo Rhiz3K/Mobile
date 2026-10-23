@@ -21,52 +21,33 @@ import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import { showToast } from "@/utils/toast";
 import { useTerminalCustomization } from "@/contexts/TerminalCustomizationContext";
-import {
-  TOTPDialog,
-  SSHAuthDialog,
-  HostKeyVerificationDialog,
-  PassphraseDialog,
-  WarpgateDialog,
-} from "@/screens/dialogs";
-import { TailscaleCheckDialog } from "@/screens/dialogs/TailscaleCheckDialog";
 import { TERMINAL_THEMES, TERMINAL_FONTS } from "@/constants/terminal-themes";
 import { MOBILE_DEFAULT_TERMINAL_CONFIG } from "@/constants/terminal-config";
 import type { SSHHost, TerminalConfig } from "@/types";
 import type { TerminalInputHandle } from "@/core/features/types";
-import {
-  useSessionTransport,
-  type HostKeyData,
-  type ShellChannel,
-  type TerminalHostConfig,
+import type {
+  ConnectionOrigin,
+  HostConnection,
+  TerminalHostConfig,
+  TransportKind,
 } from "@/core/transport";
 import { loadXtermAssets } from "./loadXtermAssets";
-import {
-  useConnectionLog,
-  ConnectionLog,
-} from "@/screens/sessions/shared/useConnectionLog";
+import { ConnectionLog } from "@/screens/sessions/shared/useConnectionLog";
+import { useHostConnection } from "@/screens/sessions/shared/useHostConnection";
+import { ConnectionPrompts } from "@/screens/sessions/shared/ConnectionPrompts";
+import { ConnectionError } from "@/screens/sessions/shared/ConnectionError";
 import { useUiColors } from "@/contexts/ThemeContext";
 import { useClient } from "@/core/accounts";
 import { useSessionAccountId } from "@/core/accounts/session";
 import { useSessionRepositories } from "@/core/data/hooks";
 
 interface TerminalProps {
-  hostConfig: {
-    id: number;
-    name: string;
-    ip: string;
-    port: number;
-    username: string;
-    authType: "password" | "key" | "credential" | "none" | "tailscale";
-    password?: string;
-    key?: string;
-    keyPassword?: string;
-    keyType?: string;
-    credentialId?: number;
-    jumpHosts?: { hostId: number }[];
-    forceKeyboardInteractive?: boolean;
-    overrideCredentialUsername?: boolean;
-    terminalConfig?: Partial<TerminalConfig>;
-  };
+  host: SSHHost;
+  hostConfig: TerminalHostConfig & { terminalConfig?: Partial<TerminalConfig> };
+  /** Session tab type, for what it needs from the transport. */
+  type: string;
+  /** Overrides the host's saved origin for this tab. */
+  origin?: ConnectionOrigin;
   isVisible: boolean;
   title?: string;
   onClose?: () => void;
@@ -77,6 +58,7 @@ interface TerminalProps {
   initialSessionId?: string | null;
   /** Fired when the backend session id is created/attached/cleared. */
   onSessionIdChange?: (sessionId: string | null) => void;
+  onTransportResolved?: (kind: TransportKind) => void;
 }
 
 export type TerminalHandle = TerminalInputHandle;
@@ -84,7 +66,10 @@ export type TerminalHandle = TerminalInputHandle;
 const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
   (
     {
+      host,
       hostConfig,
+      type,
+      origin,
       isVisible,
       title = "Terminal",
       onClose,
@@ -92,16 +77,16 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
       tabInstanceId,
       initialSessionId,
       onSessionIdChange,
+      onTransportResolved,
     },
     ref,
   ) => {
     // Null on This device, where the phone connects on its own.
     const client = useClient(useSessionAccountId());
     const repos = useSessionRepositories();
-    const transport = useSessionTransport();
     const ui = useUiColors();
     const webViewRef = useRef<WebView>(null);
-    const wsManagerRef = useRef<ShellChannel | null>(null);
+    const connRef = useRef<HostConnection | null>(null);
     const terminalColsRef = useRef(80);
     const terminalRowsRef = useRef(24);
     // Pixel height of the visible terminal area as measured by RN layout.
@@ -148,46 +133,18 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
     );
 
     const { config } = useTerminalCustomization();
-    const log = useConnectionLog();
     const [webViewKey, setWebViewKey] = useState(0);
     const [screenDimensions, setScreenDimensions] = useState(
       Dimensions.get("window"),
     );
-    type ConnectionState =
-      "connecting" | "connected" | "reconnecting" | "disconnected" | "failed";
-    const [connectionState, setConnectionState] =
-      useState<ConnectionState>("connecting");
-    const [retryCount, setRetryCount] = useState(0);
-    const [hasReceivedData, setHasReceivedData] = useState(false);
     const [htmlContent, setHtmlContent] = useState("");
     const [terminalBackgroundColor, setTerminalBackgroundColor] =
       useState<string>(ui.terminal);
 
-    const [totpRequired, setTotpRequired] = useState(false);
-    const [totpPrompt, setTotpPrompt] = useState("");
-    const [isPasswordPrompt, setIsPasswordPrompt] = useState(false);
-    const [showAuthDialog, setShowAuthDialog] = useState(false);
-    const [authDialogReason, setAuthDialogReason] = useState<
-      "no_keyboard" | "auth_failed" | "timeout"
-    >("auth_failed");
-    const [passphraseRequired, setPassphraseRequired] = useState(false);
-    const [warpgateAuth, setWarpgateAuth] = useState<{
-      url: string;
-      securityKey: string;
-    } | null>(null);
-    const [browserCheck, setBrowserCheck] = useState<{
-      url: string;
-      message: string;
-    } | null>(null);
     const [isSelecting, setIsSelecting] = useState(false);
     const [selectedText, setSelectedText] = useState("");
     const [showScrollToBottomButton, setShowScrollToBottomButton] =
       useState(false);
-    const [hostKeyVerification, setHostKeyVerification] = useState<{
-      scenario: "new" | "changed";
-      data: HostKeyData;
-    } | null>(null);
-
     const xtermAssetsRef = useRef<{
       xtermJs: string;
       xtermCss: string;
@@ -260,13 +217,11 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
       return () => subscription?.remove();
     }, []);
 
-    const handleConnectionFailure = useCallback(
+    // The view itself broke, so there is nothing left to show.
+    const handleViewFailure = useCallback(
       (errorMessage: string) => {
         showToast.error(errorMessage);
-        setConnectionState("failed");
-        if (onClose) {
-          onClose();
-        }
+        onClose?.();
       },
       [onClose],
     );
@@ -1155,7 +1110,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
               () => {
                 const key = envVar.key;
                 const value = envVar.value;
-                wsManagerRef.current?.sendInput(`export ${key}="${value}"\n`);
+                connRef.current?.sendInput(`export ${key}="${value}"\n`);
               },
               100 * (index + 1),
             );
@@ -1172,7 +1127,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
                 (s: any) => s.id === terminalConfig.startupSnippetId,
               );
               if (snippet) {
-                wsManagerRef.current?.sendInput(`${snippet.content}\n`);
+                connRef.current?.sendInput(`${snippet.content}\n`);
               }
             } catch (err) {
               console.warn("Failed to execute startup snippet:", err);
@@ -1185,39 +1140,11 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
             100 * (terminalConfig.environmentVariables?.length || 0) +
             (terminalConfig.startupSnippetId ? 400 : 200);
           setTimeout(() => {
-            wsManagerRef.current?.sendInput(`${terminalConfig.moshCommand!}\n`);
+            connRef.current?.sendInput(`${terminalConfig.moshCommand!}\n`);
           }, moshDelay);
         }
       }, 500);
     }, [config, hostConfig.terminalConfig]);
-
-    const handleTotpSubmit = useCallback(
-      (code: string) => {
-        wsManagerRef.current?.sendTotpResponse(code, isPasswordPrompt);
-        setTotpRequired(false);
-        setTotpPrompt("");
-        setIsPasswordPrompt(false);
-        setConnectionState("connecting");
-      },
-      [isPasswordPrompt],
-    );
-
-    const handleAuthDialogSubmit = useCallback(
-      (credentials: {
-        password?: string;
-        sshKey?: string;
-        keyPassword?: string;
-      }) => {
-        wsManagerRef.current?.sendReconnectWithCredentials(
-          credentials,
-          terminalColsRef.current,
-          terminalRowsRef.current,
-        );
-        setShowAuthDialog(false);
-        setConnectionState("connecting");
-      },
-      [],
-    );
 
     const handleTerminalLayout = useCallback((event: LayoutChangeEvent) => {
       const h = Math.round(event.nativeEvent.layout.height || 0);
@@ -1277,16 +1204,13 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
                 `window.setTerminalViewportHeight && window.setTerminalViewportHeight(${viewportHeightRef.current}); true;`,
               );
             }
-            wsManagerRef.current?.connect(message.data.cols, message.data.rows);
+            connRef.current?.connect(message.data.cols, message.data.rows);
             break;
 
           case "resize":
             terminalColsRef.current = message.data.cols;
             terminalRowsRef.current = message.data.rows;
-            wsManagerRef.current?.sendResize(
-              message.data.cols,
-              message.data.rows,
-            );
+            connRef.current?.resize(message.data.cols, message.data.rows);
             break;
 
           case "selectionStart":
@@ -1312,7 +1236,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
           case "input":
             // Wheel/mouse input synthesized inside the WebView (xterm onData),
             // forwarded to the pty so TUI apps can scroll their context.
-            wsManagerRef.current?.sendInput(message.data);
+            connRef.current?.sendInput(message.data);
             break;
         }
       } catch (error) {
@@ -1320,57 +1244,28 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
       }
     }, []);
 
-    useEffect(() => {
-      wsManagerRef.current?.destroy();
-
-      wsManagerRef.current = transport.openShell({
-        hostConfig: hostConfig as TerminalHostConfig,
+    const { conn, state, log, switchTo, switchOrigin } = useHostConnection(
+      host,
+      hostConfig,
+      {
+        type,
+        origin,
         tabInstanceId,
         initialSessionId,
         onSessionIdChange,
-        onStateChange: (state, data) => {
-          switch (state) {
-            case "connecting": {
-              const retryCount = (data?.retryCount as number) || 0;
-              setConnectionState(
-                retryCount > 0 ? "reconnecting" : "connecting",
-              );
-              setRetryCount(retryCount);
-              log.append({
-                level: "info",
-                message:
-                  retryCount > 0
-                    ? `Reconnecting… (attempt ${retryCount})`
-                    : `Connecting to ${hostConfig.name}…`,
-              });
-              break;
-            }
-            case "connected": {
-              const fromBackground = data?.fromBackground as boolean;
-              const isReattach = data?.isReattach as boolean;
-              setConnectionState("connected");
-              setRetryCount(0);
-              if (!isReattach) {
-                setHasReceivedData(false);
-              }
-              log.append({ level: "success", message: "Connected" });
-              webViewRef.current?.injectJavaScript(
-                `window.notifyConnected(${fromBackground}, ${isReattach}); true;`,
-              );
-              if (client) {
-                client.api.homepage
-                  .logActivity("terminal", hostConfig.id, hostConfig.name)
-                  .catch(() => {});
-              } else {
-                repos.recentActivity
-                  .add({ kind: "terminal", title: hostConfig.name })
-                  .catch(() => {});
-              }
-              break;
-            }
-            case "dataReceived":
-              setHasReceivedData(true);
-              break;
+        onTransportResolved,
+        onConnected: ({ fromBackground, isReattach }) => {
+          webViewRef.current?.injectJavaScript(
+            `window.notifyConnected(${fromBackground}, ${isReattach}); true;`,
+          );
+          if (client) {
+            client.api.homepage
+              .logActivity("terminal", hostConfig.id, hostConfig.name)
+              .catch(() => {});
+          } else {
+            repos.recentActivity
+              .add({ kind: "terminal", title: hostConfig.name })
+              .catch(() => {});
           }
         },
         onData: (data) => {
@@ -1389,70 +1284,35 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
             writeToAccessibility(data);
           }
         },
-        onTotpRequired: (prompt, isPassword) => {
-          setTotpPrompt(prompt);
-          setIsPasswordPrompt(isPassword);
-          setTotpRequired(true);
-        },
-        onAuthDialogNeeded: (reason) => {
-          setAuthDialogReason(reason);
-          setShowAuthDialog(true);
-          setConnectionState("disconnected");
-        },
-        onHostKeyVerificationRequired: (scenario, data) => {
-          setHostKeyVerification({ scenario, data });
-        },
-        onPassphraseRequired: () => {
-          setPassphraseRequired(true);
-        },
-        onWarpgateAuthRequired: (url, securityKey) => {
-          setWarpgateAuth({ url, securityKey });
-        },
-        onBrowserCheckRequired: (url, message) => {
-          setBrowserCheck({ url, message });
-        },
-        onBrowserCheckCompleted: () => {
-          setBrowserCheck(null);
-        },
         onPostConnectionSetup: () => handlePostConnectionSetup(),
         onDisconnected: (hostName) => {
-          setBrowserCheck(null);
-          setConnectionState("disconnected");
           showToast.warning(`Disconnected from ${hostName}`);
-          if (onClose) onClose();
+          onClose?.();
         },
-        onConnectionFailed: (message) => {
-          setBrowserCheck(null);
-          log.append({ level: "error", message });
-          handleConnectionFailure(message);
-        },
-        onConnectionLog: (entry) => log.ingest([entry]),
-      });
+      },
+    );
+    connRef.current = conn;
 
-      log.clear();
+    const isConnecting = state.status === "connecting";
+    const isConnected = state.status === "connected";
+    const hasReceivedData = isConnected && state.hasData;
+    const isDialogOpen = state.status === "prompt";
+    const failed = state.status === "failed" ? state : null;
+
+    // A new connection gets a fresh terminal view.
+    useEffect(() => {
       setWebViewKey((prev) => prev + 1);
-      setConnectionState("connecting");
-      setHasReceivedData(false);
-      setRetryCount(0);
       setShowScrollToBottomButton(false);
-      // Clear any stale auth/verification dialogs from a previous connection attempt.
-      setHostKeyVerification(null);
-      setTotpRequired(false);
-      setShowAuthDialog(false);
-      setPassphraseRequired(false);
-      setWarpgateAuth(null);
-      setBrowserCheck(null);
-
       if (xtermAssetsRef.current) {
         setHtmlContent(generateHTML(xtermAssetsRef.current));
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [hostConfig.id]);
+    }, [conn]);
 
     useEffect(() => {
       return () => {
-        wsManagerRef.current?.destroy();
-        wsManagerRef.current = null;
+        connRef.current?.destroy();
+        connRef.current = null;
         if (dataFlushTimerRef.current) {
           clearTimeout(dataFlushTimerRef.current);
           dataFlushTimerRef.current = null;
@@ -1473,7 +1333,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
       () => ({
         sendInput: (data: string) => {
           recordCommandInput(data);
-          wsManagerRef.current?.sendInput(data);
+          connRef.current?.sendInput(data);
         },
         fit: () => {
           try {
@@ -1482,21 +1342,12 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
             );
           } catch (e) {}
         },
-        isDialogOpen: () => {
-          return (
-            totpRequired ||
-            showAuthDialog ||
-            hostKeyVerification !== null ||
-            passphraseRequired ||
-            warpgateAuth !== null ||
-            browserCheck !== null
-          );
-        },
+        isDialogOpen: () => isDialogOpen,
         notifyBackgrounded: () => {
-          wsManagerRef.current?.notifyBackgrounded();
+          connRef.current?.notifyBackgrounded();
         },
         notifyForegrounded: () => {
-          wsManagerRef.current?.notifyForegrounded();
+          connRef.current?.notifyForegrounded();
         },
         scrollToBottom: () => {
           try {
@@ -1510,15 +1361,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
           return isSelecting;
         },
       }),
-      [
-        totpRequired,
-        showAuthDialog,
-        hostKeyVerification,
-        passphraseRequired,
-        warpgateAuth,
-        browserCheck,
-        isSelecting,
-      ],
+      [isDialogOpen, isSelecting, recordCommandInput],
     );
 
     return (
@@ -1549,11 +1392,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
         >
           <View
             style={{ flex: 1, backgroundColor: terminalBackgroundColor }}
-            pointerEvents={
-              totpRequired || showAuthDialog || hostKeyVerification !== null
-                ? "none"
-                : "auto"
-            }
+            pointerEvents={isDialogOpen ? "none" : "auto"}
           >
             <WebView
               key={`terminal-${hostConfig.id}-${webViewKey}`}
@@ -1564,8 +1403,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
                 width: "100%",
                 height: "100%",
                 backgroundColor: terminalBackgroundColor,
-                opacity:
-                  connectionState === "connected" && hasReceivedData ? 1 : 0,
+                opacity: hasReceivedData ? 1 : 0,
               }}
               javaScriptEnabled={true}
               domStorageEnabled={true}
@@ -1581,13 +1419,11 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
               onMessage={handleWebViewMessage}
               onError={(syntheticEvent) => {
                 const { nativeEvent } = syntheticEvent;
-                handleConnectionFailure(
-                  `WebView error: ${nativeEvent.description}`,
-                );
+                handleViewFailure(`WebView error: ${nativeEvent.description}`);
               }}
               onHttpError={(syntheticEvent) => {
                 const { nativeEvent } = syntheticEvent;
-                handleConnectionFailure(
+                handleViewFailure(
                   `WebView HTTP error: ${nativeEvent.statusCode}`,
                 );
               }}
@@ -1643,10 +1479,8 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
 
           {showScrollToBottomButton &&
             isVisible &&
-            connectionState === "connected" &&
-            !totpRequired &&
-            !showAuthDialog &&
-            hostKeyVerification === null && (
+            isConnected &&
+            !isDialogOpen && (
               <TouchableOpacity
                 accessibilityRole="button"
                 accessibilityLabel="Scroll to bottom"
@@ -1681,63 +1515,80 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
             )}
 
           {/* Spinner shown until terminal has rendered its first output */}
-          {(connectionState === "connecting" ||
-            connectionState === "reconnecting" ||
-            !hasReceivedData) &&
-            connectionState !== "failed" && (
-              <View
+          {!hasReceivedData && !failed && (
+            <View
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                justifyContent: "center",
+                alignItems: "center",
+                backgroundColor: terminalBackgroundColor,
+                zIndex: 120,
+              }}
+            >
+              <ActivityIndicator size="large" color={ui.brand} />
+              <Text
                 style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  justifyContent: "center",
-                  alignItems: "center",
-                  backgroundColor: terminalBackgroundColor,
-                  zIndex: 120,
+                  color: ui.text,
+                  fontSize: 16,
+                  fontWeight: "600",
+                  marginTop: 20,
+                  textAlign: "center",
+                  letterSpacing: 0.3,
                 }}
               >
-                <ActivityIndicator size="large" color={ui.brand} />
-                <Text
-                  style={{
-                    color: ui.text,
-                    fontSize: 16,
-                    fontWeight: "600",
-                    marginTop: 20,
-                    textAlign: "center",
-                    letterSpacing: 0.3,
-                  }}
-                >
-                  {connectionState === "reconnecting"
-                    ? "Reconnecting..."
+                {state.status === "connecting" && state.retry > 0
+                  ? "Reconnecting..."
+                  : state.status === "prompt"
+                    ? "Waiting for you..."
                     : "Connecting..."}
-                </Text>
-                <Text
-                  style={{
-                    color: ui.textMuted,
-                    fontSize: 13,
-                    marginTop: 6,
-                    textAlign: "center",
-                  }}
-                >
-                  {hostConfig.name}
-                  {"  |  "}
-                  {hostConfig.ip}
-                </Text>
-              </View>
-            )}
+              </Text>
+              <Text
+                style={{
+                  color: ui.textMuted,
+                  fontSize: 13,
+                  marginTop: 6,
+                  textAlign: "center",
+                }}
+              >
+                {hostConfig.name}
+                {"  |  "}
+                {hostConfig.ip}
+              </Text>
+            </View>
+          )}
 
-          <ConnectionLog
-            entries={log.entries}
-            isConnecting={
-              connectionState === "connecting" ||
-              connectionState === "reconnecting"
-            }
-            isConnected={connectionState === "connected"}
-            hasConnectionError={connectionState === "failed"}
-            onClear={log.clear}
-          />
+          {failed ? (
+            <View
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                zIndex: 130,
+              }}
+            >
+              <ConnectionError
+                failure={failed.failure}
+                switchTo={switchTo}
+                onRetry={() => void conn.retry()}
+                onSwitch={switchOrigin}
+                onClose={onClose}
+              />
+            </View>
+          ) : (
+            <ConnectionLog
+              entries={log}
+              isConnecting={isConnecting}
+              isConnected={isConnected}
+              hasConnectionError={false}
+              onClear={conn.clearLog}
+            />
+          )}
         </View>
 
         {isScreenReaderEnabled && (
@@ -1756,89 +1607,14 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
           />
         )}
 
-        <TOTPDialog
-          visible={totpRequired}
-          onSubmit={handleTotpSubmit}
-          onCancel={() => {
-            setTotpRequired(false);
-            setTotpPrompt("");
-            setIsPasswordPrompt(false);
-            if (onClose) onClose();
-          }}
-          prompt={totpPrompt}
-          isPasswordPrompt={isPasswordPrompt}
-        />
-
-        <SSHAuthDialog
-          visible={showAuthDialog}
-          onSubmit={handleAuthDialogSubmit}
-          onCancel={() => {
-            setShowAuthDialog(false);
-            if (onClose) onClose();
-          }}
+        <ConnectionPrompts
+          conn={conn}
+          state={state}
           hostInfo={{
             name: hostConfig.name,
             ip: hostConfig.ip,
             port: hostConfig.port,
             username: hostConfig.username,
-          }}
-          reason={authDialogReason}
-        />
-
-        <HostKeyVerificationDialog
-          visible={hostKeyVerification !== null}
-          scenario={hostKeyVerification?.scenario ?? "new"}
-          data={hostKeyVerification?.data ?? null}
-          onAccept={() => {
-            wsManagerRef.current?.sendHostKeyResponse("accept");
-            setHostKeyVerification(null);
-          }}
-          onReject={() => {
-            wsManagerRef.current?.sendHostKeyResponse("reject");
-            setHostKeyVerification(null);
-            if (onClose) onClose();
-          }}
-        />
-
-        <PassphraseDialog
-          visible={passphraseRequired}
-          onSubmit={(passphrase) => {
-            wsManagerRef.current?.sendPassphraseResponse(passphrase);
-            setPassphraseRequired(false);
-          }}
-          onCancel={() => {
-            setPassphraseRequired(false);
-            if (onClose) onClose();
-          }}
-          hostInfo={{
-            name: hostConfig.name,
-            ip: hostConfig.ip,
-            port: hostConfig.port,
-            username: hostConfig.username,
-          }}
-        />
-
-        <WarpgateDialog
-          visible={warpgateAuth !== null}
-          url={warpgateAuth?.url ?? ""}
-          securityKey={warpgateAuth?.securityKey ?? ""}
-          onContinue={() => {
-            wsManagerRef.current?.sendWarpgateContinue();
-            setWarpgateAuth(null);
-          }}
-          onCancel={() => {
-            setWarpgateAuth(null);
-            if (onClose) onClose();
-          }}
-        />
-
-        <TailscaleCheckDialog
-          visible={browserCheck !== null}
-          url={browserCheck?.url ?? ""}
-          message={browserCheck?.message ?? ""}
-          onCancel={() => {
-            setBrowserCheck(null);
-            if (onClose) onClose();
           }}
         />
       </View>

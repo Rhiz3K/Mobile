@@ -217,6 +217,7 @@ export function Docker({ host, isVisible }: DockerProps) {
         status={frameStatus}
         loadingLabel="Connecting to Docker…"
         errorMessage={conn.errorMessage}
+        failure={conn.state === "error" ? conn.failure : null}
         emptyMessage={
           dockerAvailable === false
             ? "Docker is not installed or not running on this host."

@@ -56,7 +56,7 @@ export const SECRET_KEYS = [
   "basicAuth",
   "clientCert",
 ];
-const DATA_KEYS = ["apiGeneration", "enabledPlugins"];
+const DATA_KEYS = ["apiGeneration", "enabledPlugins", "hostOrigins"];
 
 /**
  * Everything needed to talk to one Termix server as one user: base URLs,

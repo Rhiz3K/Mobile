@@ -102,7 +102,7 @@ test("pluginSettings fill the flat host fields", () => {
     id: 1,
     statsConfig: { metricsEnabled: true },
     pluginSettings: {
-      "ssh-terminal": { enableTerminal: true },
+      "ssh-terminal": { enableTerminal: true, connectFrom: "server" },
       "file-manager": { enableFileManager: false, defaultPath: "/srv" },
       docker: { enableDocker: true },
       tunnels: {
@@ -114,6 +114,7 @@ test("pluginSettings fill the flat host fields", () => {
     },
   });
   expect(host.enableTerminal).toBe(true);
+  expect(host.connectFrom).toBe("server");
   expect(host.enableFileManager).toBe(false);
   expect(host.defaultPath).toBe("/srv");
   expect(host.enableDocker).toBe(true);
@@ -130,6 +131,7 @@ test("a plugin missing from pluginSettings reads as off", () => {
   const host: any = flattenPluginSettings({ id: 1, pluginSettings: {} });
   expect(host.enableDocker).toBe(false);
   expect(host.enableTerminal).toBe(false);
+  expect(host.connectFrom).toBeUndefined();
   expect(JSON.parse(host.statsConfig).metricsEnabled).toBe(false);
 });
 

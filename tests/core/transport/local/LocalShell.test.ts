@@ -252,6 +252,7 @@ test("failed logins and refused keys are reported once with the host name", asyn
   await shell.connect(80, 24);
   expect(events.onConnectionFailed).toHaveBeenCalledWith(
     "Box: Authentication failed: password refused",
+    expect.objectContaining({ stage: "auth", origin: "local" }),
   );
 
   mockConnect.mockRejectedValue(new SshError("hostKeyRejected", "no"));
@@ -259,6 +260,7 @@ test("failed logins and refused keys are reported once with the host name", asyn
   await other.shell.connect(80, 24);
   expect(other.events.onConnectionFailed).toHaveBeenCalledWith(
     "Box: The host key was not trusted.",
+    expect.objectContaining({ stage: "hostKey" }),
   );
 });
 
@@ -298,6 +300,7 @@ test("a missing jump host stops the login", async () => {
   expect(mockConnect).not.toHaveBeenCalled();
   expect(events.onConnectionFailed).toHaveBeenCalledWith(
     "Box: A jump host of this host no longer exists.",
+    expect.objectContaining({ stage: "unavailable" }),
   );
 });
 
@@ -359,6 +362,25 @@ test("closing the tab mid prompt cancels the login quietly", async () => {
   await done;
   expect(aborted).toBe(true);
   expect(events.onConnectionFailed).not.toHaveBeenCalled();
+});
+
+test("a shorter connect timeout applies when there is a fallback", async () => {
+  mockConnect.mockRejectedValue(new SshError("timeout", "timed out"));
+  const { events, repo } = setup();
+  const shell = new LocalShell(
+    {
+      ...events,
+      hostConfig: { id: 7, name: "Box", ip: "box.lan" } as any,
+      connectTimeoutSecs: 8,
+    },
+    () => repo,
+  );
+  await shell.connect(80, 24);
+  expect(mockConnect.mock.calls[0][0]).toMatchObject({ connectTimeoutSecs: 8 });
+  expect(events.onConnectionFailed).toHaveBeenCalledWith(
+    "Box: timed out",
+    expect.objectContaining({ stage: "network" }),
+  );
 });
 
 test("UTF-8 split across chunks decodes whole", () => {
