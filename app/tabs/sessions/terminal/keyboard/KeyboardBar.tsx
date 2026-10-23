@@ -12,12 +12,8 @@ import KeyboardKey from "./KeyboardKey";
 import { useKeyboardCustomization } from "@/app/contexts/KeyboardCustomizationContext";
 import { KeyConfig } from "@/types/keyboard";
 import { useOrientation } from "@/app/utils/orientation";
-import {
-  BACKGROUNDS,
-  BORDER_COLORS,
-  ACCENT,
-} from "@/app/constants/designTokens";
 import { isRepeatingKey } from "@/constants/keyboard-repeat-config";
+import { useUiColors } from "@/app/contexts/ThemeContext";
 
 interface KeyboardBarProps {
   terminalRef: React.RefObject<TerminalHandle | null>;
@@ -40,6 +36,7 @@ export default function KeyboardBar({
   bottomInset = 0,
   onOpenSnippets,
 }: KeyboardBarProps) {
+  const ui = useUiColors();
   const { config } = useKeyboardCustomization();
   const { isLandscape } = useOrientation();
   const [ctrlPressed, setCtrlPressed] = useState(false);
@@ -173,11 +170,11 @@ export default function KeyboardBar({
   return (
     <View
       style={{
-        backgroundColor: BACKGROUNDS.DARKEST,
+        backgroundColor: ui.background,
         paddingBottom: isKeyboardIntentionallyHidden ? bottomInset : 0,
         marginTop: 2,
         borderTopWidth: StyleSheet.hairlineWidth,
-        borderTopColor: BORDER_COLORS.PRIMARY,
+        borderTopColor: ui.border,
       }}
     >
       <ScrollView
@@ -196,7 +193,7 @@ export default function KeyboardBar({
             {pinnedKeys.map((key, index) => renderKey(key, index))}
             <View
               className="mx-2 h-[30px] w-px"
-              style={{ backgroundColor: BORDER_COLORS.PRIMARY }}
+              style={{ backgroundColor: ui.border }}
             />
           </>
         )}
@@ -209,7 +206,7 @@ export default function KeyboardBar({
               style={{
                 width: StyleSheet.hairlineWidth,
                 height: 30,
-                backgroundColor: BORDER_COLORS.PRIMARY,
+                backgroundColor: ui.border,
                 marginHorizontal: 8,
               }}
             />
@@ -223,15 +220,15 @@ export default function KeyboardBar({
                 alignItems: "center",
                 justifyContent: "center",
                 borderWidth: StyleSheet.hairlineWidth,
-                borderColor: BORDER_COLORS.PRIMARY,
-                backgroundColor: BACKGROUNDS.CARD,
+                borderColor: ui.border,
+                backgroundColor: ui.card,
               }}
             >
               <Text
                 style={{
                   fontSize: 10,
                   fontWeight: "700",
-                  color: ACCENT,
+                  color: ui.brand,
                   letterSpacing: 0.5,
                 }}
               >
@@ -247,7 +244,7 @@ export default function KeyboardBar({
               style={{
                 width: StyleSheet.hairlineWidth,
                 height: 30,
-                backgroundColor: BORDER_COLORS.PRIMARY,
+                backgroundColor: ui.border,
                 marginHorizontal: 8,
               }}
             />
@@ -259,15 +256,15 @@ export default function KeyboardBar({
                 alignItems: "center",
                 justifyContent: "center",
                 borderWidth: StyleSheet.hairlineWidth,
-                borderColor: BORDER_COLORS.PRIMARY,
-                backgroundColor: BACKGROUNDS.CARD,
+                borderColor: ui.border,
+                backgroundColor: ui.card,
               }}
             >
               <Text
                 style={{
                   fontSize: 11,
                   fontWeight: "600",
-                  color: ACCENT,
+                  color: ui.brand,
                   letterSpacing: 0.5,
                 }}
               >

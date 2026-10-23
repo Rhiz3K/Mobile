@@ -176,7 +176,7 @@ export function TrashView({
                 onPress={() => restore(item)}
                 disabled={busyId === item.id}
                 hitSlop={6}
-                className="rounded border border-border p-2 active:bg-muted/40"
+                className="border border-border p-2 active:bg-muted/40"
               >
                 <RotateCcw size={15} color={color("foreground")} />
               </Pressable>
@@ -184,7 +184,7 @@ export function TrashView({
                 onPress={() => purge(item)}
                 disabled={busyId === item.id}
                 hitSlop={6}
-                className="rounded border border-destructive/40 p-2 active:bg-destructive/10"
+                className="border border-destructive/40 p-2 active:bg-destructive/10"
               >
                 <Trash2 size={15} color={color("destructive")} />
               </Pressable>

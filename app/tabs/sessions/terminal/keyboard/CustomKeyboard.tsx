@@ -5,12 +5,8 @@ import { TerminalHandle } from "../Terminal";
 import KeyboardKey from "./KeyboardKey";
 import { useKeyboardCustomization } from "@/app/contexts/KeyboardCustomizationContext";
 import { KeyConfig } from "@/types/keyboard";
-import {
-  BACKGROUNDS,
-  BORDER_COLORS,
-  TEXT_COLORS,
-} from "@/app/constants/designTokens";
 import { isRepeatingKey } from "@/constants/keyboard-repeat-config";
+import { useUiColors } from "@/app/contexts/ThemeContext";
 
 interface CustomKeyboardProps {
   terminalRef: React.RefObject<TerminalHandle | null>;
@@ -25,6 +21,7 @@ export default function CustomKeyboard({
   keyboardHeight: _keyboardHeight,
   isKeyboardIntentionallyHidden = false,
 }: CustomKeyboardProps) {
+  const ui = useUiColors();
   const { config } = useKeyboardCustomization();
   const [shiftPressed, setShiftPressed] = useState(false);
 
@@ -142,7 +139,7 @@ export default function CustomKeyboard({
 
   return (
     <View
-      style={{ flex: 1, backgroundColor: BACKGROUNDS.DARKEST }}
+      style={{ flex: 1, backgroundColor: ui.background }}
       pointerEvents="box-none"
     >
       <ScrollView
@@ -162,7 +159,7 @@ export default function CustomKeyboard({
                     fontWeight: "600",
                     textTransform: "uppercase",
                     letterSpacing: 0.8,
-                    color: TEXT_COLORS.TERTIARY,
+                    color: ui.textFaint,
                   }}
                 >
                   {row.label}
@@ -200,7 +197,7 @@ export default function CustomKeyboard({
               <View
                 style={{
                   height: 1,
-                  backgroundColor: BORDER_COLORS.SEPARATOR,
+                  backgroundColor: ui.border,
                   marginVertical: compactMode ? 4 : 8,
                 }}
               />
@@ -221,7 +218,7 @@ export default function CustomKeyboard({
               style={{
                 fontSize: 10,
                 fontStyle: "italic",
-                color: TEXT_COLORS.TERTIARY,
+                color: ui.textFaint,
               }}
             >
               Customize in Settings

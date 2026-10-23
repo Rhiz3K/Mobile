@@ -46,6 +46,12 @@ jobs:
       - name: Verify Android network security config
         run: npm run verify:android-network-security
 
+      - name: Verify Tailscale helpers
+        run: npm run verify:tailscale
+
+      - name: Verify theme tokens
+        run: npm run verify:theme
+
       - name: Verify remote desktop resolution
         run: node scripts/verify-remote-resolution.cjs
 

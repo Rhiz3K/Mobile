@@ -775,7 +775,7 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
                   <Pressable
                     onPress={() => loadDirectory(getParentPath(currentPath))}
                     hitSlop={8}
-                    className="rounded p-1.5 active:bg-muted/40"
+                    className="p-1.5 active:bg-muted/40"
                     disabled={currentPath === "/"}
                     style={{ opacity: currentPath === "/" ? 0.35 : 1 }}
                   >
@@ -802,7 +802,7 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
                         ) : null}
                         <Pressable
                           onPress={() => loadDirectory(bc)}
-                          className="rounded px-1 py-1 active:bg-muted/40"
+                          className="px-1 py-1 active:bg-muted/40"
                           hitSlop={4}
                         >
                           <Text
@@ -828,7 +828,7 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
                   <Pressable
                     onPress={cycleSortBy}
                     hitSlop={8}
-                    className="flex-row items-center gap-0.5 rounded px-1.5 py-1 active:bg-muted/40"
+                    className="flex-row items-center gap-0.5 px-1.5 py-1 active:bg-muted/40"
                   >
                     <ArrowUpDown size={13} color={color("muted-foreground")} />
                     <Text className="text-[10px] text-muted-foreground">
@@ -840,7 +840,7 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
                   <Pressable
                     onPress={() => setMoreMenuVisible(true)}
                     hitSlop={8}
-                    className="rounded p-1.5 active:bg-muted/40"
+                    className="p-1.5 active:bg-muted/40"
                   >
                     <MoreVertical size={16} color={color("muted-foreground")} />
                   </Pressable>
@@ -895,7 +895,7 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
                           <Pressable
                             key={`sc-${item.path}`}
                             onPress={() => loadDirectory(item.path)}
-                            className="flex-row items-center gap-1 rounded border border-border px-2 py-1 active:bg-muted/40"
+                            className="flex-row items-center gap-1 border border-border px-2 py-1 active:bg-muted/40"
                           >
                             <Bookmark
                               size={11}
@@ -914,7 +914,7 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
                                 type: "file",
                               } as FileItem)
                             }
-                            className="flex-row items-center gap-1 rounded border border-border px-2 py-1 active:bg-muted/40"
+                            className="flex-row items-center gap-1 border border-border px-2 py-1 active:bg-muted/40"
                           >
                             <Star size={11} color={color("muted-foreground")} />
                             <Text className="text-[11px]">{item.name}</Text>
@@ -999,7 +999,7 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
                       onPress={copySelected}
                       disabled={selectedFiles.size === 0}
                       hitSlop={6}
-                      className="rounded border border-border p-2 active:bg-muted/40"
+                      className="border border-border p-2 active:bg-muted/40"
                       style={{ opacity: selectedFiles.size === 0 ? 0.4 : 1 }}
                     >
                       <Copy size={16} color={color("foreground")} />
@@ -1008,7 +1008,7 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
                       onPress={cutSelected}
                       disabled={selectedFiles.size === 0}
                       hitSlop={6}
-                      className="rounded border border-border p-2 active:bg-muted/40"
+                      className="border border-border p-2 active:bg-muted/40"
                       style={{ opacity: selectedFiles.size === 0 ? 0.4 : 1 }}
                     >
                       <Scissors size={16} color={color("foreground")} />
@@ -1020,7 +1020,7 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
                       }}
                       disabled={selectedFiles.size === 0}
                       hitSlop={6}
-                      className="rounded border border-border p-2 active:bg-muted/40"
+                      className="border border-border p-2 active:bg-muted/40"
                       style={{ opacity: selectedFiles.size === 0 ? 0.4 : 1 }}
                     >
                       <Archive size={16} color={color("foreground")} />
@@ -1029,7 +1029,7 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
                       onPress={doDeleteSelected}
                       disabled={selectedFiles.size === 0}
                       hitSlop={6}
-                      className="rounded border border-destructive/40 p-2 active:bg-destructive/10"
+                      className="border border-destructive/40 p-2 active:bg-destructive/10"
                       style={{ opacity: selectedFiles.size === 0 ? 0.4 : 1 }}
                     >
                       <Trash2 size={16} color={color("destructive")} />
@@ -1037,7 +1037,7 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
                     <Pressable
                       onPress={cancelSelection}
                       hitSlop={6}
-                      className="ml-1 rounded border border-border p-2 active:bg-muted/40"
+                      className="ml-1 border border-border p-2 active:bg-muted/40"
                     >
                       <X size={16} color={color("muted-foreground")} />
                     </Pressable>
@@ -1052,7 +1052,7 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
                     <Pressable
                       onPress={doPaste}
                       hitSlop={6}
-                      className="flex-row items-center gap-1.5 rounded border border-accent-brand/30 bg-accent-brand/10 px-3 py-2 active:bg-accent-brand/20"
+                      className="flex-row items-center gap-1.5 border border-accent-brand/30 bg-accent-brand/10 px-3 py-2 active:bg-accent-brand/20"
                     >
                       <ClipboardPaste size={15} color={color("accent-brand")} />
                       <Text
@@ -1067,7 +1067,7 @@ export const FileManager = forwardRef<FileManagerHandle, FileManagerProps>(
                         setClipboard({ files: [], operation: null })
                       }
                       hitSlop={6}
-                      className="rounded border border-border p-2 active:bg-muted/40"
+                      className="border border-border p-2 active:bg-muted/40"
                     >
                       <X size={16} color={color("muted-foreground")} />
                     </Pressable>

@@ -780,10 +780,7 @@ export default function HostForm({
               ) : null}
 
               {tunnels.map((tunnel, idx) => (
-                <View
-                  key={idx}
-                  className="gap-2.5 rounded-lg border border-border p-3"
-                >
+                <View key={idx} className="gap-2.5 border border-border p-3">
                   <View className="flex-row items-center justify-between">
                     <Text weight="bold" className="text-xs">
                       Tunnel {idx + 1}
@@ -791,7 +788,7 @@ export default function HostForm({
                     <Pressable
                       onPress={() => removeTunnel(idx)}
                       hitSlop={8}
-                      className="rounded border border-destructive/40 p-1.5 active:bg-destructive/10"
+                      className="border border-destructive/40 p-1.5 active:bg-destructive/10"
                     >
                       <Trash2 size={14} color={color("destructive")} />
                     </Pressable>

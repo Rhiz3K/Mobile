@@ -44,11 +44,6 @@ import BottomToolbar from "@/app/tabs/sessions/terminal/keyboard/BottomToolbar";
 import KeyboardBar from "@/app/tabs/sessions/terminal/keyboard/KeyboardBar";
 import { useOrientation } from "@/app/utils/orientation";
 import { getMaxKeyboardHeight, getTabBarHeight } from "@/app/utils/responsive";
-import {
-  BACKGROUNDS,
-  BORDER_COLORS,
-  RADIUS,
-} from "@/app/constants/designTokens";
 import { addKeyCommandListener } from "@/modules/hardware-keyboard";
 import TerminalImeInput, {
   callImeInput,
@@ -62,6 +57,7 @@ import {
   translateCommittedText,
   translateSpecialKeyEvent,
 } from "@/app/tabs/sessions/terminal/keyboard/terminalInputMapping";
+import { useUiColors } from "@/app/contexts/ThemeContext";
 
 type ActiveModifiers = {
   ctrl: boolean;
@@ -70,6 +66,7 @@ type ActiveModifiers = {
 };
 
 export default function Sessions() {
+  const ui = useUiColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { height, isLandscape } = useOrientation();
@@ -610,8 +607,8 @@ export default function Sessions() {
 
   const activeTerminalBgColor =
     activeSession?.type === "terminal" && activeSessionId
-      ? terminalBackgroundColors[activeSessionId] || BACKGROUNDS.DARKEST
-      : BACKGROUNDS.DARKEST;
+      ? terminalBackgroundColors[activeSessionId] || ui.terminal
+      : ui.background;
 
   return (
     <View
@@ -621,7 +618,7 @@ export default function Sessions() {
         backgroundColor:
           activeSession?.type === "terminal"
             ? activeTerminalBgColor
-            : BACKGROUNDS.DARK,
+            : ui.background,
       }}
     >
       <View
@@ -758,7 +755,7 @@ export default function Sessions() {
               <ConnectionsPanel />
             </Screen>
           ) : (
-            <View style={{ flex: 1, backgroundColor: BACKGROUNDS.DARKEST }}>
+            <View style={{ flex: 1, backgroundColor: ui.background }}>
               <View
                 style={{
                   flexDirection: "row",
@@ -767,8 +764,8 @@ export default function Sessions() {
                   paddingBottom: 8,
                   paddingHorizontal: 16,
                   borderBottomWidth: 1,
-                  borderBottomColor: "rgba(255,255,255,0.08)",
-                  backgroundColor: BACKGROUNDS.DARKEST,
+                  borderBottomColor: ui.border,
+                  backgroundColor: ui.background,
                 }}
               >
                 <View style={{ flex: 1 }}>
@@ -784,13 +781,12 @@ export default function Sessions() {
                     height: 32,
                     alignItems: "center",
                     justifyContent: "center",
-                    borderRadius: RADIUS.BUTTON,
                     borderWidth: 1,
-                    borderColor: BORDER_COLORS.BUTTON,
-                    backgroundColor: BACKGROUNDS.BUTTON,
+                    borderColor: ui.border,
+                    backgroundColor: ui.muted,
                   }}
                 >
-                  <X size={15} color="#ffffff" />
+                  <X size={15} color={ui.text} />
                 </Pressable>
               </View>
               <ConnectionsPanel onClose={closeConnectionsPanel} />
@@ -848,7 +844,7 @@ export default function Sessions() {
               left: 0,
               right: 0,
               height: effectiveKeyboardHeight,
-              backgroundColor: BACKGROUNDS.DARKEST,
+              backgroundColor: ui.background,
               zIndex: 1002,
             }}
           />
@@ -901,7 +897,7 @@ export default function Sessions() {
               left: 0,
               right: 0,
               zIndex: 1002,
-              backgroundColor: BACKGROUNDS.DARKEST,
+              backgroundColor: ui.background,
             }}
           >
             <BottomToolbar

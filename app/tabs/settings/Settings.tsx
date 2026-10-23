@@ -48,7 +48,7 @@ import {
   ACCENT_PRESET_COLORS,
   THEMES,
   THEME_LABELS,
-  type ThemeId,
+  THEME_SWATCHES,
 } from "@/app/constants/theme";
 import { toast } from "@/app/utils/toast";
 import {
@@ -475,24 +475,36 @@ export default function Settings() {
             <View className="gap-2">
               <Label>Theme</Label>
               <View className="flex-row flex-wrap gap-1.5">
-                {THEMES.map((th) => {
-                  const active = theme === th.id;
+                {THEMES.map((id) => {
+                  const active = theme === id;
+                  const swatches =
+                    id === "system"
+                      ? [THEME_SWATCHES.light, THEME_SWATCHES.dark]
+                      : [THEME_SWATCHES[id]];
                   return (
                     <Pressable
-                      key={th.id}
-                      onPress={() => setTheme(th.id as ThemeId)}
+                      key={id}
+                      onPress={() => setTheme(id)}
                       className={`flex-row items-center gap-1.5 border px-2 py-1.5 ${active ? "border-accent-brand/50 bg-accent-brand/10" : "border-border"}`}
                     >
-                      {th.preview !== "auto" ? (
-                        <View
-                          style={{ backgroundColor: th.preview }}
-                          className="h-3 w-3 border border-border/50"
-                        />
-                      ) : null}
+                      <View className="h-3.5 w-3.5 flex-row overflow-hidden border border-border">
+                        {swatches.map((sw, i) => (
+                          <View
+                            key={i}
+                            style={{ backgroundColor: sw.background }}
+                            className="flex-1 justify-end"
+                          >
+                            <View
+                              style={{ backgroundColor: sw.panel }}
+                              className="h-1"
+                            />
+                          </View>
+                        ))}
+                      </View>
                       <Text
                         className={`text-[11px] ${active ? "text-accent-brand" : "text-muted-foreground"}`}
                       >
-                        {THEME_LABELS[th.id]}
+                        {THEME_LABELS[id]}
                       </Text>
                     </Pressable>
                   );

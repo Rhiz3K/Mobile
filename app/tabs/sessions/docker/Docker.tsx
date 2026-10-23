@@ -244,7 +244,7 @@ export function Docker({ host, isVisible }: DockerProps) {
             onPress={runRefresh}
             disabled={!canRefresh}
             hitSlop={8}
-            className={`rounded p-1.5 ${
+            className={`p-1.5 ${
               canRefresh ? "active:bg-muted/40" : "opacity-40"
             }`}
           >

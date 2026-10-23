@@ -691,7 +691,7 @@ export default function Hosts() {
           {alerts.map((alert) => (
             <View
               key={alert.id}
-              className="mt-2 flex-row items-start gap-2 rounded-lg border border-border bg-card p-3"
+              className="mt-2 flex-row items-start gap-2 border border-border bg-card p-3"
             >
               <AlertTriangle
                 size={15}
@@ -709,7 +709,7 @@ export default function Hosts() {
               <Pressable
                 onPress={() => handleDismissAlert(alert.id)}
                 hitSlop={8}
-                className="rounded p-0.5 active:bg-muted/40"
+                className="p-0.5 active:bg-muted/40"
               >
                 <X size={14} color={color("muted-foreground")} />
               </Pressable>

@@ -7,6 +7,12 @@
 - Add hosts from your Tailscale device list when the Tailscale plugin is on
 - Answer the Tailscale SSH check from the terminal
 
+### Changed
+
+- Theme colors now match Termix on the web and desktop exactly
+- The terminal, keyboard bar and tab bar follow the chosen theme instead of always being dark
+- The theme picker shows the same swatches as Termix
+
 ## 1.6.0
 
 The app now follows which Termix plugins are turned on, and RDP asks for credentials when a host has none saved.

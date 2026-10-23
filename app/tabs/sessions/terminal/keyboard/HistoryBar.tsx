@@ -13,14 +13,9 @@ import {
   deleteCommandFromHistory,
   clearCommandHistory,
 } from "@/app/main-axios";
-import {
-  BACKGROUNDS,
-  BORDER_COLORS,
-  ACCENT,
-  TEXT_COLORS,
-} from "@/app/constants/designTokens";
 import { showToast } from "@/app/utils/toast";
 import { MONO_FONT } from "@/app/constants/fonts";
+import { useUiColors } from "@/app/contexts/ThemeContext";
 
 interface HistoryBarProps {
   terminalRef: React.RefObject<TerminalHandle | null>;
@@ -37,6 +32,7 @@ export default function HistoryBar({
   hostId,
   isVisible,
 }: HistoryBarProps) {
+  const ui = useUiColors();
   const [commands, setCommands] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -81,10 +77,10 @@ export default function HistoryBar({
           flex: 1,
           alignItems: "center",
           justifyContent: "center",
-          backgroundColor: BACKGROUNDS.DARKEST,
+          backgroundColor: ui.background,
         }}
       >
-        <ActivityIndicator size="large" color={ACCENT} />
+        <ActivityIndicator size="large" color={ui.brand} />
       </View>
     );
   }
@@ -96,14 +92,14 @@ export default function HistoryBar({
           flex: 1,
           alignItems: "center",
           justifyContent: "center",
-          backgroundColor: BACKGROUNDS.DARKEST,
+          backgroundColor: ui.background,
         }}
       >
         <Text
           style={{
             fontSize: 14,
             fontWeight: "500",
-            color: TEXT_COLORS.SECONDARY,
+            color: ui.textMuted,
           }}
         >
           No history yet
@@ -111,7 +107,7 @@ export default function HistoryBar({
         <Text
           style={{
             fontSize: 12,
-            color: TEXT_COLORS.TERTIARY,
+            color: ui.textFaint,
             marginTop: 4,
             textAlign: "center",
             paddingHorizontal: 24,
@@ -124,7 +120,7 @@ export default function HistoryBar({
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: BACKGROUNDS.DARKEST }}>
+    <View style={{ flex: 1, backgroundColor: ui.background }}>
       <ScrollView contentContainerStyle={{ padding: 12 }}>
         {commands.map((command, idx) => (
           <View
@@ -132,10 +128,10 @@ export default function HistoryBar({
             style={{
               flexDirection: "row",
               alignItems: "center",
-              backgroundColor: BACKGROUNDS.CARD,
+              backgroundColor: ui.card,
               marginBottom: 6,
               borderWidth: 1,
-              borderColor: BORDER_COLORS.SECONDARY,
+              borderColor: ui.border,
             }}
           >
             <TouchableOpacity
@@ -146,7 +142,7 @@ export default function HistoryBar({
               <Text
                 style={{
                   fontSize: 13,
-                  color: TEXT_COLORS.PRIMARY,
+                  color: ui.text,
                   fontFamily: MONO_FONT,
                 }}
                 numberOfLines={1}
@@ -159,7 +155,7 @@ export default function HistoryBar({
               hitSlop={6}
               onPress={() => remove(command)}
             >
-              <Trash2 size={15} color={TEXT_COLORS.TERTIARY} />
+              <Trash2 size={15} color={ui.textFaint} />
             </TouchableOpacity>
           </View>
         ))}
@@ -170,12 +166,12 @@ export default function HistoryBar({
             paddingVertical: 10,
             alignItems: "center",
             borderWidth: 1,
-            borderColor: BORDER_COLORS.SECONDARY,
+            borderColor: ui.border,
           }}
           activeOpacity={0.7}
           onPress={clearAll}
         >
-          <Text style={{ fontSize: 12, color: TEXT_COLORS.SECONDARY }}>
+          <Text style={{ fontSize: 12, color: ui.textMuted }}>
             Clear history
           </Text>
         </TouchableOpacity>

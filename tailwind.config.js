@@ -39,6 +39,9 @@ module.exports = {
           foreground: withAlpha("--accent-foreground"),
         },
         destructive: withAlpha("--destructive"),
+        warning: withAlpha("--warning"),
+        "terminal-bg": withAlpha("--terminal-bg"),
+        overlay: "rgb(0 0 0 / 0.5)",
         border: withAlpha("--border"),
         input: withAlpha("--input"),
         ring: withAlpha("--ring"),
@@ -68,16 +71,25 @@ module.exports = {
         mono: ["JetBrainsMono", "monospace"],
         sans: ["JetBrainsMono", "monospace"],
       },
+      // Core type scale (classic-layout): 10 labels, 11 meta, 12 body,
+      // 13 row titles, 14 headings, 17 screen titles.
+      fontSize: {
+        "2xs": ["10px", "14px"],
+        meta: ["11px", "15px"],
+        xs: ["12px", "16px"],
+        row: ["13px", "17px"],
+        sm: ["14px", "20px"],
+        title: ["17px", "22px"],
+      },
+      // Square corners everywhere like core. Only dots, avatars and
+      // spinners use rounded-full.
       borderRadius: {
-        // Square corners everywhere - matches the web redesign.
         none: "0px",
         sm: "0px",
         DEFAULT: "0px",
         md: "0px",
         lg: "0px",
         xl: "0px",
-        // The two intentional exceptions in the web design:
-        check: "4px",
         full: "9999px",
       },
     },

@@ -152,7 +152,7 @@ export function FileViewer({
                   <Pressable
                     onPress={handleRevert}
                     hitSlop={6}
-                    className="rounded border border-border p-2 active:bg-muted/40"
+                    className="border border-border p-2 active:bg-muted/40"
                   >
                     <RotateCcw size={16} color={color("muted-foreground")} />
                   </Pressable>
@@ -160,7 +160,7 @@ export function FileViewer({
                     onPress={handleSave}
                     disabled={isSaving}
                     hitSlop={6}
-                    className="rounded border border-accent-brand/40 bg-accent-brand/10 p-2 active:bg-accent-brand/20"
+                    className="border border-accent-brand/40 bg-accent-brand/10 p-2 active:bg-accent-brand/20"
                     style={{ opacity: isSaving ? 0.7 : 1 }}
                   >
                     {isSaving ? (
@@ -177,7 +177,7 @@ export function FileViewer({
               <Pressable
                 onPress={handleClose}
                 hitSlop={6}
-                className="rounded border border-border p-2 active:bg-muted/40"
+                className="border border-border p-2 active:bg-muted/40"
               >
                 <X size={16} color={color("foreground")} />
               </Pressable>

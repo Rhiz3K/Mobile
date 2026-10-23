@@ -5,13 +5,8 @@ import { TerminalHandle } from "../Terminal";
 import CustomKeyboard from "./CustomKeyboard";
 import SnippetsBar from "./SnippetsBar";
 import HistoryBar from "./HistoryBar";
-import {
-  BACKGROUNDS,
-  BORDER_COLORS,
-  ACCENT,
-  TEXT_COLORS,
-} from "@/app/constants/designTokens";
 import { useServerFeatures } from "@/app/contexts/ServerFeaturesContext";
+import { useUiColors } from "@/app/contexts/ThemeContext";
 
 type ToolbarMode = "keyboard" | "snippets" | "history";
 
@@ -32,6 +27,7 @@ export default function BottomToolbar({
   initialTab = "keyboard",
   hostId,
 }: BottomToolbarProps) {
+  const ui = useUiColors();
   const [mode, setMode] = useState<ToolbarMode>(initialTab);
   const insets = useSafeAreaInsets();
   const { has } = useServerFeatures();
@@ -58,10 +54,10 @@ export default function BottomToolbar({
   return (
     <View
       style={{
-        backgroundColor: BACKGROUNDS.DARKEST,
+        backgroundColor: ui.background,
         marginTop: 2,
         borderTopWidth: StyleSheet.hairlineWidth,
-        borderTopColor: BORDER_COLORS.PRIMARY,
+        borderTopColor: ui.border,
       }}
       pointerEvents="box-none"
     >
@@ -69,7 +65,7 @@ export default function BottomToolbar({
         style={{
           flexDirection: "row",
           height: TAB_BAR_HEIGHT,
-          backgroundColor: BACKGROUNDS.DARKEST,
+          backgroundColor: ui.background,
         }}
       >
         {tabs.map((tab, index) => {
@@ -83,12 +79,10 @@ export default function BottomToolbar({
                 justifyContent: "center",
                 paddingVertical: 6,
                 paddingHorizontal: 4,
-                backgroundColor: isActive
-                  ? BACKGROUNDS.CARD
-                  : BACKGROUNDS.DARKEST,
+                backgroundColor: isActive ? ui.card : ui.background,
                 borderRightWidth:
                   index !== tabs.length - 1 ? StyleSheet.hairlineWidth : 0,
-                borderRightColor: BORDER_COLORS.PRIMARY,
+                borderRightColor: ui.border,
               }}
               onPress={() => setMode(tab.id)}
             >
@@ -98,7 +92,7 @@ export default function BottomToolbar({
                   fontWeight: "700",
                   letterSpacing: 0.8,
                   textAlign: "center",
-                  color: isActive ? ACCENT : TEXT_COLORS.TERTIARY,
+                  color: isActive ? ui.brand : ui.textFaint,
                 }}
               >
                 {tab.label}
@@ -111,7 +105,7 @@ export default function BottomToolbar({
                     left: 0,
                     right: 0,
                     height: StyleSheet.hairlineWidth * 2,
-                    backgroundColor: ACCENT,
+                    backgroundColor: ui.brand,
                   }}
                 />
               )}
@@ -125,7 +119,7 @@ export default function BottomToolbar({
           height: safeKeyboardHeight,
           paddingBottom: insets.bottom,
           overflow: "hidden",
-          backgroundColor: BACKGROUNDS.DARKEST,
+          backgroundColor: ui.background,
         }}
       >
         {activeMode === "keyboard" && (

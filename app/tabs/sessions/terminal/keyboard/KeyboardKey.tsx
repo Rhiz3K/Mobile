@@ -3,15 +3,11 @@ import { TouchableOpacity, Text } from "react-native";
 import * as Haptics from "expo-haptics";
 import { KeySize } from "@/types/keyboard";
 import {
-  BACKGROUNDS,
-  BORDER_COLORS,
-  ACCENT,
-} from "@/app/constants/designTokens";
-import {
   DEFAULT_KEY_REPEAT_INTERVAL,
   DEFAULT_KEY_REPEAT_INITIAL_DELAY,
   useKeyRepeat,
 } from "@/constants/keyboard-repeat-config";
+import { useUiColors } from "@/app/contexts/ThemeContext";
 
 interface KeyboardKeyProps {
   label: string;
@@ -42,6 +38,7 @@ export default function KeyboardKey({
   keyRepeatInterval = DEFAULT_KEY_REPEAT_INTERVAL,
   keyRepeatInitialDelay = DEFAULT_KEY_REPEAT_INITIAL_DELAY,
 }: KeyboardKeyProps) {
+  const ui = useUiColors();
   const [isPressed, setIsPressed] = useState(false);
   const onPressRef = useRef(onPress);
   const hapticFeedbackRef = useRef(hapticFeedback);
@@ -113,10 +110,10 @@ export default function KeyboardKey({
 
   const bgColor = isActive
     ? isModifier
-      ? `${ACCENT}26`
-      : BACKGROUNDS.ACTIVE
-    : BACKGROUNDS.BUTTON;
-  const borderColor = isActive ? ACCENT : BORDER_COLORS.BUTTON;
+      ? `${ui.brand}26`
+      : ui.active
+    : ui.muted;
+  const borderColor = isActive ? ui.brand : ui.border;
 
   return (
     <TouchableOpacity
@@ -137,7 +134,7 @@ export default function KeyboardKey({
     >
       <Text
         className={`text-center font-medium ${getTextSizeClass()}`}
-        style={[{ color: isActive ? ACCENT : "#e4e4e4" }, textStyle]}
+        style={[{ color: isActive ? ui.brand : ui.text }, textStyle]}
       >
         {label}
       </Text>

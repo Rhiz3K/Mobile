@@ -19,8 +19,7 @@ import { toast } from "@/app/utils/toast";
 
 /**
  * One configured tunnel: source:port → endpoint:port, live status badge, and
- * connect/disconnect/cancel controls gated by the current state. Restyled onto
- * theme tokens (no designTokens) to match the redesigned sessions.
+ * connect/disconnect/cancel controls gated by the current state.
  */
 export default function TunnelCard({
   tunnel,

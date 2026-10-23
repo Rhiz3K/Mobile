@@ -31,16 +31,10 @@ import { useRouter } from "expo-router";
 import { useOrientation } from "@/app/utils/orientation";
 import { getTabBarHeight, getButtonSize } from "@/app/utils/responsive";
 import {
-  BORDER_COLORS,
-  BACKGROUNDS,
-  RADIUS,
-  ACCENT,
-  TEXT_COLORS,
-} from "@/app/constants/designTokens";
-import {
   callImeInput,
   type TerminalImeInputHandle,
 } from "@/modules/terminal-ime-input";
+import { useUiColors } from "@/app/contexts/ThemeContext";
 
 function getSessionIcon(type: SessionType) {
   switch (type) {
@@ -90,6 +84,7 @@ export default function TabBar({
   activeSessionType,
   onShowConnections,
 }: TabBarProps) {
+  const ui = useUiColors();
   const router = useRouter();
   const { isLandscape } = useOrientation();
   const insets = useSafeAreaInsets();
@@ -122,9 +117,9 @@ export default function TabBar({
     <View style={{ position: "relative" }}>
       <View
         style={{
-          backgroundColor: BACKGROUNDS.DARKEST,
+          backgroundColor: ui.background,
           borderTopWidth: StyleSheet.hairlineWidth,
-          borderTopColor: BORDER_COLORS.PRIMARY,
+          borderTopColor: ui.border,
           borderBottomWidth: 0,
           height: tabBarHeight + (needsBottomPadding ? insets.bottom : 0),
           paddingBottom: needsBottomPadding ? insets.bottom : 0,
@@ -155,9 +150,8 @@ export default function TabBar({
                 width: buttonSize,
                 height: buttonSize,
                 borderWidth: StyleSheet.hairlineWidth,
-                borderColor: BORDER_COLORS.BUTTON,
-                backgroundColor: BACKGROUNDS.BUTTON,
-                borderRadius: RADIUS.BUTTON,
+                borderColor: ui.border,
+                backgroundColor: ui.muted,
                 shadowColor: "#000",
                 shadowOffset: { width: 0, height: 2 },
                 shadowOpacity: 0.1,
@@ -165,7 +159,7 @@ export default function TabBar({
                 elevation: 2,
               }}
             >
-              <Layers size={isLandscape ? 16 : 18} color="#ffffff" />
+              <Layers size={isLandscape ? 16 : 18} color={ui.text} />
             </TouchableOpacity>
           </View>
 
@@ -179,9 +173,8 @@ export default function TabBar({
               width: buttonSize,
               height: buttonSize,
               borderWidth: StyleSheet.hairlineWidth,
-              borderColor: BORDER_COLORS.BUTTON,
-              backgroundColor: BACKGROUNDS.BUTTON,
-              borderRadius: RADIUS.BUTTON,
+              borderColor: ui.border,
+              backgroundColor: ui.muted,
               shadowColor: "#000",
               shadowOffset: { width: 0, height: 2 },
               shadowOpacity: 0.1,
@@ -190,7 +183,7 @@ export default function TabBar({
               marginRight: isLandscape ? 6 : 8,
             }}
           >
-            <ArrowLeft size={isLandscape ? 18 : 20} color="#ffffff" />
+            <ArrowLeft size={isLandscape ? 18 : 20} color={ui.text} />
           </TouchableOpacity>
 
           <View style={{ flex: 1, justifyContent: "center" }}>
@@ -222,7 +215,7 @@ export default function TabBar({
               {sessions.map((session) => {
                 const isActive = session.id === activeSessionId;
                 const SessionIcon = getSessionIcon(session.type);
-                const iconColor = isActive ? ACCENT : TEXT_COLORS.SECONDARY;
+                const iconColor = isActive ? ui.brand : ui.textMuted;
 
                 return (
                   <TouchableOpacity
@@ -232,14 +225,9 @@ export default function TabBar({
                     className="flex-row items-center"
                     style={{
                       borderWidth: StyleSheet.hairlineWidth,
-                      borderColor: isActive
-                        ? BORDER_COLORS.ACTIVE
-                        : BORDER_COLORS.BUTTON,
-                      backgroundColor: BACKGROUNDS.CARD,
-                      borderRadius: RADIUS.BUTTON,
-                      shadowColor: isActive
-                        ? BORDER_COLORS.ACTIVE
-                        : "transparent",
+                      borderColor: isActive ? ui.brand : ui.border,
+                      backgroundColor: ui.card,
+                      shadowColor: isActive ? ui.brand : "transparent",
                       shadowOffset: { width: 0, height: 2 },
                       shadowOpacity: isActive ? 0.2 : 0,
                       shadowRadius: 4,
@@ -278,16 +266,12 @@ export default function TabBar({
                         width: isLandscape ? 28 : 32,
                         height: buttonSize,
                         borderLeftWidth: StyleSheet.hairlineWidth,
-                        borderLeftColor: isActive
-                          ? BORDER_COLORS.ACTIVE
-                          : BORDER_COLORS.BUTTON,
+                        borderLeftColor: isActive ? ui.brand : ui.border,
                       }}
                     >
                       <X
                         size={isLandscape ? 13 : 14}
-                        color={
-                          isActive ? TEXT_COLORS.PRIMARY : TEXT_COLORS.TERTIARY
-                        }
+                        color={isActive ? ui.text : ui.textFaint}
                         strokeWidth={2.5}
                       />
                     </TouchableOpacity>
@@ -307,9 +291,8 @@ export default function TabBar({
                 width: buttonSize,
                 height: buttonSize,
                 borderWidth: StyleSheet.hairlineWidth,
-                borderColor: BORDER_COLORS.BUTTON,
-                backgroundColor: BACKGROUNDS.BUTTON,
-                borderRadius: RADIUS.BUTTON,
+                borderColor: ui.border,
+                backgroundColor: ui.muted,
                 shadowColor: "#000",
                 shadowOffset: { width: 0, height: 2 },
                 shadowOpacity: 0.1,
@@ -319,9 +302,9 @@ export default function TabBar({
               }}
             >
               {keyboardIntentionallyHiddenRef.current ? (
-                <ChevronUp size={isLandscape ? 18 : 20} color="#ffffff" />
+                <ChevronUp size={isLandscape ? 18 : 20} color={ui.text} />
               ) : (
-                <ChevronDown size={isLandscape ? 18 : 20} color="#ffffff" />
+                <ChevronDown size={isLandscape ? 18 : 20} color={ui.text} />
               )}
             </TouchableOpacity>
           )}
@@ -336,21 +319,18 @@ export default function TabBar({
                 width: buttonSize,
                 height: buttonSize,
                 borderWidth: StyleSheet.hairlineWidth,
-                borderColor: isCustomKeyboardVisible
-                  ? BORDER_COLORS.ACTIVE
-                  : BORDER_COLORS.BUTTON,
+                borderColor: isCustomKeyboardVisible ? ui.brand : ui.border,
                 backgroundColor: isCustomKeyboardVisible
-                  ? `${ACCENT}18`
-                  : BACKGROUNDS.BUTTON,
-                borderRadius: RADIUS.BUTTON,
+                  ? `${ui.brand}18`
+                  : ui.muted,
                 elevation: 2,
                 marginLeft: isLandscape ? 6 : 8,
               }}
             >
               {isCustomKeyboardVisible ? (
-                <Minus size={isLandscape ? 18 : 20} color={ACCENT} />
+                <Minus size={isLandscape ? 18 : 20} color={ui.brand} />
               ) : (
-                <Plus size={isLandscape ? 18 : 20} color="#ffffff" />
+                <Plus size={isLandscape ? 18 : 20} color={ui.text} />
               )}
             </TouchableOpacity>
           )}

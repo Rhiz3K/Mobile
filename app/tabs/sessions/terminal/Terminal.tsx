@@ -27,11 +27,6 @@ import {
 import { showToast } from "../../../utils/toast";
 import { useTerminalCustomization } from "../../../contexts/TerminalCustomizationContext";
 import {
-  BACKGROUNDS,
-  ACCENT,
-  TEXT_COLORS,
-} from "../../../constants/designTokens";
-import {
   TOTPDialog,
   SSHAuthDialog,
   HostKeyVerificationDialog,
@@ -49,6 +44,7 @@ import {
 } from "./NativeWebSocketManager";
 import { loadXtermAssets } from "./loadXtermAssets";
 import { useConnectionLog, ConnectionLog } from "../_shared/useConnectionLog";
+import { useUiColors } from "@/app/contexts/ThemeContext";
 
 interface TerminalProps {
   hostConfig: {
@@ -104,6 +100,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
     },
     ref,
   ) => {
+    const ui = useUiColors();
     const webViewRef = useRef<WebView>(null);
     const wsManagerRef = useRef<NativeWebSocketManager | null>(null);
     const terminalColsRef = useRef(80);
@@ -163,7 +160,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
     const [hasReceivedData, setHasReceivedData] = useState(false);
     const [htmlContent, setHtmlContent] = useState("");
     const [terminalBackgroundColor, setTerminalBackgroundColor] =
-      useState<string>(BACKGROUNDS.DARKEST);
+      useState<string>(ui.terminal);
 
     const [totpRequired, setTotpRequired] = useState(false);
     const [totpPrompt, setTotpPrompt] = useState("");
@@ -657,7 +654,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
     const handleStyle = document.createElement('style');
     handleStyle.textContent =
       '.sel-handle{position:fixed;width:' + HANDLE_SIZE + 'px;height:' + HANDLE_SIZE + 'px;display:none;z-index:50;touch-action:none;}' +
-      '.sel-handle .knob{position:absolute;top:2px;width:18px;height:18px;background:${ACCENT};}' +
+      '.sel-handle .knob{position:absolute;top:2px;width:18px;height:18px;background:${ui.brand};}' +
       '.sel-handle.start .knob{right:' + (HANDLE_SIZE / 2 - 1) + 'px;border-radius:50% 0 50% 50%;}' +
       '.sel-handle.end .knob{left:' + (HANDLE_SIZE / 2 - 1) + 'px;border-radius:0 50% 50% 50%;}';
     document.head.appendChild(handleStyle);
@@ -1124,6 +1121,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
         config.fontSize,
         config.fontFamily,
         onBackgroundColorChange,
+        ui.brand,
       ],
     );
 
@@ -1604,9 +1602,9 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
                 top: 8,
                 alignSelf: "center",
                 flexDirection: "row",
-                backgroundColor: BACKGROUNDS.CARD,
+                backgroundColor: ui.card,
                 borderWidth: 1,
-                borderColor: ACCENT,
+                borderColor: ui.brand,
                 zIndex: 30,
                 elevation: 6,
               }}
@@ -1624,7 +1622,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
                 >
                   <Text
                     style={{
-                      color: TEXT_COLORS.PRIMARY,
+                      color: ui.text,
                       fontSize: 14,
                       fontWeight: "600",
                     }}
@@ -1658,9 +1656,9 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
                   width: 40,
                   height: 40,
                   borderRadius: 0,
-                  backgroundColor: BACKGROUNDS.CARD,
+                  backgroundColor: ui.card,
                   borderWidth: 1,
-                  borderColor: ACCENT,
+                  borderColor: ui.brand,
                   alignItems: "center",
                   justifyContent: "center",
                   zIndex: 20,
@@ -1671,7 +1669,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
                   elevation: 6,
                 }}
               >
-                <ChevronDown size={20} color={ACCENT} />
+                <ChevronDown size={20} color={ui.brand} />
               </TouchableOpacity>
             )}
 
@@ -1693,10 +1691,10 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
                   zIndex: 120,
                 }}
               >
-                <ActivityIndicator size="large" color={ACCENT} />
+                <ActivityIndicator size="large" color={ui.brand} />
                 <Text
                   style={{
-                    color: TEXT_COLORS.PRIMARY,
+                    color: ui.text,
                     fontSize: 16,
                     fontWeight: "600",
                     marginTop: 20,
@@ -1710,7 +1708,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
                 </Text>
                 <Text
                   style={{
-                    color: TEXT_COLORS.SECONDARY,
+                    color: ui.textMuted,
                     fontSize: 13,
                     marginTop: 6,
                     textAlign: "center",

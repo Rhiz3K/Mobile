@@ -103,7 +103,7 @@ export function SSHAuthDialog({
         </View>
       }
     >
-      <View className={`mb-3 rounded border px-3 py-2.5 ${bannerBg}`}>
+      <View className={`mb-3 border px-3 py-2.5 ${bannerBg}`}>
         <Text className={`text-xs ${bannerText}`}>{reasonText}</Text>
       </View>
 

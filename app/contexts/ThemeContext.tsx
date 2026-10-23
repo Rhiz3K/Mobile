@@ -9,13 +9,20 @@ import React, {
 import { View, useColorScheme as useRNColorScheme } from "react-native";
 import { vars } from "nativewind";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SystemUI from "expo-system-ui";
 import {
   DEFAULT_ACCENT,
+  DEFAULT_THEME,
   hexToRgbTriplet,
+  resolveTheme,
   STORAGE_KEYS,
   THEME_IS_DARK,
   THEME_VARS,
+  THEMES,
+  tripletToHex,
+  uiColorsFor,
   type ThemeId,
+  type UiColors,
 } from "@/app/constants/theme";
 import { republishWithPreferences } from "@/app/widgets";
 
@@ -38,7 +45,7 @@ const DEFAULT_ACCENT_TRIPLET = hexToRgbTriplet(DEFAULT_ACCENT)!;
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const systemScheme = useRNColorScheme();
-  const [theme, setThemeState] = useState<ThemeId>("dark");
+  const [theme, setThemeState] = useState<ThemeId>(DEFAULT_THEME);
   const [accent, setAccentState] = useState<string>(DEFAULT_ACCENT);
   const [ready, setReady] = useState(false);
 
@@ -50,7 +57,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem(STORAGE_KEYS.theme),
           AsyncStorage.getItem(STORAGE_KEYS.accent),
         ]);
-        if (savedTheme) setThemeState(savedTheme as ThemeId);
+        if (savedTheme && THEMES.includes(savedTheme as ThemeId))
+          setThemeState(savedTheme as ThemeId);
         if (savedAccent && hexToRgbTriplet(savedAccent))
           setAccentState(savedAccent);
       } catch {
@@ -77,11 +85,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       .catch(() => {});
   }, []);
 
-  const resolvedTheme: Exclude<ThemeId, "system"> =
-    theme === "system" ? (systemScheme === "light" ? "light" : "dark") : theme;
+  const resolvedTheme = resolveTheme(theme, systemScheme);
 
   const isDark = THEME_IS_DARK[resolvedTheme];
   const accentTriplet = hexToRgbTriplet(accent) ?? DEFAULT_ACCENT_TRIPLET;
+
+  // Root view color shows behind the keyboard and during screen changes.
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync(
+      tripletToHex(THEME_VARS[resolvedTheme].background),
+    ).catch(() => {});
+  }, [resolvedTheme]);
 
   // Build the CSS-variable style for the active theme + accent.
   const themeStyle = useMemo(() => {
@@ -134,6 +148,15 @@ export function useTheme(): ThemeContextValue {
   const ctx = useContext(ThemeContext);
   if (!ctx) throw new Error("useTheme must be used within ThemeProvider");
   return ctx;
+}
+
+/** Theme colors as hex, for style props on the session and keyboard surfaces. */
+export function useUiColors(): UiColors {
+  const { resolvedTheme, accent } = useTheme();
+  return useMemo(
+    () => uiColorsFor(resolvedTheme, accent),
+    [resolvedTheme, accent],
+  );
 }
 
 /** Resolve a token name (e.g. "accent-brand", "muted-foreground") to an rgb()

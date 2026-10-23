@@ -8,13 +8,8 @@ import {
 } from "react-native";
 import { TerminalHandle } from "@/app/tabs/sessions/terminal/Terminal";
 import { getSnippets, getSnippetFolders } from "@/app/main-axios";
-import {
-  BACKGROUNDS,
-  BORDER_COLORS,
-  ACCENT,
-  TEXT_COLORS,
-} from "@/app/constants/designTokens";
 import { showToast } from "@/app/utils/toast";
+import { useUiColors } from "@/app/contexts/ThemeContext";
 
 interface Snippet {
   id: number;
@@ -44,14 +39,12 @@ interface SnippetsBarProps {
   height: number;
 }
 
-/**
- * Snippet runner inside the terminal's custom keyboard. Restyled onto theme
- * tokens (was hardcoded designTokens); behavior/props unchanged.
- */
+/** Snippet runner inside the terminal's custom keyboard. */
 export default function SnippetsBar({
   terminalRef,
   isVisible,
 }: SnippetsBarProps) {
+  const ui = useUiColors();
   const [snippets, setSnippets] = useState<Snippet[]>([]);
   const [folders, setFolders] = useState<SnippetFolder[]>([]);
   const [collapsedFolders, setCollapsedFolders] = useState<Set<number>>(
@@ -125,12 +118,12 @@ export default function SnippetsBar({
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
-        backgroundColor: BACKGROUNDS.CARD,
+        backgroundColor: ui.card,
         paddingHorizontal: 12,
         paddingVertical: 10,
         marginBottom: 6,
         borderWidth: 1,
-        borderColor: BORDER_COLORS.PRIMARY,
+        borderColor: ui.border,
         borderLeftWidth: 3,
         borderLeftColor: accent,
       }}
@@ -141,22 +134,18 @@ export default function SnippetsBar({
           style={{
             fontSize: 13,
             fontWeight: "500",
-            color: TEXT_COLORS.PRIMARY,
+            color: ui.text,
             flex: 1,
           }}
           numberOfLines={1}
         >
           {label}
         </Text>
-        <Text
-          style={{ fontSize: 12, color: TEXT_COLORS.SECONDARY, marginLeft: 4 }}
-        >
+        <Text style={{ fontSize: 12, color: ui.textMuted, marginLeft: 4 }}>
           ({count})
         </Text>
       </View>
-      <Text
-        style={{ fontSize: 10, color: TEXT_COLORS.TERTIARY, marginLeft: 8 }}
-      >
+      <Text style={{ fontSize: 10, color: ui.textFaint, marginLeft: 8 }}>
         {collapsed ? "▶" : "▼"}
       </Text>
     </TouchableOpacity>
@@ -165,37 +154,34 @@ export default function SnippetsBar({
   const SnippetRow = ({ snippet }: { snippet: Snippet }) => (
     <TouchableOpacity
       style={{
-        backgroundColor: BACKGROUNDS.CARD,
+        backgroundColor: ui.card,
         paddingHorizontal: 12,
         paddingVertical: 10,
         marginBottom: 6,
         marginLeft: 16,
         borderWidth: 1,
-        borderColor: BORDER_COLORS.SECONDARY,
+        borderColor: ui.border,
       }}
       activeOpacity={0.7}
       onPress={() => executeSnippet(snippet)}
     >
-      <Text
-        style={{ fontSize: 13, color: TEXT_COLORS.PRIMARY }}
-        numberOfLines={1}
-      >
+      <Text style={{ fontSize: 13, color: ui.text }} numberOfLines={1}>
         {snippet.name}
       </Text>
     </TouchableOpacity>
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: BACKGROUNDS.DARKEST }}>
+    <View style={{ flex: 1, backgroundColor: ui.background }}>
       {loading ? (
         <View
           style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
         >
-          <ActivityIndicator size="large" color={ACCENT} />
+          <ActivityIndicator size="large" color={ui.brand} />
           <Text
             style={{
               fontSize: 13,
-              color: TEXT_COLORS.SECONDARY,
+              color: ui.textMuted,
               marginTop: 12,
             }}
           >
@@ -217,7 +203,7 @@ export default function SnippetsBar({
               <FolderHeader
                 label="Uncategorized"
                 count={unfolderedSnippets.length}
-                accent={TEXT_COLORS.TERTIARY}
+                accent={ui.textFaint}
                 collapsed={collapsedFolders.has(0)}
                 onPress={() => toggleFolder(0)}
               />
@@ -236,7 +222,7 @@ export default function SnippetsBar({
                 <FolderHeader
                   label={folder.name}
                   count={folderSnippets.length}
-                  accent={folder.color || ACCENT}
+                  accent={folder.color || ui.brand}
                   collapsed={isCollapsed}
                   onPress={() => toggleFolder(folder.id)}
                 />
@@ -254,7 +240,7 @@ export default function SnippetsBar({
                 style={{
                   fontSize: 14,
                   fontWeight: "500",
-                  color: TEXT_COLORS.SECONDARY,
+                  color: ui.textMuted,
                 }}
               >
                 No snippets yet
@@ -262,7 +248,7 @@ export default function SnippetsBar({
               <Text
                 style={{
                   fontSize: 12,
-                  color: TEXT_COLORS.TERTIARY,
+                  color: ui.textFaint,
                   marginTop: 4,
                 }}
               >
