@@ -31,6 +31,7 @@
 
 - The Android app icon is no longer cut off and now uses the same logo and color as Termix on the web and desktop
 - The splash screen uses the same logo and color as the app icon
+- Uploading a large file in the file manager no longer fails
 
 ## 1.6.0
 
