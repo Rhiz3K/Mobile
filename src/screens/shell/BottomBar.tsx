@@ -1,4 +1,5 @@
-import { Pressable, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Keyboard, Platform, Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { BottomTabBarProps } from "expo-router/tabs";
 import {
@@ -13,6 +14,7 @@ import { useThemeColor } from "@/contexts/ThemeContext";
 import { useTerminalSessions } from "@/contexts/TerminalSessionsContext";
 import { useSessionStatuses, type SessionState } from "@/core/sessions/status";
 import { useOrientation } from "@/utils/orientation";
+import { useFeatureAvailable } from "@/core/features/hooks";
 
 type Icon = (props: { color: string; size: number }) => React.ReactNode;
 
@@ -51,6 +53,33 @@ export function BottomBar({ state, navigation }: BottomTabBarProps) {
   const color = useThemeColor();
   const { sessions } = useTerminalSessions();
   const statuses = useSessionStatuses();
+  const aiAvailable = useFeatureAvailable("ai");
+  const [keyboardVisible, setKeyboardVisible] = useState(
+    () => Platform.OS === "android" && Keyboard.isVisible(),
+  );
+  const onAi = state.routes[state.index]?.name === "ai";
+  const onUnavailableAi = onAi && !aiAvailable;
+
+  // Leave AI when the active account can no longer use it.
+  useEffect(() => {
+    if (onUnavailableAi) navigation.navigate("tools");
+  }, [onUnavailableAi, navigation]);
+
+  // Android lifts the bar over the chat input when the keyboard opens.
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    const show = Keyboard.addListener("keyboardDidShow", () =>
+      setKeyboardVisible(true),
+    );
+    const hide = Keyboard.addListener("keyboardDidHide", () =>
+      setKeyboardVisible(false),
+    );
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
   const accent = color("accent-brand") ?? "#f59145";
   const muted = color("muted-foreground") ?? "#a4a4a4";
   const iconSize = isLandscape ? 18 : 20;
@@ -58,6 +87,8 @@ export function BottomBar({ state, navigation }: BottomTabBarProps) {
     sessions.map((s) => s.id),
     statuses,
   );
+
+  if (onAi && keyboardVisible) return null;
 
   return (
     <View
@@ -67,7 +98,8 @@ export function BottomBar({ state, navigation }: BottomTabBarProps) {
       {state.routes.map((route, index) => {
         const tab = TABS.find((t) => t.name === route.name);
         if (!tab) return null;
-        const focused = state.index === index;
+        const focused =
+          state.index === index || (onAi && route.name === "tools");
         const tint = focused ? accent : muted;
         const count = route.name === "sessions" ? sessions.length : 0;
 
@@ -77,7 +109,7 @@ export function BottomBar({ state, navigation }: BottomTabBarProps) {
             target: route.key,
             canPreventDefault: true,
           });
-          if (!focused && !event.defaultPrevented) {
+          if (state.index !== index && !event.defaultPrevented) {
             navigation.navigate(route.name);
           }
         };

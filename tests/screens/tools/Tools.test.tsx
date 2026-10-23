@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react-native";
 import Tools from "@/screens/tools/Tools";
 import { matchHosts } from "@/screens/tools/HostPicker";
+import { aiFeature } from "@/features/ai/register";
 
 const mockPush = jest.fn();
 const mockNavigate = jest.fn(async () => null);
@@ -74,6 +75,16 @@ test("a screen tool opens its route", async () => {
   await render(<Tools />);
   await fireEvent.press(screen.getByText("Snippets"));
   expect(mockPush).toHaveBeenCalledWith("/s");
+});
+
+test("AI Assistant opens its hidden tab route without picking a host", async () => {
+  mockTools = aiFeature.tools!;
+  await render(<Tools />);
+  expect(screen.getByText("Chat with your server's AI assistant")).toBeTruthy();
+  await fireEvent.press(screen.getByText("AI Assistant"));
+  expect(mockPush).toHaveBeenCalledWith("/(tabs)/ai");
+  expect(screen.queryByTestId("sheet")).toBeNull();
+  expect(mockNavigate).not.toHaveBeenCalled();
 });
 
 test("matchHosts searches name, address and tags", () => {

@@ -1,5 +1,6 @@
 import { FeatureRegistry } from "@/core/features/registry";
 import { BUILT_IN_FEATURES, registerBuiltInFeatures } from "@/features";
+import { Sparkles } from "lucide-react-native";
 
 function registry() {
   const r = new FeatureRegistry();
@@ -22,29 +23,54 @@ test("built in features register without clashes", () => {
   expect(new Set(ids).size).toBe(ids.length);
 });
 
-test("AI settings are native and require the plugin API", () => {
+test("AI tools and settings are native and require the plugin API", () => {
   const r = registry();
   const ai = BUILT_IN_FEATURES.find((feature) => feature.id === "ai");
   expect(ai).toMatchObject({
     title: "AI Assistant",
+    plugins: ["ai"],
     source: "native",
     requires: { plugin: "ai", pluginApiOnly: true },
   });
-  expect(r.settingsLinks(legacyServer).some((link) => link.id === "ai")).toBe(
-    false,
-  );
-  const links = r.settingsLinks({
+  const enabledServer = {
     ...legacyServer,
     client: { supports: () => true } as any,
-  });
+  };
+  const links = r.settingsLinks(enabledServer);
   expect(links.find((link) => link.id === "ai")).toMatchObject({
     label: "AI Assistant",
     order: 15,
-    href: "/tabs/settings/AiAssistant",
+    href: "/(tabs)/ai",
   });
   expect(links.map((link) => link.order)).toEqual(
     links.map((link) => link.order).sort((a, b) => a - b),
   );
+  const tools = r.tools(enabledServer);
+  expect(tools.find((tool) => tool.id === "ai")).toMatchObject({
+    label: "AI Assistant",
+    description: expect.any(String),
+    icon: Sparkles,
+    order: 25,
+    href: "/(tabs)/ai",
+  });
+  expect(tools.map((tool) => tool.order)).toEqual(
+    tools.map((tool) => tool.order).sort((a, b) => a - b),
+  );
+
+  const unavailableContexts = [
+    legacyServer,
+    {
+      ...enabledServer,
+      client: {
+        supports: (req: { plugin?: string }) => req.plugin !== "ai",
+      } as any,
+    },
+    { account: { id: "local", kind: "local" } as const, client: null },
+  ];
+  for (const ctx of unavailableContexts) {
+    expect(r.tools(ctx).some((tool) => tool.id === "ai")).toBe(false);
+    expect(r.settingsLinks(ctx).some((link) => link.id === "ai")).toBe(false);
+  }
 });
 
 test("every session type is owned by exactly one feature", () => {
