@@ -119,7 +119,13 @@
       ],
       "expo-dev-client",
       "expo-secure-store",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-sqlite",
+        {
+          "useSQLCipher": true
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

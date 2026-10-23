@@ -12,6 +12,8 @@ jest.mock("expo-secure-store", () => {
     deleteItemAsync: jest.fn(async (key: string) => {
       store.delete(key);
     }),
+    WHEN_UNLOCKED: 0,
+    WHEN_UNLOCKED_THIS_DEVICE_ONLY: 6,
     __reset: () => store.clear(),
   };
 });
@@ -35,4 +37,22 @@ if (!process.env.TEST_LOGS) {
 jest.mock("react-native-webview", () => {
   const { View } = require("react-native");
   return { __esModule: true, WebView: View, default: View };
+});
+
+// The real store is SQLCipher in native code. Tests use better-sqlite3
+// through tests/helpers/db.ts instead.
+jest.mock("expo-sqlite", () => ({
+  openDatabaseSync: jest.fn(() => {
+    throw new Error("Use tests/helpers/db.ts in tests");
+  }),
+  deleteDatabaseSync: jest.fn(),
+  addDatabaseChangeListener: jest.fn(() => ({ remove: jest.fn() })),
+}));
+
+jest.mock("expo-crypto", () => {
+  const crypto = require("node:crypto");
+  return {
+    getRandomBytes: (n: number) => new Uint8Array(crypto.randomBytes(n)),
+    randomUUID: () => crypto.randomUUID(),
+  };
 });

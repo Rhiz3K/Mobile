@@ -46,6 +46,14 @@ export const plainStore: JsonKV = withJson({
   },
 });
 
+/**
+ * Keychain items stay on this phone: never in iCloud Keychain or a phone
+ * backup. Android Keystore keys never leave the device anyway.
+ */
+export const DEVICE_ONLY: SecureStore.SecureStoreOptions = {
+  keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+};
+
 // SecureStore keys only allow letters, digits, ".", "-" and "_".
 const secureKey = (key: string) => key.replace(/[^A-Za-z0-9._-]/g, "_");
 
@@ -53,16 +61,16 @@ const secureKey = (key: string) => key.replace(/[^A-Za-z0-9._-]/g, "_");
 export const secureStore: JsonKV = withJson({
   async get(key) {
     try {
-      return await SecureStore.getItemAsync(secureKey(key));
+      return await SecureStore.getItemAsync(secureKey(key), DEVICE_ONLY);
     } catch {
       return null;
     }
   },
   async set(key, value) {
-    await SecureStore.setItemAsync(secureKey(key), value);
+    await SecureStore.setItemAsync(secureKey(key), value, DEVICE_ONLY);
   },
   async remove(key) {
-    await SecureStore.deleteItemAsync(secureKey(key));
+    await SecureStore.deleteItemAsync(secureKey(key), DEVICE_ONLY);
   },
 });
 

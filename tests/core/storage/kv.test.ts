@@ -14,11 +14,12 @@ test("each account reads only its own keys", async () => {
   expect(await b.data.getJson("list")).toEqual([2]);
 });
 
-test("secrets go to secure storage, never to plain storage", async () => {
+test("secrets go to device only secure storage, never to plain storage", async () => {
   await accountStorage("a").secrets.set("session", "tok");
   expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
     "acct.a.session",
     "tok",
+    { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY },
   );
   expect(await AsyncStorage.getAllKeys()).toEqual([]);
 });
