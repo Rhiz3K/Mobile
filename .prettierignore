@@ -16,3 +16,6 @@ modules/termix-ssh/dist
 modules/termix-ssh/test-server/out
 modules/termix-ssh/ios/TermixSshCore.xcframework
 modules/termix-ssh/android/src/main/jniLibs
+
+# Vendored upstream sources
+modules/termix-terminal/ios/vendor/

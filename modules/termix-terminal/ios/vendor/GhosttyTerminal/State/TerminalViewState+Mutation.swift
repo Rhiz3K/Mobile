@@ -5,6 +5,7 @@
 //  Created by Lakr233 on 2026/3/17.
 //
 
+import Combine
 import SwiftUI
 
 public extension TerminalViewState {
@@ -17,21 +18,34 @@ public extension TerminalViewState {
         controller.setColorScheme(colorScheme) {
             self.objectWillChange.send()
         }
+        publishBackgroundColor()
     }
 
     @discardableResult
     func setTheme(_ theme: TerminalTheme) -> Bool {
-        return controller.setTheme(theme) {
+        let changed = controller.setTheme(theme) {
             self.objectWillChange.send()
         }
+        publishBackgroundColor()
+        return changed
     }
 
     @discardableResult
     func setTerminalConfiguration(
-        _ terminalConfiguration: TerminalConfiguration
+        _ terminalConfiguration: TerminalConfiguration,
     ) -> Bool {
-        return controller.setTerminalConfiguration(terminalConfiguration) {
+        let changed = controller.setTerminalConfiguration(terminalConfiguration) {
             self.objectWillChange.send()
         }
+        publishBackgroundColor()
+        return changed
+    }
+}
+
+extension TerminalViewState {
+    func publishBackgroundColor() {
+        let color = programBackgroundColor ?? controller.backgroundColor
+        guard backgroundColor != color else { return }
+        backgroundColor = color
     }
 }

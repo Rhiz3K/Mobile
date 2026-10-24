@@ -7,12 +7,12 @@ public extension TerminalTheme {
     /// Afterglow (dark) + Alabaster (light) default theme.
     static let `default` = TerminalTheme(
         light: .alabaster,
-        dark: .afterglow
+        dark: .afterglow,
     )
 }
 
 public extension TerminalConfiguration {
-    /// Alabaster - light terminal theme.
+    /// Alabaster — light terminal theme.
     ///
     /// Background: #F7F7F7, Foreground: #000000
     static let alabaster = TerminalConfiguration { builder in
@@ -40,7 +40,7 @@ public extension TerminalConfiguration {
         builder.withPalette(15, color: "#F7F7F7")
     }
 
-    /// Afterglow - dark terminal theme.
+    /// Afterglow — dark terminal theme.
     ///
     /// Background: #212121, Foreground: #D0D0D0
     static let afterglow = TerminalConfiguration { builder in

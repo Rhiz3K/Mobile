@@ -13,7 +13,7 @@ import GhosttyKit
     import AppKit
 #endif
 
-public struct TerminalInputModifiers: OptionSet, Sendable {
+public struct TerminalInputModifiers: OptionSet, Hashable, Sendable {
     public let rawValue: UInt32
 
     public init(rawValue: UInt32) {
@@ -38,24 +38,65 @@ public struct TerminalInputModifiers: OptionSet, Sendable {
     #if canImport(UIKit)
         public init(from flags: UIKeyModifierFlags) {
             var mods = TerminalInputModifiers()
-            if flags.contains(.shift) { mods.insert(.shift) }
-            if flags.contains(.control) { mods.insert(.ctrl) }
-            if flags.contains(.alternate) { mods.insert(.alt) }
-            if flags.contains(.command) { mods.insert(.super_) }
-            if flags.contains(.alphaShift) { mods.insert(.caps) }
-            if flags.contains(.numericPad) { mods.insert(.num) }
+            if flags.contains(.shift) {
+                mods.insert(.shift)
+            }
+            if flags.contains(.control) {
+                mods.insert(.ctrl)
+            }
+            if flags.contains(.alternate) {
+                mods.insert(.alt)
+            }
+            if flags.contains(.command) {
+                mods.insert(.super_)
+            }
+            if flags.contains(.alphaShift) {
+                mods.insert(.caps)
+            }
+            if flags.contains(.numericPad) {
+                mods.insert(.num)
+            }
             self = mods
         }
 
     #elseif canImport(AppKit)
         public init(from flags: NSEvent.ModifierFlags) {
             var mods = TerminalInputModifiers()
-            if flags.contains(.shift) { mods.insert(.shift) }
-            if flags.contains(.control) { mods.insert(.ctrl) }
-            if flags.contains(.option) { mods.insert(.alt) }
-            if flags.contains(.command) { mods.insert(.super_) }
-            if flags.contains(.capsLock) { mods.insert(.caps) }
-            if flags.contains(.numericPad) { mods.insert(.num) }
+            if flags.contains(.shift) {
+                mods.insert(.shift)
+            }
+            if flags.contains(.control) {
+                mods.insert(.ctrl)
+            }
+            if flags.contains(.option) {
+                mods.insert(.alt)
+            }
+            if flags.contains(.command) {
+                mods.insert(.super_)
+            }
+            if flags.contains(.capsLock) {
+                mods.insert(.caps)
+            }
+            if flags.contains(.numericPad) {
+                mods.insert(.num)
+            }
+            // Which side is held, as upstream's `ghosttyMods` reads it:
+            // `macos-option-as-alt = left` makes only the left Option an Alt
+            // and leaves the right one composing (ą on Polish Pro). Without
+            // the bit every Option read as the left one.
+            let raw = flags.rawValue
+            if raw & UInt(NX_DEVICERSHIFTKEYMASK) != 0 {
+                mods.insert(.shiftRight)
+            }
+            if raw & UInt(NX_DEVICERCTLKEYMASK) != 0 {
+                mods.insert(.ctrlRight)
+            }
+            if raw & UInt(NX_DEVICERALTKEYMASK) != 0 {
+                mods.insert(.altRight)
+            }
+            if raw & UInt(NX_DEVICERCMDKEYMASK) != 0 {
+                mods.insert(.superRight)
+            }
             self = mods
         }
     #endif
