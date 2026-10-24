@@ -11,12 +11,15 @@ export async function readLocalText(uri: string): Promise<string> {
   return (await fetch(uri)).text();
 }
 
+// Small slices: Hermes runs out of stack spreading 32K arguments.
+const CHUNK = 0x1000;
+
 export async function readLocalBase64(uri: string): Promise<string> {
   if (isLocal(uri)) return new File(uri).base64();
   const bytes = new Uint8Array(await (await fetch(uri)).arrayBuffer());
   let binary = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
   }
   return btoa(binary);
 }

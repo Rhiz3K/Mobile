@@ -1,9 +1,12 @@
 // Hermes has btoa/atob but no TextDecoder, so these are done by hand.
 
+// Small slices: Hermes runs out of stack spreading 32K arguments.
+const CHUNK = 0x1000;
+
 export function toBase64(bytes: Uint8Array): string {
   let binary = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
   }
   return btoa(binary);
 }
