@@ -7,6 +7,7 @@ import {
 } from "@/constants/stats-config";
 import type { SSHHost } from "@/types";
 import { isSshHost } from "@/utils/hosts";
+import { MetricsCard } from "./MetricsCard";
 import { ServerStats, type ServerStatsHandle } from "./ServerStats";
 
 function statsConfig(host: SSHHost): StatsConfig {
@@ -64,6 +65,16 @@ export const hostMetricsFeature: FeatureDef = {
         client?.isPluginApi() ? "host-metrics" : "stats",
       capabilities: ["keyboard-cover"],
       component: MetricsTab,
+    },
+  ],
+  dashboardCards: [
+    {
+      id: "host-metrics",
+      title: "Metrics",
+      order: 10,
+      tabType: "stats",
+      isAvailable: (host) => isSshHost(host) && metricsAllowed(host),
+      component: MetricsCard,
     },
   ],
   hostActions: [

@@ -1,7 +1,7 @@
 import { Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { BottomTabBarProps } from "expo-router/tabs";
-import { Server, SquareTerminal, Settings } from "lucide-react-native";
+import { House, Server, SquareTerminal, Settings } from "lucide-react-native";
 import { Text } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { useOrientation } from "@/utils/orientation";
@@ -10,12 +10,14 @@ const ICONS: Record<
   string,
   (props: { color: string; size: number }) => React.ReactNode
 > = {
+  home: (p) => <House {...p} />,
   hosts: (p) => <Server {...p} />,
   sessions: (p) => <SquareTerminal {...p} />,
   settings: (p) => <Settings {...p} />,
 };
 
 const LABELS: Record<string, string> = {
+  home: "Home",
   hosts: "Hosts",
   sessions: "Sessions",
   settings: "Settings",

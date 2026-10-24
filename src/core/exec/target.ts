@@ -167,3 +167,48 @@ export function useExecTarget(
 
   return { target, retry: connect, switchOrigin: setOverride };
 }
+
+/**
+ * The exec target for a Home card. Resolved while `active`, without logging
+ * in first (the first poll does), and released when the card stops.
+ */
+export function useCardTarget(
+  host: SSHHost,
+  accountId: string | null,
+  type: string,
+  active: boolean,
+): ExecTarget {
+  const [target, setTarget] = useState<ExecTarget>({ phase: "connecting" });
+  const hostRef = useRef(host);
+  hostRef.current = host;
+
+  useEffect(() => {
+    if (!active) return;
+    let live = true;
+    let runner: ExecRunner | null = null;
+    resolveExecTarget({
+      accountId,
+      host: hostRef.current,
+      type,
+      connect: false,
+    })
+      .catch((error): ExecTarget => ({
+        phase: "failed",
+        failure: fromError(error),
+      }))
+      .then((next) => {
+        if (!live) {
+          if (next.phase === "local") next.runner.release();
+          return;
+        }
+        if (next.phase === "local") runner = next.runner;
+        setTarget(next);
+      });
+    return () => {
+      live = false;
+      runner?.release();
+    };
+  }, [accountId, host.id, type, active]);
+
+  return target;
+}

@@ -9,7 +9,11 @@ function client() {
         ? { entries: [{ message: "x" }], truncated: false, config }
         : [],
   }));
-  const post = jest.fn(async () => ({ data: { state: "active", output: "" } }));
+  const post = jest.fn(
+    async (_path: string, _body?: unknown, _config?: unknown) => ({
+      data: { state: "active", output: "" },
+    }),
+  );
   const c: any = {
     http: { auth: { get, post } },
     rootBase: () => "https://t.example",

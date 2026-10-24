@@ -2,6 +2,7 @@ import { Box, Container } from "lucide-react-native";
 import type { FeatureDef, SessionTabProps } from "@/core/features/types";
 import { isSshHost } from "@/utils/hosts";
 import { Docker } from "./Docker";
+import { DockerCard } from "./DockerCard";
 
 function DockerTab({ session, isVisible }: SessionTabProps) {
   return <Docker host={session.host} isVisible={isVisible} />;
@@ -35,6 +36,16 @@ export const dockerFeature: FeatureDef = {
       order: 30,
       isAvailable: (host) => isSshHost(host) && !!host.enableDocker,
       run: (_host, ctx) => ctx.openSession("docker"),
+    },
+  ],
+  dashboardCards: [
+    {
+      id: "docker",
+      title: "Docker",
+      order: 20,
+      tabType: "docker",
+      isAvailable: (host) => isSshHost(host) && !!host.enableDocker,
+      component: DockerCard,
     },
   ],
   hostToggles: [

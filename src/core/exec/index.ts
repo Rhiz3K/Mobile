@@ -14,5 +14,6 @@ export {
   execKey,
   resolveExecTarget,
   useExecTarget,
+  useCardTarget,
   type ExecTarget,
 } from "./target";

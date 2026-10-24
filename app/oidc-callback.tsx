@@ -48,5 +48,5 @@ export default function OidcCallback() {
     openAuthFlow("oidc");
   }, [openAuthFlow]);
 
-  return <Redirect href="/(tabs)/hosts" />;
+  return <Redirect href="/(tabs)/home" />;
 }

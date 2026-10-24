@@ -358,6 +358,25 @@ export interface SessionMenuItemDef {
   view?: ComponentType<{ ctx: SessionMenuContext; onClose: () => void }>;
 }
 
+export interface DashboardCardProps {
+  host: SSHHost;
+  /** Account the host belongs to. */
+  accountId: string | null;
+  /** False while Home is hidden or the app is away; cards stop polling. */
+  active: boolean;
+}
+
+/** A small live card for a pinned host on Home. */
+export interface DashboardCardDef {
+  id: string;
+  title: string;
+  order: number;
+  /** The session tab type it stands for, so it connects the way that tab would. */
+  tabType: string;
+  isAvailable: (host: SSHHost) => boolean;
+  component: ComponentType<DashboardCardProps>;
+}
+
 export interface FeatureDef {
   id: string;
   title: string;
@@ -378,6 +397,7 @@ export interface FeatureDef {
   keyboardTabs?: KeyboardTabDef[];
   sessionMenuItems?: SessionMenuItemDef[];
   companions?: CompanionDef[];
+  dashboardCards?: DashboardCardDef[];
   /**
    * Named things in the app's own vocabulary that this feature fills, for
    * small spots like a form field. See CAPABILITIES.

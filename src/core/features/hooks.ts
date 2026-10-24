@@ -2,6 +2,7 @@ import { useMemo, useSyncExternalStore } from "react";
 import { accounts, useAccounts, useClient } from "@/core/accounts";
 import { useSessionAccountId } from "@/core/accounts/session";
 import { features } from "./registry";
+import type { SSHHost } from "@/types";
 import type { Capability, FeatureContext } from "./types";
 
 function useRegistryVersion(): number {
@@ -35,6 +36,12 @@ export function useSessionFeatureContext(): FeatureContext {
   const sessionAccount = useSessionAccountId();
   const active = useAccounts().active.id;
   return useContextFor(sessionAccount ?? active);
+}
+
+/** Home cards for a host, as the active account sees them. */
+export function useDashboardCards(host: SSHHost) {
+  const ctx = useFeatureContext();
+  return useMemo(() => features.dashboardCards(host, ctx), [ctx, host]);
 }
 
 export function useHostActions() {

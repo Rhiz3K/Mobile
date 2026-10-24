@@ -210,3 +210,28 @@ test("companions are listed per tab type and host, by order", () => {
   ]);
   expect(r.companionsFor("filemanager", host, local)).toEqual([]);
 });
+
+test("dashboard cards come from available features, filtered per host and ordered", () => {
+  const r = new FeatureRegistry();
+  const card = (id: string, order: number, want: boolean) => ({
+    id,
+    title: id,
+    order,
+    tabType: id,
+    isAvailable: () => want,
+    component: Dummy,
+  });
+  r.register(
+    feature("phone", {
+      availableOn: ["local", "server"],
+      dashboardCards: [
+        card("b", 20, true),
+        card("a", 10, true),
+        card("off", 5, false),
+      ],
+    }),
+  );
+  r.register(feature("server-only", { dashboardCards: [card("s", 1, true)] }));
+  const host = { id: 1 } as any;
+  expect(r.dashboardCards(host, local).map((c) => c.id)).toEqual(["a", "b"]);
+});

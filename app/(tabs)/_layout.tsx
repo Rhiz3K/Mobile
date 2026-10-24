@@ -14,6 +14,7 @@ export default function TabLayout() {
       tabBar={hideTabBar ? () => null : (props) => <CustomTabBar {...props} />}
       screenOptions={{ headerShown: false }}
     >
+      <Tabs.Screen name="home" options={{ title: "Home" }} />
       <Tabs.Screen name="hosts" options={{ title: "Hosts" }} />
       <Tabs.Screen name="sessions" options={{ title: "Sessions" }} />
       <Tabs.Screen name="settings" options={{ title: "Settings" }} />

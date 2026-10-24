@@ -3,6 +3,7 @@ import type { SSHHost } from "@/types";
 import type {
   Capability,
   CompanionDef,
+  DashboardCardDef,
   FeatureContext,
   FeatureDef,
   FeatureRequirement,
@@ -207,6 +208,13 @@ export class FeatureRegistry {
     return this.available(ctx).some((d) =>
       d.capabilities?.includes(capability),
     );
+  }
+
+  /** Cards for one host on Home, in order. */
+  dashboardCards(host: SSHHost, ctx: FeatureContext): DashboardCardDef[] {
+    return this.collect(ctx, (d) => d.dashboardCards)
+      .filter((c) => c.isAvailable(host))
+      .sort(byOrder);
   }
 
   private collect<T>(

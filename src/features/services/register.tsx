@@ -2,6 +2,7 @@ import { Cog, ServerCog } from "lucide-react-native";
 import type { FeatureDef, SessionTabProps } from "@/core/features/types";
 import { isSshHost } from "@/utils/hosts";
 import { Services } from "./Services";
+import { ServicesCard } from "./ServicesCard";
 
 function ServicesTab({ session, isVisible }: SessionTabProps) {
   return <Services host={session.host} isVisible={isVisible} />;
@@ -35,6 +36,16 @@ export const servicesFeature: FeatureDef = {
       order: 35,
       isAvailable: (host) => isSshHost(host) && !!host.enableServices,
       run: (_host, ctx) => ctx.openSession("services"),
+    },
+  ],
+  dashboardCards: [
+    {
+      id: "service-manager",
+      title: "Services",
+      order: 30,
+      tabType: "services",
+      isAvailable: (host) => isSshHost(host) && !!host.enableServices,
+      component: ServicesCard,
     },
   ],
   hostToggles: [

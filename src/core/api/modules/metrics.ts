@@ -271,7 +271,26 @@ export function createMetricsApi(c: AccountClient) {
     }
   }
 
+  /** The last sample of every host the server already watches. Starts nothing. */
+  async function getMetricsSummary(): Promise<
+    {
+      hostId: number;
+      cpu: number | null;
+      memory: number | null;
+      disk: number | null;
+      lastChecked: string;
+    }[]
+  > {
+    try {
+      const response = await c.http.stats.get(`/metrics/summary`);
+      return Array.isArray(response.data) ? response.data : [];
+    } catch (error) {
+      c.fail(error, "fetch metrics summary");
+    }
+  }
+
   return {
+    getMetricsSummary,
     getMetricsHistory,
     getAllServerStatuses,
     getServerStatusById,

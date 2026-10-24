@@ -1,7 +1,11 @@
 import { act, renderHook } from "@testing-library/react-native";
 import { scriptShell } from "@termix-ssh/plugin-sdk/host-scripts";
 import { execPool } from "@/core/exec/pool";
-import { resolveExecTarget, useExecTarget } from "@/core/exec/target";
+import {
+  resolveExecTarget,
+  useCardTarget,
+  useExecTarget,
+} from "@/core/exec/target";
 import { SshError } from "@/modules/termix-ssh";
 import { fakeHostSession, fakeSsh } from "../../helpers/exec";
 
@@ -22,10 +26,8 @@ jest.mock("@/core/data/hooks", () => ({
   }),
 }));
 
-beforeEach(() => {
-  mockCheckOpen.mockReset();
-  execPool.closeAll();
-});
+beforeEach(() => mockCheckOpen.mockReset());
+afterEach(() => execPool.dispose());
 
 const host = {
   id: 1,
@@ -123,4 +125,22 @@ test("the hook connects when the tab shows and passes the saved sudo password", 
   if (target.phase !== "local") return;
   await target.runner.run("x", { mode: "root" });
   expect(fake.calls[1].stdin.split("\n")[1]).toBe("saved");
+});
+
+test("a card target waits until active, skips the login, and lets go on unmount", async () => {
+  const open = jest.fn(async () => fakeHostSession(fakeSsh()).session);
+  mockCheckOpen.mockResolvedValue({ attempts: [local(open)] });
+  const { result, rerender, unmount } = await renderHook(
+    ({ active }: { active: boolean }) =>
+      useCardTarget(host, "s", "docker", active),
+    { initialProps: { active: false } },
+  );
+  await settle();
+  expect(mockCheckOpen).not.toHaveBeenCalled();
+  await rerender({ active: true });
+  await settle();
+  expect(result.current.phase).toBe("local");
+  expect(open).not.toHaveBeenCalled();
+  await unmount();
+  expect(execPool.size()).toBe(0);
 });

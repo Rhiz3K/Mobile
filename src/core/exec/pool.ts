@@ -76,6 +76,15 @@ export class ExecPool {
     }
   }
 
+  /** Closes everything and forgets every host, timers included. Test seam. */
+  dispose(): void {
+    for (const entry of this.entries.values()) {
+      if (entry.idle) clearTimeout(entry.idle);
+      if (entry.session) this.drop(entry, entry.session);
+    }
+    this.entries.clear();
+  }
+
   size(): number {
     return [...this.entries.values()].filter((e) => e.session).length;
   }
