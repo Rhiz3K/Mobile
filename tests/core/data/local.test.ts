@@ -479,3 +479,17 @@ test("host terminal settings, sudo password and ssh options round trip", async (
   await repos.hosts.update(saved.id, { ...fullHost, sudoPassword: "" });
   expect((await repos.hosts.get(saved.id))!.sudoPassword).toBeUndefined();
 });
+
+test("snippets keep the note flag", async () => {
+  const { repos } = setup();
+  const note = await repos.snippets.create({
+    name: "n",
+    content: "text",
+    isNote: true,
+  });
+  expect((await repos.snippets.get(note.id))!.isNote).toBe(true);
+  await repos.snippets.update(note.id, { name: "n2" });
+  expect((await repos.snippets.get(note.id))!.isNote).toBe(true);
+  await repos.snippets.update(note.id, { isNote: false });
+  expect((await repos.snippets.get(note.id))!.isNote).toBe(false);
+});

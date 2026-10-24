@@ -5,6 +5,7 @@ import { TerminalHandle } from "@/features/terminal/Terminal";
 import CustomKeyboard from "./CustomKeyboard";
 import { useKeyboardTabs } from "@/core/features";
 import { useUiColors } from "@/contexts/ThemeContext";
+import type { SSHHost } from "@/types";
 
 // "keyboard" is built in; the rest are tabs features add.
 type ToolbarMode = string;
@@ -16,6 +17,7 @@ interface BottomToolbarProps {
   isKeyboardIntentionallyHidden?: boolean;
   initialTab?: ToolbarMode;
   hostId?: number;
+  host?: SSHHost;
 }
 
 export default function BottomToolbar({
@@ -25,6 +27,7 @@ export default function BottomToolbar({
   isKeyboardIntentionallyHidden = false,
   initialTab = "keyboard",
   hostId,
+  host,
 }: BottomToolbarProps) {
   const ui = useUiColors();
   const [mode, setMode] = useState<ToolbarMode>(initialTab);
@@ -132,6 +135,7 @@ export default function BottomToolbar({
           <ExtraTab
             terminalRef={terminalRef}
             hostId={hostId}
+            host={host}
             isVisible={true}
             height={safeKeyboardHeight}
           />

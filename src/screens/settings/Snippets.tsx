@@ -18,7 +18,18 @@ import { Snippet, SnippetFolder } from "@/types";
 import { publishSnippetSnapshot } from "@/widgets";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { Screen } from "@/components/Screen";
-import { Text, Button, Input, Label, Sheet, SheetBody, EmptyState } from "@/ui";
+import {
+  Text,
+  Button,
+  Input,
+  Label,
+  Sheet,
+  SheetBody,
+  EmptyState,
+  FakeSwitch,
+  SettingRow,
+} from "@/ui";
+import { useTerminalCustomization } from "@/contexts/TerminalCustomizationContext";
 import { toast } from "@/utils/toast";
 import { useRepositories } from "@/core/data/hooks";
 
@@ -27,12 +38,14 @@ type SnippetFormData = {
   content: string;
   description: string;
   folder: string;
+  isNote: boolean;
 };
 
 export default function Snippets() {
   const color = useThemeColor();
   const repos = useRepositories();
   const router = useRouter();
+  const { config, updateConfig } = useTerminalCustomization();
 
   const [snippets, setSnippets] = useState<Snippet[]>([]);
   const [folders, setFolders] = useState<SnippetFolder[]>([]);
@@ -50,6 +63,7 @@ export default function Snippets() {
     content: "",
     description: "",
     folder: "",
+    isNote: false,
   });
   const [saving, setSaving] = useState(false);
 
@@ -131,7 +145,13 @@ export default function Snippets() {
 
   const openCreate = () => {
     setEditingSnippet(null);
-    setForm({ name: "", content: "", description: "", folder: "" });
+    setForm({
+      name: "",
+      content: "",
+      description: "",
+      folder: "",
+      isNote: false,
+    });
     setEditDialog(true);
   };
 
@@ -142,6 +162,7 @@ export default function Snippets() {
       content: snippet.content,
       description: snippet.description ?? "",
       folder: snippet.folder ?? "",
+      isNote: !!snippet.isNote,
     });
     setEditDialog(true);
   };
@@ -162,6 +183,7 @@ export default function Snippets() {
         content: form.content.trim(),
         description: form.description.trim() || undefined,
         folder: form.folder.trim() || undefined,
+        isNote: form.isNote,
       };
       if (editingSnippet) {
         await repos.snippets.update(editingSnippet.id, payload);
@@ -465,6 +487,20 @@ export default function Snippets() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
         >
+          <View className="border-b border-border px-4">
+            <SettingRow
+              label="Ask before running"
+              description="Confirm before a snippet runs in the terminal"
+              last
+            >
+              <FakeSwitch
+                checked={!!config.confirmSnippetRun}
+                onChange={(v) =>
+                  void updateConfig({ confirmSnippetRun: v }).catch(() => {})
+                }
+              />
+            </SettingRow>
+          </View>
           {unfoldered.length > 0 &&
             renderFolderSection("Uncategorized", null, unfoldered)}
           {folders.map((folder) =>
@@ -552,6 +588,16 @@ export default function Snippets() {
                 <ChevronRight size={14} color={color("muted-foreground")} />
               </Pressable>
             </View>
+            <SettingRow
+              label="Note"
+              description="Pasted into the terminal without running"
+              last
+            >
+              <FakeSwitch
+                checked={form.isNote}
+                onChange={(v) => setForm((f) => ({ ...f, isNote: v }))}
+              />
+            </SettingRow>
           </View>
         </SheetBody>
       </Sheet>

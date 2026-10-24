@@ -244,6 +244,7 @@ export function localRepositories(
             description: draft.description || null,
             folder: draft.folder || null,
             order: draft.order ?? 0,
+            isNote: Boolean(draft.isNote),
           })
           .returning()
           .get();
@@ -272,6 +273,7 @@ export function localRepositories(
                 ? current.folder
                 : draft.folder || null,
             order: draft.order ?? current.order,
+            isNote: draft.isNote ?? current.isNote,
             updatedAt: now(),
           })
           .where(eq(snippets.id, id))

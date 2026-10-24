@@ -221,17 +221,21 @@ export interface TerminalInputHandle {
   keyTarget?: () => TerminalKeyTarget | null;
 }
 
+export interface KeyboardTabProps {
+  terminalRef: RefObject<TerminalInputHandle | null>;
+  hostId?: number;
+  /** The active tab's host, for snippet variables. */
+  host?: SSHHost;
+  isVisible: boolean;
+  height: number;
+}
+
 /** A tab in the terminal keyboard toolbar. */
 export interface KeyboardTabDef {
   id: string;
   label: string;
   order: number;
-  component: ComponentType<{
-    terminalRef: RefObject<TerminalInputHandle | null>;
-    hostId?: number;
-    isVisible: boolean;
-    height: number;
-  }>;
+  component: ComponentType<KeyboardTabProps>;
 }
 
 export interface FeatureDef {

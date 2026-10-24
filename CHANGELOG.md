@@ -40,6 +40,11 @@
 - Option sends Alt on iPad hardware keyboards when you turn it on, and Cmd+. sends Escape
 - A Terminal tab in the host editor for the theme, font, cursor, bell, scrollback, startup snippet, keepalive, environment variables and terminal behavior of one host
 - A sudo password field in the host editor
+- Snippets work on This device, and the snippets panel in the terminal has folders and search
+- Snippets fill in $HOST, $USER, $PORT and $NAME, and ask for $INPUT_1 style values before they run
+- Long press a snippet to insert it without running or to copy it
+- Mark a snippet as a note so it is pasted without running
+- An option to confirm before a snippet runs
 - The startup snippet fills in $HOST, $USER, $PORT and $NAME and runs once the shell shows its prompt
 
 ### Changed

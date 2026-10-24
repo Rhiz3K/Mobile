@@ -461,6 +461,8 @@ export interface TerminalConfig {
   haptics: boolean;
   /** Phone only: Option on an iPad keyboard sends Alt instead of symbols. */
   optionAsMeta: boolean;
+  /** Phone only: ask before a snippet runs. */
+  confirmSnippetRun?: boolean;
 
   // Host only, from the ssh-terminal plugin.
   useSSHTitle?: boolean;
@@ -693,6 +695,10 @@ export interface Snippet {
   description?: string;
   folder?: string;
   order?: number;
+  /** Pasted without running. */
+  isNote?: boolean;
+  /** Hosts the web app runs it on, as the server's JSON list. Kept as is. */
+  hostFilter?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -703,6 +709,7 @@ export interface SnippetData {
   description?: string;
   folder?: string;
   order?: number;
+  isNote?: boolean;
 }
 
 export interface SnippetFolder {

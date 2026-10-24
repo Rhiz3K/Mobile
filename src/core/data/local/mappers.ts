@@ -300,6 +300,8 @@ export function snippetFromRow(row: SnippetRow): Snippet {
     // Null like the server: screens group by `folder === null`.
     folder: row.folder as string | undefined,
     order: row.order,
+    isNote: row.isNote,
+    hostFilter: row.hostFilter,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };

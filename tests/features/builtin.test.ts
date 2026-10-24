@@ -93,20 +93,21 @@ test("host editor switches and tabs keep the old order", () => {
     .map((t) => t.formTab!)
     .sort((a, b) => a.order - b.order)
     .map((t) => t.id);
-  expect(tabs).toEqual(["tunnels", "rdp", "vnc", "telnet"]);
+  expect(tabs).toEqual(["terminal", "tunnels", "rdp", "vnc", "telnet"]);
 });
 
 test("Tailscale discovery is off on older servers", () => {
   expect(registry().hasCapability("hosts.discovery", legacyServer)).toBe(false);
 });
 
-test("This device gets the terminal and no server features", () => {
+test("This device gets the terminal and snippets, and no server features", () => {
   const ctx = {
     account: { id: "local", kind: "local" } as const,
     client: null,
   };
   const r = registry();
-  expect(r.available(ctx).map((f) => f.id)).toEqual(["terminal"]);
+  expect(r.available(ctx).map((f) => f.id)).toEqual(["terminal", "snippets"]);
+  expect(r.keyboardTabs(ctx).map((t) => t.id)).toEqual(["snippets", "history"]);
   expect(r.canOpen("terminal", {}, ctx)).toBe(true);
   expect(r.canOpen("docker", {}, ctx)).toBe(false);
 });

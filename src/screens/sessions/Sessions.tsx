@@ -801,6 +801,7 @@ export default function Sessions() {
               }
               initialTab={customKeyboardInitialTab}
               hostId={activeSession?.host?.id}
+              host={activeSession?.host}
             />
           </SessionAccountProvider>
         </View>
