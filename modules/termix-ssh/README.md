@@ -18,6 +18,9 @@ The phone's own SSH and SFTP engine. A Rust core on [russh](https://github.com/w
   UDP), like core's transport
 - Shell with a pty, terminal modes, resize and signals; exec with a timeout and an output cap; streaming
   exec with stdin
+- Shell output can skip JS: with `pipeId` the bytes go to the terminal view through `modules/termix-pipe`.
+  When the view falls behind, the pipe pauses the Rust reader, the channel window fills and the server
+  stops sending
 - SFTP: list, stat, lstat, realpath, read link, symlink, mkdir, rmdir, rename, chmod, remove, recursive
   delete (never follows links), small reads and writes, and streamed download and upload with progress
   and resume

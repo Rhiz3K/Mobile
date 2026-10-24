@@ -1,5 +1,6 @@
 import ExpoModulesCore
 import Foundation
+import TermixPipe
 
 // How long a login waits for the user to answer a host key or prompt.
 private let promptTimeoutNs: UInt64 = 5 * 60 * 1_000_000_000
@@ -228,17 +229,46 @@ private final class Callbacks: SessionCallbacks, @unchecked Sendable {
 private final class ShellSink: ShellCallbacks, @unchecked Sendable {
   let shellId: String
   weak var module: TermixSshModule?
-  init(_ shellId: String, _ module: TermixSshModule) {
+  // With a pipe the bytes go straight to the terminal view; JS only hears that output started.
+  let pipeId: String?
+  let pipe: BytePipe?
+  private var announced = false
+  init(_ shellId: String, _ module: TermixSshModule, pipeId: String?) {
     self.shellId = shellId
     self.module = module
+    self.pipeId = pipeId
+    self.pipe = pipeId.map { TermixPipes.get($0) }
   }
-  func onData(data: Data) { module?.sendEvent("onShellData", ["shellId": shellId, "data": data.base64EncodedString()]) }
+  func onData(data: Data) {
+    guard let pipe else {
+      module?.sendEvent("onShellData", ["shellId": shellId, "data": data.base64EncodedString()])
+      return
+    }
+    pipe.push(data)
+    if !announced {
+      announced = true
+      module?.sendEvent("onShellActive", ["shellId": shellId])
+    }
+  }
   func onExit(exitCode: UInt32?, exitSignal: String?) {
     _ = module?.shells.remove(shellId)
+    _ = module?.producers.remove(shellId)
+    if let pipe, let pipeId {
+      pipe.setProducer(nil)
+      TermixPipes.release(pipeId)
+    }
     module?.sendEvent("onShellExit", [
       "shellId": shellId, "exitCode": exitCode.map { Int($0) } as Any, "exitSignal": exitSignal as Any,
     ])
   }
+}
+
+/// Pauses the Rust reader while the terminal view catches up.
+private final class ShellProducer: PipeProducer, @unchecked Sendable {
+  let shell: Shell
+  init(_ shell: Shell) { self.shell = shell }
+  func pause() { shell.pause() }
+  func resume() { shell.resume() }
 }
 
 private final class ExecSink: ExecCallbacks, @unchecked Sendable {
@@ -277,6 +307,8 @@ private final class OpProgress: ProgressCallback, @unchecked Sendable {
 public final class TermixSshModule: Module {
   fileprivate let sessions = Store<Live>()
   fileprivate let shells = Store<Owned<Shell>>()
+  // The pipe holds its producer weakly, so the module keeps it.
+  fileprivate let producers = Store<ShellProducer>()
   fileprivate let execs = Store<Owned<ExecHandle>>()
   fileprivate let forwards = Store<Owned<Forward>>()
   fileprivate let cancels = Store<CancelToken>()
@@ -326,7 +358,7 @@ public final class TermixSshModule: Module {
 
     Events(
       "onHostKey", "onKeyboardInteractive", "onBanner", "onDisconnect",
-      "onShellData", "onShellExit", "onExecData", "onExecExit", "onProgress"
+      "onShellData", "onShellActive", "onShellExit", "onExecData", "onExecExit", "onProgress"
     )
 
     Function("engineVersion") { engineVersion() }
@@ -417,13 +449,19 @@ public final class TermixSshModule: Module {
       try? await self.execs[execId]?.value.end()
     }
 
-    AsyncFunction("openShell") { (id: String, shellId: String, term: String, cols: Int, rows: Int, env: [String: String]) async throws in
+    AsyncFunction("openShell") { (id: String, shellId: String, term: String, cols: Int, rows: Int, env: [String: String], pipeId: String?) async throws in
+      let sink = ShellSink(shellId, self, pipeId: pipeId)
       let shell = try await ssh {
         try await self.live(id).session.openShell(
           term: term, cols: UInt32(cols), rows: UInt32(rows),
-          env: env.map { EnvVar(name: $0.key, value: $0.value) }, callbacks: ShellSink(shellId, self))
+          env: env.map { EnvVar(name: $0.key, value: $0.value) }, callbacks: sink)
       }
       self.shells[shellId] = Owned(sessionId: id, value: shell)
+      if let pipe = sink.pipe {
+        let producer = ShellProducer(shell)
+        self.producers[shellId] = producer
+        pipe.setProducer(producer)
+      }
     }
 
     AsyncFunction("writeShell") { (shellId: String, data: String) async throws in
@@ -582,6 +620,7 @@ public final class TermixSshModule: Module {
       self.forwards.removeAll().forEach { $0.value.stop() }
       _ = self.execs.removeAll()
       _ = self.shells.removeAll()
+      _ = self.producers.removeAll()
       _ = self.sessions.removeAll()
     }
   }

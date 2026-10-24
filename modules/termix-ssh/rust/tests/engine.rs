@@ -144,6 +144,28 @@ async fn exec_timeout_cap_and_stream() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn paused_shell_holds_back_output() {
+    let s = connect(key_login(TARGET), Cb::new(), None).await.unwrap();
+    let out = Arc::new(Out::default());
+    let sh = s.open_shell("xterm-256color".into(), 80, 24, vec![], out.clone()).await.unwrap();
+    // The quotes keep the echoed command line from matching the marker.
+    sh.write(b"stty -echo; echo RE''ADY\n".to_vec()).await.unwrap();
+    assert!(out.wait_for("READY", 10).await, "{}", out.text());
+    sh.pause();
+    let before = out.data.lock().unwrap().len();
+    sh.write(b"head -c 8000000 /dev/zero | tr '\\0' x; echo; echo FLOOD_''DONE\n".to_vec()).await.unwrap();
+    tokio::time::sleep(Duration::from_secs(3)).await;
+    // Only what was already in flight plus one channel window may arrive while paused.
+    let held = out.data.lock().unwrap().len() - before;
+    assert!(held < 4_000_000, "read {held} bytes while paused");
+    sh.resume();
+    assert!(out.wait_for("FLOOD_DONE", 60).await);
+    assert!(out.data.lock().unwrap().len() - before >= 8_000_000);
+    sh.end().await.unwrap();
+    record("shell.pause", true, Detail::none());
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn sftp_full_set() {
     let s = connect(key_login(TARGET), Cb::new(), None).await.unwrap();
     let f = s.open_sftp().await.unwrap();

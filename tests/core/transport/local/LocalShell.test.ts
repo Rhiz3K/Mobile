@@ -80,6 +80,7 @@ function profile(over: Partial<HostConnectProfile["host"]> = {}) {
 
 function setup(
   profiles: Record<number, HostConnectProfile> = { 7: profile() },
+  extra: Partial<ShellOptions> = {},
 ) {
   const repo = {
     profile: jest.fn(async (id: number) => profiles[id] ?? null),
@@ -110,6 +111,7 @@ function setup(
       authType: "password",
     },
     ...events,
+    ...extra,
   };
   const shell = new LocalShell(options, () => repo);
   return { shell, repo, events };
@@ -171,6 +173,28 @@ test("connects, trusts a first key, opens a shell and streams text", async () =>
   s.shell.handlers.onExit(0, null);
   expect(events.onDisconnected).toHaveBeenCalledWith("Box");
   expect(s.disconnect).toHaveBeenCalled();
+});
+
+test("a piped shell sends output to the view and reports its first data", async () => {
+  const s = fakeSession();
+  mockConnect.mockResolvedValue(s);
+  const { shell, events } = setup(undefined, { pipeId: "tab-1" });
+  events.onHostKeyVerificationRequired.mockImplementation(() =>
+    shell.sendHostKeyResponse("accept"),
+  );
+
+  await shell.connect(80, 24);
+
+  expect(s.openShell).toHaveBeenCalledWith(
+    { cols: 80, rows: 24, env: { COLORTERM: "truecolor" }, pipeId: "tab-1" },
+    expect.anything(),
+  );
+  s.shell.handlers.onActive();
+  s.shell.handlers.onActive();
+  expect(
+    events.onStateChange.mock.calls.filter((c) => c[0] === "dataReceived"),
+  ).toHaveLength(1);
+  expect(events.onData).not.toHaveBeenCalled();
 });
 
 test("keyboard-interactive asks codes and says when one was wrong", async () => {

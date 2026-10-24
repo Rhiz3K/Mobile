@@ -5,6 +5,8 @@ import expo.modules.kotlin.exception.CodedException
 import expo.modules.kotlin.functions.Coroutine
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import expo.modules.termixpipe.PipeProducer
+import expo.modules.termixpipe.TermixPipes
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
 import uniffi.termix_ssh_core.CancelToken
@@ -258,7 +260,7 @@ class TermixSshModule : Module() {
 
         Events(
             "onHostKey", "onKeyboardInteractive", "onBanner", "onDisconnect",
-            "onShellData", "onShellExit", "onExecData", "onExecExit", "onProgress",
+            "onShellData", "onShellActive", "onShellExit", "onExecData", "onExecExit", "onProgress",
         )
 
         Function("engineVersion") { engineVersion() }
@@ -347,20 +349,41 @@ class TermixSshModule : Module() {
 
         AsyncFunction("execClose") Coroutine { execId: String -> execs[execId]?.value?.let { runCatching { it.end() } } }
 
-        AsyncFunction("openShell") Coroutine { id: String, shellId: String, term: String, cols: Int, rows: Int, env: Map<String, String> ->
+        AsyncFunction("openShell") Coroutine { id: String, shellId: String, term: String, cols: Int, rows: Int, env: Map<String, String>, pipeId: String? ->
+            // With a pipe the bytes go straight to the terminal view; JS only hears that output started.
+            val pipe = pipeId?.let { TermixPipes.get(it) }
+            var announced = false
             val shell = ssh {
                 live(id).session.openShell(
                     term, cols.toUInt(), rows.toUInt(), env.map { EnvVar(it.key, it.value) },
                     object : ShellCallbacks {
-                        override fun onData(data: ByteArray) = sendEvent("onShellData", mapOf("shellId" to shellId, "data" to b64(data)))
+                        override fun onData(data: ByteArray) {
+                            if (pipe == null) {
+                                sendEvent("onShellData", mapOf("shellId" to shellId, "data" to b64(data)))
+                                return
+                            }
+                            pipe.push(data)
+                            if (!announced) {
+                                announced = true
+                                sendEvent("onShellActive", mapOf("shellId" to shellId))
+                            }
+                        }
                         override fun onExit(exitCode: UInt?, exitSignal: String?) {
                             shells.remove(shellId)?.value?.destroy()
+                            if (pipe != null && pipeId != null) {
+                                pipe.setProducer(null)
+                                TermixPipes.release(pipeId)
+                            }
                             sendEvent("onShellExit", mapOf("shellId" to shellId, "exitCode" to exitCode?.toInt(), "exitSignal" to exitSignal))
                         }
                     },
                 )
             }
             shells[shellId] = Owned(id, shell)
+            pipe?.setProducer(object : PipeProducer {
+                override fun pause() = shell.pause()
+                override fun resume() = shell.resume()
+            })
         }
 
         AsyncFunction("writeShell") Coroutine { shellId: String, data: String ->

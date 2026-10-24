@@ -275,16 +275,15 @@ export class LocalShell implements ShellChannel {
         cols: this.cols,
         rows: this.rows,
         env: { COLORTERM: "truecolor", ...chain.login.env },
+        pipeId: this.options.pipeId,
       },
       {
         onData: (bytes) => {
           const text = decoder.decode(bytes);
           if (text) this.options.onData(text);
-          if (!this.sawData) {
-            this.sawData = true;
-            this.options.onStateChange("dataReceived", { hostName: this.name });
-          }
+          this.markData();
         },
+        onActive: () => this.markData(),
         onExit: () => {
           if (this.destroyed || this.shell !== shell) return;
           this.shell = null;
@@ -304,6 +303,12 @@ export class LocalShell implements ShellChannel {
       this.shell = null;
       if (!this.background) this.reconnect(false);
     });
+  }
+
+  private markData() {
+    if (this.sawData) return;
+    this.sawData = true;
+    this.options.onStateChange("dataReceived", { hostName: this.name });
   }
 
   private scheduleReconnect(retryCount: number, fromBackground: boolean) {

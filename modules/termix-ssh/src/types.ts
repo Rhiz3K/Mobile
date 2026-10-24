@@ -204,6 +204,7 @@ export interface TermixSshNativeModule {
     cols: number,
     rows: number,
     env: Record<string, string>,
+    pipeId: string | null,
   ): Promise<void>;
   writeShell(shellId: string, data: string): Promise<void>;
   resizeShell(shellId: string, cols: number, rows: number): Promise<void>;
@@ -301,6 +302,7 @@ export interface NativeEvents {
   onBanner: { sessionId: string; banner: string };
   onDisconnect: { sessionId: string; kind: SshDisconnectKind; reason: string };
   onShellData: { shellId: string; data: string };
+  onShellActive: { shellId: string };
   onShellExit: {
     shellId: string;
     exitCode: number | null;

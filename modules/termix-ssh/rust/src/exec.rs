@@ -46,6 +46,7 @@ impl Session {
             let (mut t_out, mut t_err) = (false, false);
             let (exit_code, exit_signal) = drain(
                 reader,
+                None,
                 |d| push_capped(&mut out, &d, cap, &mut t_out),
                 |d| push_capped(&mut err, &d, cap, &mut t_err),
             )
@@ -84,7 +85,7 @@ impl Session {
         tokio::spawn(async move {
             let cb = callbacks.clone();
             let (code, signal) =
-                drain(reader, |d| callbacks.on_stdout(d), |d| cb.on_stderr(d)).await;
+                drain(reader, None, |d| callbacks.on_stdout(d), |d| cb.on_stderr(d)).await;
             cb.on_exit(code, signal);
         });
         Ok(Arc::new(ExecHandle { writer }))

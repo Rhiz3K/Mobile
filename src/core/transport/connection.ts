@@ -106,6 +106,8 @@ export interface HostConnectionOptions {
   plan: () => Promise<PlannedAttempts>;
   tabInstanceId?: string;
   initialSessionId?: string | null;
+  /** Native pipe of the terminal view, for shells that can feed it directly. */
+  pipeId?: string;
   /** Connect timeout for a try that has a fallback after it. */
   fallbackTimeoutSecs?: number;
   onData: (data: string) => void;
@@ -278,6 +280,7 @@ export class HostConnection {
     return {
       hostConfig: this.options.host,
       tabInstanceId: this.options.tabInstanceId,
+      pipeId: this.options.pipeId,
       initialSessionId: this.sessionId,
       connectTimeoutSecs: hasFallback
         ? (this.options.fallbackTimeoutSecs ?? 8)

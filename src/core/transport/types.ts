@@ -94,6 +94,11 @@ export interface ShellOptions extends ShellEvents {
   initialSessionId?: string | null;
   /** Shorter connect timeout, for a try that has another way to fall back on. */
   connectTimeoutSecs?: number;
+  /**
+   * Native pipe of the terminal view. A local shell sends its output there instead of `onData`;
+   * the relay ignores it.
+   */
+  pipeId?: string;
 }
 
 /** A live shell on a host. */

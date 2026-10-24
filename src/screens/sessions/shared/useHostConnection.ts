@@ -55,6 +55,8 @@ export function useHostConnection(
     origin?: ConnectionOrigin;
     tabInstanceId?: string;
     initialSessionId?: string | null;
+    /** Native pipe of the tab's terminal view. */
+    pipeId?: string;
   },
 ) {
   const accountId = useSessionAccountId();
@@ -73,6 +75,7 @@ export function useHostConnection(
           checkOpen(accountId, host, isSsh, opts.type, originRef.current),
         tabInstanceId: opts.tabInstanceId,
         initialSessionId: opts.initialSessionId,
+        pipeId: opts.pipeId,
         onData: (d) => handlers.current.onData(d),
         onConnected: (i) => handlers.current.onConnected?.(i),
         onPostConnectionSetup: () => handlers.current.onPostConnectionSetup?.(),

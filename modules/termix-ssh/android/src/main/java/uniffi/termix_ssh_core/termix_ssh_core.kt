@@ -920,7 +920,11 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_termix_ssh_core_checksum_method_shell_end(
     ): Int
+    external fun uniffi_termix_ssh_core_checksum_method_shell_pause(
+    ): Int
     external fun uniffi_termix_ssh_core_checksum_method_shell_resize(
+    ): Int
+    external fun uniffi_termix_ssh_core_checksum_method_shell_resume(
     ): Int
     external fun uniffi_termix_ssh_core_checksum_method_shell_signal(
     ): Int
@@ -1106,8 +1110,12 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_termix_ssh_core_fn_method_shell_end(`ptr`: Long,
     ): Long
+    external fun uniffi_termix_ssh_core_fn_method_shell_pause(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
     external fun uniffi_termix_ssh_core_fn_method_shell_resize(`ptr`: Long,`cols`: Int,`rows`: Int,
     ): Long
+    external fun uniffi_termix_ssh_core_fn_method_shell_resume(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
     external fun uniffi_termix_ssh_core_fn_method_shell_signal(`ptr`: Long,`name`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_termix_ssh_core_fn_method_shell_write(`ptr`: Long,`data`: RustBuffer.ByValue,
@@ -1412,7 +1420,13 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_termix_ssh_core_checksum_method_shell_end() and 0xFFFF) != 21084) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_termix_ssh_core_checksum_method_shell_pause() and 0xFFFF) != 23782) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_termix_ssh_core_checksum_method_shell_resize() and 0xFFFF) != 30553) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_termix_ssh_core_checksum_method_shell_resume() and 0xFFFF) != 54501) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_termix_ssh_core_checksum_method_shell_signal() and 0xFFFF) != 34912) {
@@ -5493,7 +5507,14 @@ public interface ShellInterface {
     
     suspend fun `end`()
     
+    /**
+     * Stops reading output until `resume`. The server stops once the channel window is full.
+     */
+    fun `pause`()
+    
     suspend fun `resize`(`cols`: kotlin.UInt, `rows`: kotlin.UInt)
+    
+    fun `resume`()
     
     /**
      * Like `INT` or `TERM`. Many servers ignore signals; Ctrl+C as input always works.
@@ -5629,6 +5650,21 @@ open class Shell: Disposable, AutoCloseable, ShellInterface
     }
 
     
+    /**
+     * Stops reading output until `resume`. The server stops once the channel window is full.
+     */override fun `pause`()
+        = 
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_termix_ssh_core_fn_method_shell_pause(
+        it,
+        _status)
+}
+    }
+    
+    
+
+    
     @Throws(SshException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `resize`(`cols`: kotlin.UInt, `rows`: kotlin.UInt) {
@@ -5651,6 +5687,18 @@ open class Shell: Disposable, AutoCloseable, ShellInterface
         SshException.ErrorHandler,
     )
     }
+
+    override fun `resume`()
+        = 
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_termix_ssh_core_fn_method_shell_resume(
+        it,
+        _status)
+}
+    }
+    
+    
 
     
     /**

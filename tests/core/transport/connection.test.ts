@@ -387,11 +387,13 @@ describe("HostConnection", () => {
     const { conn, opts } = setup([t.transport], {
       initialSessionId: "s1",
       tabInstanceId: "tab",
+      pipeId: "pipe",
     });
     await conn.connect(80, 24);
     const { options, channel } = t.last();
     expect(options.initialSessionId).toBe("s1");
     expect(options.tabInstanceId).toBe("tab");
+    expect(options.pipeId).toBe("pipe");
 
     conn.sendInput("ls\r");
     conn.resize(120, 40);

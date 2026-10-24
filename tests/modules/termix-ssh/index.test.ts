@@ -280,6 +280,7 @@ describe("termix-ssh channels", () => {
       80,
       24,
       {},
+      null,
     );
 
     emit("onShellData", {
@@ -307,6 +308,20 @@ describe("termix-ssh channels", () => {
     expect(onExit).toHaveBeenCalledWith(null, "HUP");
     emit("onShellData", { shellId, data: "AA==" });
     expect(onData).toHaveBeenCalledTimes(1);
+  });
+
+  it("passes the pipe id and reports when piped output starts", async () => {
+    const { s } = await session();
+    const onActive = jest.fn();
+    await s.openShell(
+      { cols: 80, rows: 24, pipeId: "tab-1" },
+      { onData: jest.fn(), onActive },
+    );
+    const call = mockNative.openShell.mock.calls.at(-1)!;
+    expect(call[6]).toBe("tab-1");
+    emit("onShellActive", { shellId: "other" });
+    emit("onShellActive", { shellId: call[1] });
+    expect(onActive).toHaveBeenCalledTimes(1);
   });
 
   it("runs exec with limits and cancel", async () => {

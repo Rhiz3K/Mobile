@@ -2838,7 +2838,14 @@ public protocol ShellProtocol: AnyObject, Sendable {
     
     func end() async throws 
     
+    /**
+     * Stops reading output until `resume`. The server stops once the channel window is full.
+     */
+    func pause() 
+    
     func resize(cols: UInt32, rows: UInt32) async throws 
+    
+    func resume() 
     
     /**
      * Like `INT` or `TERM`. Many servers ignore signals; Ctrl+C as input always works.
@@ -2917,6 +2924,17 @@ open func end()async throws   {
         )
 }
     
+    /**
+     * Stops reading output until `resume`. The server stops once the channel window is full.
+     */
+open func pause()  {try! rustCall() {
+        uniffiCallStatus in
+    uniffi_termix_ssh_core_fn_method_shell_pause(
+            self.uniffiCloneHandle(),uniffiCallStatus
+    )
+}
+}
+    
 open func resize(cols: UInt32, rows: UInt32)async throws   {
     return
         try  await uniffiRustCallAsync(
@@ -2931,6 +2949,14 @@ open func resize(cols: UInt32, rows: UInt32)async throws   {
             liftFunc: { $0 },
             errorHandler: FfiConverterTypeSshError_lift
         )
+}
+    
+open func resume()  {try! rustCall() {
+        uniffiCallStatus in
+    uniffi_termix_ssh_core_fn_method_shell_resume(
+            self.uniffiCloneHandle(),uniffiCallStatus
+    )
+}
 }
     
     /**
@@ -5368,7 +5394,13 @@ private let initializationResult: InitializationResult = {
     if (uniffi_termix_ssh_core_checksum_method_shell_end() != 21084) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_termix_ssh_core_checksum_method_shell_pause() != 23782) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_termix_ssh_core_checksum_method_shell_resize() != 30553) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_shell_resume() != 54501) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_termix_ssh_core_checksum_method_shell_signal() != 34912) {

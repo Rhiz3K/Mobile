@@ -176,7 +176,10 @@ export function inspectCertificate(text: string): SshCertInfo {
 }
 
 export interface ShellHandlers {
+  /** Output bytes. With a `pipeId` they go to the terminal view instead, and this gets nothing. */
   onData(data: Uint8Array): void;
+  /** First output of a piped shell. */
+  onActive?(): void;
   onExit?(exitCode: number | null, exitSignal: string | null): void;
 }
 
@@ -190,6 +193,9 @@ export class SshShell {
     this.subs.push(
       on("onShellData", (e) => {
         if (e.shellId === id) handlers.onData(fromBase64(e.data));
+      }),
+      on("onShellActive", (e) => {
+        if (e.shellId === id) handlers.onActive?.();
       }),
       on("onShellExit", (e) => {
         if (e.shellId !== id) return;
@@ -297,6 +303,8 @@ export interface ShellOptions {
   cols: number;
   rows: number;
   env?: Record<string, string>;
+  /** Sends output natively to the terminal view registered on this pipe, with back pressure. */
+  pipeId?: string;
 }
 
 export interface ExecOptions {
@@ -575,6 +583,7 @@ export class SshSession {
           options.cols,
           options.rows,
           options.env ?? {},
+          options.pipeId ?? null,
         ),
       );
     } catch (err) {
