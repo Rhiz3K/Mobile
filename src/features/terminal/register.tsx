@@ -12,6 +12,8 @@ import { Terminal, type TerminalHandle } from "./Terminal";
 import HistoryBar from "./history/HistoryBar";
 import { hostTerminalEditor } from "./HostTerminalTab";
 import { HostKeyRowsView } from "./keys/HostKeyRowsView";
+import KeyRowBar from "./keys/KeyRowBar";
+import BottomToolbar from "./keyboard/BottomToolbar";
 
 const TerminalTab = forwardRef<TerminalHandle, SessionTabProps>(
   (
@@ -68,6 +70,7 @@ export const terminalFeature: FeatureDef = {
       toServerTabType: () => "terminal",
       capabilities: ["terminal-input"],
       component: TerminalTab,
+      inputChrome: { keyRow: KeyRowBar, keyPanel: BottomToolbar },
     },
   ],
   hostActions: [

@@ -105,6 +105,34 @@ export interface SessionTabDef {
   needs?: TransportCapability[];
   // Each tab has its own handle type, so the ref stays loose here.
   component: ComponentType<SessionTabProps & { ref?: Ref<any> }>;
+  /** The key row and keys panel of a `terminal-input` tab. */
+  inputChrome?: {
+    keyRow: ComponentType<SessionKeyRowProps>;
+    keyPanel: ComponentType<SessionKeyPanelProps>;
+  };
+}
+
+/** The key row above the keyboard, as the session screen places it. */
+export interface SessionKeyRowProps {
+  terminalRef: RefObject<TerminalInputHandle | null>;
+  host?: SSHHost | null;
+  isVisible: boolean;
+  isKeyboardIntentionallyHidden?: boolean;
+  bottomInset?: number;
+  /** Key row commands the screen handles, like opening a panel tab. */
+  onCommand?: (id: string) => void;
+}
+
+/** The keys panel that stands in for the keyboard. */
+export interface SessionKeyPanelProps {
+  terminalRef: RefObject<TerminalInputHandle | null>;
+  isVisible: boolean;
+  keyboardHeight: number;
+  isKeyboardIntentionallyHidden?: boolean;
+  initialTab?: string;
+  hostId?: number;
+  host?: SSHHost;
+  onCommand?: (id: string) => void;
 }
 
 // Hosts

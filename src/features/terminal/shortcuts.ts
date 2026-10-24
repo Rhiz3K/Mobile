@@ -23,12 +23,6 @@ export const TERMINAL_SHORTCUTS = new Set<string>([
   "fontReset",
 ]);
 
-/** The tab number of a "tab3" shortcut, or null. */
-export function tabNumber(id: string): number | null {
-  const match = /^tab([1-9])$/.exec(id);
-  return match ? Number(match[1]) : null;
-}
-
 /** For the help list, per platform. */
 export function shortcutHelp(
   os: string = Platform.OS,

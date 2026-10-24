@@ -138,3 +138,10 @@ test("terminal tabs get find, tmux, key rows, and a share link through the serve
       .map((i) => i.id),
   ).toEqual(["terminal.tmuxWindows", "terminal.keyRows"]);
 });
+
+test("the terminal tab brings its own key row and keys panel", () => {
+  const chrome = registry().sessionTab("terminal")?.inputChrome;
+  expect(chrome?.keyRow).toBeDefined();
+  expect(chrome?.keyPanel).toBeDefined();
+  expect(registry().sessionTab("docker")?.inputChrome).toBeUndefined();
+});

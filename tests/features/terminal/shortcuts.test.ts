@@ -2,8 +2,8 @@ import {
   TERMINAL_SHORTCUTS,
   nextFontSize,
   shortcutHelp,
-  tabNumber,
 } from "@/features/terminal/shortcuts";
+import { tabNumber } from "@/contexts/session-tabs";
 
 test("tab shortcuts carry their number", () => {
   expect(tabNumber("tab1")).toBe(1);

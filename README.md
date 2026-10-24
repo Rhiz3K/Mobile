@@ -34,7 +34,7 @@ Try Termix at [demo.termix.site](https://demo.termix.site/). Any username and pa
 
 ## Features
 
-- SSH terminal: several sessions in tabs, a custom terminal keyboard with a layout you can change, snippets, a history bar, hardware keyboards, dictation and VoiceOver. Sessions stay alive in the background.
+- SSH terminal: several sessions in tabs you can rename, drag and swipe between, key rows with a tmux row that you can change per host, snippets with variables, history with search and suggestions, find, sudo password fill, tmux attach, share links, hardware keyboard shortcuts, dictation and VoiceOver. Sessions stay alive in the background.
 - File manager: browse, edit, move, compress and download files over SSH. Pin files, add folder shortcuts and restore from trash.
 - Host metrics: CPU, memory, disk, network, uptime, processes, ports, firewall rules and login history, plus server alerts on the hosts screen.
 - SSH tunnels: create, start and stop tunnels, set up per host in the host editor.

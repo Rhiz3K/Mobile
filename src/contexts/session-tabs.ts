@@ -36,3 +36,9 @@ export function neighborTab<T extends { id: string }>(
   const next = (Math.max(0, at) + step + tabs.length) % tabs.length;
   return tabs[next];
 }
+
+/** The tab number of a "tab3" keyboard shortcut, or null. */
+export function tabNumber(id: string): number | null {
+  const match = /^tab([1-9])$/.exec(id);
+  return match ? Number(match[1]) : null;
+}

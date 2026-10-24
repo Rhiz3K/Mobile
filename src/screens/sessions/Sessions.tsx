@@ -28,14 +28,11 @@ import { Text } from "@/ui";
 import TabBar from "@/screens/sessions/navigation/TabBar";
 import { SessionMenu } from "@/screens/sessions/SessionMenu";
 import { TabSwipeEdge } from "@/screens/sessions/TabSwipeEdge";
-import { neighborTab } from "@/contexts/session-tabs";
-import { tabNumber } from "@/features/terminal/shortcuts";
+import { neighborTab, tabNumber } from "@/contexts/session-tabs";
 import type {
   SessionMenuContext,
   SessionMenuItemDef,
 } from "@/core/features/types";
-import BottomToolbar from "@/features/terminal/keyboard/BottomToolbar";
-import KeyRowBar from "@/features/terminal/keys/KeyRowBar";
 import { useOrientation } from "@/utils/orientation";
 import { getMaxKeyboardHeight, getTabBarHeight } from "@/utils/responsive";
 import {
@@ -144,6 +141,12 @@ export default function Sessions() {
     activeSession?.type,
     "terminal-input",
   );
+  // The active tab's own key row and keys panel.
+  const chrome = activeSession
+    ? features.sessionTab(activeSession.type)?.inputChrome
+    : undefined;
+  const KeyRowBar = chrome?.keyRow;
+  const BottomToolbar = chrome?.keyPanel;
 
   const getActiveTerminalRef = useCallback(() => {
     return activeSessionId ? tabRefs.current[activeSessionId] : null;
@@ -740,45 +743,48 @@ export default function Sessions() {
         </View>
       )}
 
-      {sessions.length > 0 && activeIsTerminal && !isCustomKeyboardVisible && (
-        <View
-          style={{
-            position: "absolute",
-            bottom: keyboardIntentionallyHiddenRef.current
-              ? 0
-              : isKeyboardVisible && currentKeyboardHeight > 0
-                ? currentKeyboardHeight + (isLandscape && !isIPad ? 4 : 0)
-                : 0,
-            left: 0,
-            right: 0,
-            height: keyboardIntentionallyHiddenRef.current
-              ? KEYBOARD_BAR_HEIGHT_EXTENDED
-              : KEYBOARD_BAR_HEIGHT,
-            zIndex: 1003,
-            overflow: "visible",
-            justifyContent: "center",
-          }}
-        >
-          <SessionAccountProvider
-            accountId={activeSession?.accountId ?? LOCAL_ACCOUNT_ID}
+      {sessions.length > 0 &&
+        activeIsTerminal &&
+        KeyRowBar &&
+        !isCustomKeyboardVisible && (
+          <View
+            style={{
+              position: "absolute",
+              bottom: keyboardIntentionallyHiddenRef.current
+                ? 0
+                : isKeyboardVisible && currentKeyboardHeight > 0
+                  ? currentKeyboardHeight + (isLandscape && !isIPad ? 4 : 0)
+                  : 0,
+              left: 0,
+              right: 0,
+              height: keyboardIntentionallyHiddenRef.current
+                ? KEYBOARD_BAR_HEIGHT_EXTENDED
+                : KEYBOARD_BAR_HEIGHT,
+              zIndex: 1003,
+              overflow: "visible",
+              justifyContent: "center",
+            }}
           >
-            <KeyRowBar
-              terminalRef={
-                activeSessionId
-                  ? tabRefs.current[activeSessionId]
-                  : React.createRef<TerminalHandle>()
-              }
-              host={activeSession?.host}
-              isVisible={true}
-              isKeyboardIntentionallyHidden={
-                keyboardIntentionallyHiddenRef.current
-              }
-              bottomInset={KEYBOARD_BAR_BOTTOM_INSET}
-              onCommand={handleKeyCommand}
-            />
-          </SessionAccountProvider>
-        </View>
-      )}
+            <SessionAccountProvider
+              accountId={activeSession?.accountId ?? LOCAL_ACCOUNT_ID}
+            >
+              <KeyRowBar
+                terminalRef={
+                  activeSessionId
+                    ? tabRefs.current[activeSessionId]
+                    : React.createRef<TerminalHandle>()
+                }
+                host={activeSession?.host}
+                isVisible={true}
+                isKeyboardIntentionallyHidden={
+                  keyboardIntentionallyHiddenRef.current
+                }
+                bottomInset={KEYBOARD_BAR_BOTTOM_INSET}
+                onCommand={handleKeyCommand}
+              />
+            </SessionAccountProvider>
+          </View>
+        )}
 
       {sessions.length > 0 &&
         features.sessionHas(activeSession?.type, "keyboard-cover") &&
@@ -834,38 +840,41 @@ export default function Sessions() {
         />
       </View>
 
-      {activeSession && isCustomKeyboardVisible && activeIsTerminal && (
-        <View
-          pointerEvents="box-none"
-          style={{
-            position: "absolute",
-            bottom: 0,
-            left: 0,
-            right: 0,
-            zIndex: 1002,
-            backgroundColor: ui.background,
-          }}
-        >
-          <SessionAccountProvider accountId={activeSession.accountId}>
-            <BottomToolbar
-              terminalRef={
-                activeSessionId
-                  ? tabRefs.current[activeSessionId]
-                  : React.createRef<TerminalHandle>()
-              }
-              isVisible={isCustomKeyboardVisible}
-              keyboardHeight={customKeyboardHeight}
-              isKeyboardIntentionallyHidden={
-                keyboardIntentionallyHiddenRef.current
-              }
-              initialTab={customKeyboardInitialTab}
-              hostId={activeSession?.host?.id}
-              host={activeSession?.host}
-              onCommand={handleKeyCommand}
-            />
-          </SessionAccountProvider>
-        </View>
-      )}
+      {activeSession &&
+        BottomToolbar &&
+        isCustomKeyboardVisible &&
+        activeIsTerminal && (
+          <View
+            pointerEvents="box-none"
+            style={{
+              position: "absolute",
+              bottom: 0,
+              left: 0,
+              right: 0,
+              zIndex: 1002,
+              backgroundColor: ui.background,
+            }}
+          >
+            <SessionAccountProvider accountId={activeSession.accountId}>
+              <BottomToolbar
+                terminalRef={
+                  activeSessionId
+                    ? tabRefs.current[activeSessionId]
+                    : React.createRef<TerminalHandle>()
+                }
+                isVisible={isCustomKeyboardVisible}
+                keyboardHeight={customKeyboardHeight}
+                isKeyboardIntentionallyHidden={
+                  keyboardIntentionallyHiddenRef.current
+                }
+                initialTab={customKeyboardInitialTab}
+                hostId={activeSession?.host?.id}
+                host={activeSession?.host}
+                onCommand={handleKeyCommand}
+              />
+            </SessionAccountProvider>
+          </View>
+        )}
 
       <SessionMenu
         session={sessions.find((s) => s.id === menuFor) ?? null}
