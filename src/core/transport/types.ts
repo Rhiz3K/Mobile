@@ -1,5 +1,8 @@
 import type {
+  DisplayConfig,
+  DisplayHandlers,
   ExecOptions,
+  RemoteDisplay,
   SshExecResult,
   SshSession,
   SshSftp,
@@ -198,4 +201,23 @@ export interface Transport {
     host: TerminalHostConfig,
     options?: { signal?: AbortSignal },
   ): Promise<HostSession>;
+  /**
+   * A VNC or RDP session the phone opens itself, through the host's jump
+   * hosts and proxies. Only the local transport has it.
+   */
+  openDisplay?(
+    host: TerminalHostConfig,
+    config: DisplayTarget,
+    handlers: DisplayHandlers,
+    options?: { signal?: AbortSignal },
+  ): Promise<LocalDisplay>;
+}
+
+/** What to open: the protocol, login and size. Address and proxies come from the host. */
+export type DisplayTarget = Omit<DisplayConfig, "host" | "proxies">;
+
+export interface LocalDisplay {
+  display: RemoteDisplay;
+  /** Stops the session and logs out of the jump hosts. */
+  close(): void;
 }

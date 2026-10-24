@@ -117,6 +117,9 @@ test("This device gets the features that run on the phone, and no server only on
     "service-manager",
     "tunnels",
     "host-metrics",
+    "remote-desktop",
+    "remote-desktop.rdp",
+    "remote-desktop.vnc",
     "remote-desktop.telnet",
     "snippets",
     "host-defaults",
@@ -126,8 +129,8 @@ test("This device gets the features that run on the phone, and no server only on
   expect(r.canOpen("terminal", {}, ctx)).toBe(true);
   expect(r.canOpen("filemanager", {}, ctx)).toBe(true);
   expect(r.canOpen("docker", {}, ctx)).toBe(true);
-  expect(r.canOpen("remoteDesktop", {}, ctx)).toBe(false);
-  // The phone dials Telnet itself.
+  // The phone dials RDP, VNC and Telnet itself.
+  expect(r.canOpen("remoteDesktop", { remoteProtocol: "rdp" }, ctx)).toBe(true);
   expect(r.canOpen("telnet", {}, ctx)).toBe(true);
 });
 

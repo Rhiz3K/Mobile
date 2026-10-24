@@ -9,12 +9,6 @@ test("lab links become routes with their query", () => {
   );
 });
 
-test("the display lab opens the same way", () => {
-  expect(labRouteFromUrl("termix-mobile://dev/display-lab")).toBe(
-    "/dev/display-lab",
-  );
-});
-
 test("anything else is ignored", () => {
   expect(labRouteFromUrl(null)).toBeNull();
   expect(labRouteFromUrl("")).toBeNull();

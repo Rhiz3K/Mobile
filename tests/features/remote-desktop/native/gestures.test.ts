@@ -7,7 +7,7 @@ import {
   WHEEL_DOWN,
   WHEEL_UP,
   type GestureAction,
-} from "@/screens/dev/display-lab/gestures";
+} from "@/features/remote-desktop/native/gestures";
 import type { Viewport } from "@/features/remote-desktop/viewport";
 
 // A 1000x500 view showing a 2000x1000 desktop: half size, so view (x, y) is remote (2x, 2y).

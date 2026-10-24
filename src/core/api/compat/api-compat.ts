@@ -146,6 +146,7 @@ export function flattenPluginSettings<T extends Record<string, any>>(
     set("rdpPort", rd.rdpPort ?? 3389);
     set("vncPort", rd.vncPort ?? 5900);
     set("telnetPort", rd.telnetPort ?? 23);
+    if (typeof rd.rdpSecurity === "string") set("rdpSecurity", rd.rdpSecurity);
     if (rd.guacamoleConfig !== undefined) {
       set("guacamoleConfig", rd.guacamoleConfig);
     }

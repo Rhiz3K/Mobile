@@ -1,4 +1,7 @@
-import { keysymFor, keysymForChar } from "@/screens/dev/display-lab/keys";
+import {
+  keysymFor,
+  keysymForChar,
+} from "@/features/remote-desktop/native/keys";
 
 test("android keys map by name, then by the typed character", () => {
   expect(keysymFor({ key: "ENTER", char: 13, down: true })).toBe(0xff0d);

@@ -9,4 +9,5 @@ rectangle into a frame by id, and the view shows it, so pixels never cross the J
 - `TermixDisplayView` (JS): `frameId`, `scale`, `offsetX`, `offsetY` place the desktop; zoom and pan
   math lives in `src/features/remote-desktop/viewport.ts`. `onKey` reports hardware keys.
 
-This is the D5 prototype; only the dev display lab uses it. Kotlin tests are in `android/src/test`.
+The remote desktop tab draws the phone's own VNC and RDP sessions with it
+(`src/features/remote-desktop/native/NativeRemoteDesktop.tsx`). Kotlin tests are in `android/src/test`.

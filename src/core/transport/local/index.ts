@@ -2,12 +2,13 @@ import { LOCAL_ACCOUNT_ID } from "@/core/accounts/types";
 import { repositoriesFor } from "@/core/data/repositories";
 import type { HostConnectRepository } from "@/core/data/types";
 import { AppError } from "@/core/errors";
-import { isSshEngineAvailable } from "@/modules/termix-ssh";
+import { isSshEngineAvailable, openDisplay } from "@/modules/termix-ssh";
 import type { HostSession, Transport } from "../types";
-import { closeAll, openChain } from "./chain";
+import { closeAll, openChain, openJumps } from "./chain";
 import { autoAnswer } from "./kbd";
 import { LocalShell } from "./LocalShell";
 import { LocalTelnetShell } from "./LocalTelnetShell";
+import { proxiesOf } from "./resolve";
 
 export const NO_ENGINE =
   "This build has no SSH engine. Use the app from the store, or link a Termix server to connect.";
@@ -60,6 +61,45 @@ export function createLocalTransport(
         ssh: target,
         close: async () => closeAll([...chain.hops, target]),
       };
+    },
+    async openDisplay(host, target, handlers, options = {}) {
+      if (reason()) throw refuse();
+      const store = repo();
+      const profile =
+        host.id > 0 && store ? await store.profile(host.id) : null;
+      const hops = await openJumps(
+        store,
+        host,
+        (host.jumpHosts ?? []).map((j) => j.hostId),
+        {
+          askHostKey: null,
+          askKbd: async (req, login) => autoAnswer(req.prompts, login.password),
+          signal: options.signal,
+        },
+      );
+      try {
+        const display = await openDisplay(
+          { ...target, host: host.ip, proxies: proxiesOf(profile?.socks5) },
+          {
+            ...handlers,
+            onClosed: (reason) => {
+              closeAll(hops);
+              handlers.onClosed?.(reason);
+            },
+          },
+          hops[hops.length - 1],
+        );
+        return {
+          display,
+          close: () => {
+            display.close();
+            closeAll(hops);
+          },
+        };
+      } catch (err) {
+        closeAll(hops);
+        throw err;
+      }
     },
   };
 }

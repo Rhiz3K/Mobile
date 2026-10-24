@@ -3,7 +3,7 @@ import {
   Monitor,
   MousePointerClick,
 } from "lucide-react-native";
-import { forwardRef } from "react";
+import { forwardRef, useMemo } from "react";
 import { checkOpen } from "@/core/features/open-check";
 import type {
   FeatureDef,
@@ -14,8 +14,12 @@ import type {
 import { Terminal, type TerminalHandle } from "@/features/terminal/Terminal";
 import KeyRowBar from "@/features/terminal/keys/KeyRowBar";
 import BottomToolbar from "@/features/terminal/keyboard/BottomToolbar";
+import { displayProtocols } from "@/modules/termix-ssh";
+import { ConnectionError } from "@/screens/sessions/shared/ConnectionError";
 import type { SSHHost } from "@/types";
 import { isSshHost, toTerminalHostConfig } from "@/utils/hosts";
+import { NativeRemoteDesktop } from "./native/NativeRemoteDesktop";
+import { useRemoteRoute } from "./route";
 import { RemoteDesktop, type RemoteDesktopProtocol } from "./RemoteDesktop";
 import { REMOTE_DESKTOP_TAB, TELNET_TAB, telnetTabFor } from "./telnet";
 
@@ -28,22 +32,72 @@ function asProtocol(value?: string): RemoteDesktopProtocol {
     : "rdp";
 }
 
+/** Opens on the phone when it can dial the protocol, else through the server. */
 function RemoteDesktopTab({
   session,
   isVisible,
   onClose,
   onStatus,
 }: SessionTabProps) {
-  return (
-    <RemoteDesktop
-      host={session.host}
-      isVisible={isVisible}
-      title={session.title}
-      protocol={asProtocol(session.remoteProtocol)}
-      onClose={onClose}
-      onStatus={onStatus}
-    />
+  const protocol = asProtocol(session.remoteProtocol);
+  const native = useMemo(() => displayProtocols(), []);
+  const { route, switchTo } = useRemoteRoute(
+    session.host,
+    protocol,
+    native,
+    session.origin,
   );
+  switch (route.via) {
+    case "checking":
+      return null;
+    case "blocked":
+      return (
+        <ConnectionError
+          failure={{ stage: "unavailable", message: route.reason, hint: "" }}
+          switchTo={route.fix}
+          onSwitch={(o) => switchTo(o, true)}
+          onClose={onClose}
+        />
+      );
+    case "server":
+      return (
+        <RemoteDesktop
+          host={route.host}
+          isVisible={isVisible}
+          title={session.title}
+          protocol={protocol}
+          onClose={onClose}
+          onStatus={onStatus}
+        />
+      );
+    case "device":
+      // A server Telnet tab reopened on a phone that can dial it.
+      if (protocol === "telnet") {
+        return (
+          <Terminal
+            host={session.host}
+            hostConfig={toTerminalHostConfig(session.host)}
+            type={TELNET_TAB}
+            protocol="telnet"
+            isVisible={isVisible}
+            title={session.title}
+            onClose={onClose}
+            onStatus={onStatus}
+          />
+        );
+      }
+      return (
+        <NativeRemoteDesktop
+          host={session.host}
+          protocol={protocol}
+          transport={route.transport}
+          isVisible={isVisible}
+          title={session.title}
+          onStatus={onStatus}
+          onUseServer={route.serverToo ? () => switchTo("server") : undefined}
+        />
+      );
+  }
 }
 
 /** Telnet the phone opens itself, in the native terminal. */
@@ -85,12 +139,15 @@ const TelnetTab = forwardRef<TerminalHandle, SessionTabProps>(
 );
 TelnetTab.displayName = "TelnetTab";
 
-/** The tab all three protocols open through the server. */
+/**
+ * The tab RDP and VNC open, and Telnet through the server. The phone dials RDP
+ * and VNC itself, so it works with no server and on servers without the plugin.
+ */
 export const remoteDesktopFeature: FeatureDef = {
   id: "remote-desktop",
   title: "Remote Desktop",
   source: "native",
-  requires: { plugin: PLUGIN },
+  availableOn: ["local", "server"],
   sessionTabs: [
     {
       type: REMOTE_DESKTOP_TAB,
@@ -98,14 +155,12 @@ export const remoteDesktopFeature: FeatureDef = {
       titleSuffix: (s) =>
         s.remoteProtocol ? s.remoteProtocol.toUpperCase() : "Remote",
       shortLabel: (s) => SHORT[asProtocol(s.remoteProtocol)],
-      needs: ["guacd"],
+      needsOneOf: [["tcp"], ["guacd"]],
+      dialsDirectly: true,
+      relayRequires: { plugin: PLUGIN },
       serverTabTypes: PROTOCOLS,
       toServerTabType: (s) => asProtocol(s.remoteProtocol),
       fromServerTabType: (tabType) => ({ remoteProtocol: tabType }),
-      requires: (s) => ({
-        plugin: PLUGIN,
-        protocol: asProtocol(s.remoteProtocol),
-      }),
       capabilities: ["own-keyboard"],
       component: RemoteDesktopTab,
     },
@@ -181,6 +236,12 @@ function protocolFeature(
   };
 }
 
+// The phone dials these itself, so they need no server plugin.
+const PHONE_TOO: Partial<FeatureDef> = {
+  requires: undefined,
+  availableOn: ["local", "server"],
+};
+
 export const rdpFeature = protocolFeature("rdp", {
   label: "RDP",
   badge: "RDP",
@@ -189,6 +250,7 @@ export const rdpFeature = protocolFeature("rdp", {
   order: 0,
   enabled: (host) => !!host.enableRdp,
   toggleKey: "enableRdp",
+  extra: PHONE_TOO,
 });
 
 export const vncFeature = protocolFeature("vnc", {
@@ -198,6 +260,7 @@ export const vncFeature = protocolFeature("vnc", {
   order: 1,
   enabled: (host) => !!host.enableVnc,
   toggleKey: "enableVnc",
+  extra: PHONE_TOO,
 });
 
 // The phone dials Telnet itself, so it works with no server and on servers
@@ -223,8 +286,7 @@ export const telnetFeature = protocolFeature("telnet", {
     );
   },
   extra: {
-    requires: undefined,
-    availableOn: ["local", "server"],
+    ...PHONE_TOO,
     sessionTabs: [
       {
         type: TELNET_TAB,

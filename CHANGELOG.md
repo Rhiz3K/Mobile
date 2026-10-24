@@ -104,6 +104,8 @@
 - Share a host as a QR code or link and scan one from another phone
 - Quick Connect reads user@host:port and can save the host
 - Telnet hosts connect straight from the phone, with no Termix server needed, and open in the terminal with its key rows and find
+- RDP and VNC hosts connect straight from the phone, with no Termix server needed, through jump hosts and proxies too. Touch and trackpad modes, held mouse buttons, pinch zoom, two finger scroll, hardware keyboards and clipboard paste work, and RDP follows the screen when you rotate. The server's remote desktop view is still used when the host connects through the server
+- A refused RDP or VNC login from the phone asks for the login again right away
 
 ### Changed
 

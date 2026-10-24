@@ -51,7 +51,8 @@ feature (`telnet`, `vnc`, `rdp`, all on by default), so one can be left out to s
     with TLS on rustls and NLA through NTLM. It runs on its own thread because IronRDP's futures are not
     all `Send`. Kerberos, RD Gateway, clipboard, audio and drives are not in yet.
 
-VNC and RDP on the phone are a prototype: only the dev display lab opens them.
+The remote desktop tab uses these when the phone can reach the host, and the server's Guacamole view
+otherwise (`src/features/remote-desktop/native`).
 
 Size: the arm64 Android library went from 3.4 MB (0.3.0) to 8.1 MB (0.4.0). Telnet and VNC add about
 0.2 MB of that; RDP is the rest. A Windows build with the same profile shows the same split (4.0 MB

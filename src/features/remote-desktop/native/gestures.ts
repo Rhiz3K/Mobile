@@ -1,5 +1,5 @@
-// Touch to mouse for a remote desktop (D5 input design). Pure, so it can be
-// tested without a phone; the lab feeds it touches and sends what it returns.
+// Touch to mouse for a remote desktop. Pure, so it can be
+// tested without a phone; the tab feeds it touches and sends what it returns.
 import {
   clampPan,
   fitScale,

@@ -26,10 +26,39 @@ test("a This device host opens a terminal from the phone", async () => {
 });
 
 test("server features on a This device host say what they need", async () => {
-  const check = await checkOpen("local", { id: 1 }, true, "remoteDesktop");
-  expect(check.attempts).toEqual([]);
-  expect(check.blocked?.reason).toMatch(/needs a Termix server/);
-  expect(check.blocked?.fix).toBeUndefined();
+  // No built in tab needs a server alone any more, so a plugin like one.
+  const off = features.register({
+    id: "test-server-only",
+    title: "Server thing",
+    source: "native",
+    availableOn: ["local", "server"],
+    sessionTabs: [
+      {
+        type: "serverThing",
+        icon: (() => null) as never,
+        titleSuffix: () => "",
+        shortLabel: () => "",
+        needs: ["server"],
+        serverTabTypes: [],
+        toServerTabType: () => "serverThing",
+        component: () => null,
+      },
+    ],
+  });
+  try {
+    const check = await checkOpen("local", { id: 1 }, true, "serverThing");
+    expect(check.attempts).toEqual([]);
+    expect(check.blocked?.reason).toMatch(/needs a Termix server/);
+    expect(check.blocked?.fix).toBeUndefined();
+  } finally {
+    off();
+  }
+});
+
+test("RDP and VNC on a This device host open from the phone, even with SSH off", async () => {
+  const check = await checkOpen("local", { id: 1 }, false, "remoteDesktop");
+  expect(check.blocked).toBeUndefined();
+  expect(check.attempts.map((t) => t.kind)).toEqual(["local"]);
 });
 
 test("docker on a This device host runs over the phone's SSH", async () => {
@@ -64,9 +93,6 @@ test("a This device telnet host opens from the phone, even with SSH off", async 
   const check = await checkOpen("local", { id: 1 }, false, "telnet");
   expect(check.blocked).toBeUndefined();
   expect(check.attempts.map((t) => t.kind)).toEqual(["local"]);
-  // RDP and VNC still need a server.
-  const rdp = await checkOpen("local", { id: 1 }, false, "remoteDesktop");
-  expect(rdp.attempts).toEqual([]);
 });
 
 test("telnet in the terminal keeps only the phone's way", () => {

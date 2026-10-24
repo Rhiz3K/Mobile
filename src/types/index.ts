@@ -94,6 +94,8 @@ export interface SSHHost {
   telnetUser?: string;
   telnetPassword?: string;
   telnetPort?: number;
+  /** The remote desktop plugin's RDP security: any, nla, tls. Empty means any. */
+  rdpSecurity?: string;
   dockerConfig?: string;
   macAddress?: string;
 
