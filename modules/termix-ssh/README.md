@@ -31,7 +31,8 @@ The phone's own SSH and SFTP engine. A Rust core on [russh](https://github.com/w
 - Key tools for the login editor: `inspectKey`, `convertKeyToOpenssh` and `inspectCertificate`
 - Core's algorithm list, plus a legacy set (ssh-rsa, sha1 key exchange, 3des, hmac-sha1) behind
   `allowLegacyAlgorithms` (on by default, like core). Not supported: `sntrup761x25519-sha512`. Agent
-  auth and browser sign-ins (OPKSSH, Step CA, Vault) need a Termix server
+  auth, `op://` references and browser sign-ins (OPKSSH, Step CA, Vault) need a Termix server;
+  the app names the product when a host uses one
 
 ## Telnet and remote desktops
 

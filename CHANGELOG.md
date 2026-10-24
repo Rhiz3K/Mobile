@@ -19,6 +19,10 @@
 - See gateways from the Tunnels plugin, read only
 - Add hosts from your Tailscale device list when the Tailscale plugin is on
 - Answer the Tailscale SSH check from the terminal
+- Sign in to hosts with OPKSSH, Step CA or Vault through a linked server, in your browser
+- Hosts that need a Termix server to sign in say which product it is when you are on This device
+- Wake a host from the phone with Wake-on-LAN, also on This device with no server
+- See if hosts are online from the phone when no server reports it
 - Themed app icon on Android 13 and newer
 - Link more than one Termix server and switch between them from Settings or the Hosts screen
 - Open tabs keep running when you switch to another server
