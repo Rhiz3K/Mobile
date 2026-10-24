@@ -152,6 +152,12 @@ export const XtermSurface = forwardRef<
     copySelection: () => run("window.lab.copy()"),
     focus: () => run("window.lab.focus()"),
     blur: () => run("window.lab.blur()"),
+    // The xterm baseline only takes raw input, so key row calls are not compared.
+    selectAll: () => {},
+    toggleModifier: () => {},
+    sendKey: () => {},
+    typeText: () => {},
+    answerClipboard: () => {},
     getStats: () =>
       new Promise<EngineStats | null>((resolve) => {
         if (!ready.current) return resolve(null);

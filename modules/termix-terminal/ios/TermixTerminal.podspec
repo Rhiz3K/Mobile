@@ -18,6 +18,7 @@ Pod::Spec.new do |s|
 
   s.dependency 'ExpoModulesCore'
   s.dependency 'GhosttyTerminal'
+  s.dependency 'TermixPipe'
 
   # Swift/Objective-C compatibility
   s.pod_target_xcconfig = {

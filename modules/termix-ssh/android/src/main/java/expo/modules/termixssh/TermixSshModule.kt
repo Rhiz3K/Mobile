@@ -353,6 +353,7 @@ class TermixSshModule : Module() {
             // With a pipe the bytes go straight to the terminal view; JS only hears that output started.
             val pipe = pipeId?.let { TermixPipes.get(it) }
             var announced = false
+            var producer: PipeProducer? = null
             val shell = ssh {
                 live(id).session.openShell(
                     term, cols.toUInt(), rows.toUInt(), env.map { EnvVar(it.key, it.value) },
@@ -371,7 +372,7 @@ class TermixSshModule : Module() {
                         override fun onExit(exitCode: UInt?, exitSignal: String?) {
                             shells.remove(shellId)?.value?.destroy()
                             if (pipe != null && pipeId != null) {
-                                pipe.setProducer(null)
+                                producer?.let { pipe.detachProducer(it) }
                                 TermixPipes.release(pipeId)
                             }
                             sendEvent("onShellExit", mapOf("shellId" to shellId, "exitCode" to exitCode?.toInt(), "exitSignal" to exitSignal))
@@ -380,10 +381,14 @@ class TermixSshModule : Module() {
                 )
             }
             shells[shellId] = Owned(id, shell)
-            pipe?.setProducer(object : PipeProducer {
-                override fun pause() = shell.pause()
-                override fun resume() = shell.resume()
-            })
+            if (pipe != null) {
+                val p = object : PipeProducer {
+                    override fun pause() = shell.pause()
+                    override fun resume() = shell.resume()
+                }
+                producer = p
+                pipe.setProducer(p)
+            }
         }
 
         AsyncFunction("writeShell") Coroutine { shellId: String, data: String ->

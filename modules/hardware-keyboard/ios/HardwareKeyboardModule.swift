@@ -5,11 +5,17 @@ public class HardwareKeyboardModule: Module {
   private static var swizzled = false
   private static var instances: [ObjectIdentifier: HardwareKeyboardModule] = [:]
   private static var lastEmit: (input: String, shift: Bool, ctrl: Bool, alt: Bool, time: TimeInterval)?
+  // Only the xterm fallback needs keys taken from the whole app; the native terminal reads its own.
+  static var enabled = false
 
   public func definition() -> ModuleDefinition {
     Name("HardwareKeyboard")
 
     Events("onKeyCommand")
+
+    Function("setEnabled") { (value: Bool) in
+      HardwareKeyboardModule.enabled = value
+    }
 
     OnCreate {
       // Register immediately on creation, not waiting for a listener
@@ -75,6 +81,10 @@ public class HardwareKeyboardModule: Module {
 
 extension UIResponder {
   @objc func hk_pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+    guard HardwareKeyboardModule.enabled else {
+      hk_pressesBegan(presses, with: event)
+      return
+    }
     let handled = presses.contains { press in
       guard let key = press.key else { return false }
 
@@ -180,6 +190,7 @@ extension UIResponder {
 
 extension UIViewController {
   @objc func hk_keyCommands() -> [UIKeyCommand]? {
+    guard HardwareKeyboardModule.enabled else { return hk_keyCommands() }
     var commands = self.hk_keyCommands() ?? []
 
     // Shift+Tab

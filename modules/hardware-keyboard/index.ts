@@ -13,6 +13,7 @@ interface HardwareKeyboardModule {
     eventName: "onKeyCommand",
     listener: (event: KeyCommandEvent) => void,
   ): EventSubscription;
+  setEnabled?(enabled: boolean): void;
 }
 
 const HardwareKeyboard =
@@ -23,4 +24,12 @@ export function addKeyCommandListener(
 ): EventSubscription | null {
   if (!HardwareKeyboard) return null;
   return HardwareKeyboard.addListener("onKeyCommand", listener);
+}
+
+/**
+ * Takes Tab, arrows and Ctrl keys from the whole app for the xterm fallback.
+ * The native terminal reads the keyboard itself, so it stays off there.
+ */
+export function setHardwareKeyboardEnabled(enabled: boolean): void {
+  HardwareKeyboard?.setEnabled?.(enabled);
 }

@@ -2,9 +2,10 @@
  * TermixTerminal - the native terminal view, on libghostty.
  *
  * iOS renders with Metal through libghostty-spm; Android draws on a Canvas
- * over libghostty-vt. The view only parses and draws: pty output comes in
- * through write, typed bytes go out through onInput, so any transport works.
- * Binary data is base64 on the bridge.
+ * over libghostty-vt. The view parses and draws, handles the keyboard, IME,
+ * selection, links and the clipboard. Pty output comes from a native pipe
+ * (`pipeId`, the local SSH engine) or from write; typed bytes go out through
+ * onInput, so any transport works. Binary data is base64 on the bridge.
  */
 import { forwardRef, useImperativeHandle, useMemo, useRef } from "react";
 import type { ComponentType, Ref } from "react";
@@ -13,6 +14,10 @@ import { requireNativeView } from "expo";
 import { requireOptionalNativeModule } from "expo-modules-core";
 
 import type {
+  ClipboardRequest,
+  StickyState,
+  TerminalBell,
+  TerminalCursor,
   TerminalStats,
   TerminalTheme,
   TerminalViewHandle,
@@ -28,18 +33,38 @@ interface NativeHandle {
   paste(text: string): Promise<void>;
   scrollToBottom(): Promise<void>;
   copySelection(): Promise<void>;
+  selectAll(): Promise<void>;
   focus(): Promise<void>;
   blur(): Promise<void>;
+  toggleModifier(name: string): Promise<void>;
+  sendKey(name: string, shift: boolean): Promise<void>;
+  typeText(text: string): Promise<void>;
+  answerClipboard(id: number, allow: boolean): Promise<void>;
   getStats(): Promise<TerminalStats>;
 }
 
 interface NativeProps {
+  pipeId?: string | null;
   fontSize: number;
+  fontFamily?: string;
+  lineHeight?: number;
+  letterSpacing?: number;
   theme: Record<string, unknown>;
+  cursor?: TerminalCursor;
+  scrollback?: number;
+  bell?: TerminalBell;
+  optionAsMeta?: boolean;
+  accentColor?: string;
   onInput: (e: Ev<{ data: string }>) => void;
   onResize: (e: Ev<{ cols: number; rows: number }>) => void;
   onBell?: (e: Ev<object>) => void;
   onTitleChange?: (e: Ev<{ title: string }>) => void;
+  onScrollState?: (e: Ev<{ atBottom: boolean }>) => void;
+  onLink?: (e: Ev<{ url: string }>) => void;
+  onCopy?: (e: Ev<{ text: string; fromProgram: boolean }>) => void;
+  onClipboardRequest?: (e: Ev<ClipboardRequest>) => void;
+  onFontSize?: (e: Ev<{ size: number }>) => void;
+  onModifiers?: (e: Ev<{ ctrl: StickyState; alt: StickyState }>) => void;
   style?: StyleProp<ViewStyle>;
   ref?: Ref<NativeHandle>;
 }
@@ -63,7 +88,9 @@ export function nativeTheme(theme: TerminalTheme): Record<string, unknown> {
     background: theme.background,
     foreground: theme.foreground,
     cursorColor: theme.cursor,
+    cursorAccent: theme.cursorAccent,
     selectionBackground: theme.selectionBackground,
+    selectionForeground: theme.selectionForeground,
     palette: theme.palette,
   };
 }
@@ -106,8 +133,14 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(
         paste: (text) => call((n) => n.paste(text)),
         scrollToBottom: () => call((n) => n.scrollToBottom()),
         copySelection: () => call((n) => n.copySelection()),
+        selectAll: () => call((n) => n.selectAll()),
         focus: () => call((n) => n.focus()),
         blur: () => call((n) => n.blur()),
+        toggleModifier: (name) => call((n) => n.toggleModifier(name)),
+        sendKey: (name, shift = false) => call((n) => n.sendKey(name, shift)),
+        typeText: (text) => call((n) => n.typeText(text)),
+        answerClipboard: (id, allow) =>
+          call((n) => n.answerClipboard(id, allow)),
         getStats: async () =>
           queue.ready && native.current ? native.current.getStats() : null,
       };
@@ -118,8 +151,17 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(
       <NativeView
         ref={native}
         style={props.style}
+        pipeId={props.pipeId ?? null}
         fontSize={props.fontSize}
+        fontFamily={props.fontFamily}
+        lineHeight={props.lineHeight}
+        letterSpacing={props.letterSpacing}
         theme={nativeTheme(props.theme)}
+        cursor={props.cursor}
+        scrollback={props.scrollback}
+        bell={props.bell}
+        optionAsMeta={props.optionAsMeta}
+        accentColor={props.accentColor}
         onInput={(e) => props.onInput(e.nativeEvent.data)}
         onResize={(e) => {
           queue.markReady();
@@ -127,6 +169,25 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(
         }}
         onBell={() => props.onBell?.()}
         onTitleChange={(e) => props.onTitle?.(e.nativeEvent.title)}
+        onScrollState={(e) => props.onScrollState?.(e.nativeEvent.atBottom)}
+        onLink={(e) => props.onLink?.(e.nativeEvent.url)}
+        onCopy={(e) =>
+          props.onCopy?.(e.nativeEvent.text, e.nativeEvent.fromProgram)
+        }
+        onClipboardRequest={(e) =>
+          props.onClipboardRequest?.({
+            id: e.nativeEvent.id,
+            kind: e.nativeEvent.kind,
+            text: e.nativeEvent.text,
+          })
+        }
+        onFontSize={(e) => props.onFontSize?.(e.nativeEvent.size)}
+        onModifiers={(e) =>
+          props.onModifiers?.({
+            ctrl: e.nativeEvent.ctrl,
+            alt: e.nativeEvent.alt,
+          })
+        }
       />
     );
   },

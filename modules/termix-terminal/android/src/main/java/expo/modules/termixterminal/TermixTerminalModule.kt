@@ -14,11 +14,26 @@ class TermixTerminalModule : Module() {
     Constant("engineLoaded") { GhosttyVt.loaded }
 
     View(TermixTerminalView::class) {
-      Events("onInput", "onResize", "onBell", "onTitleChange")
+      Events(
+        "onInput", "onResize", "onBell", "onTitleChange", "onScrollState", "onLink", "onCopy",
+        "onClipboardRequest", "onFontSize", "onModifiers"
+      )
 
-      Prop("fontSize") { view: TermixTerminalView, size: Float ->
-        view.setFontSize(size)
+      Prop("pipeId") { view: TermixTerminalView, id: String? -> view.setPipe(id) }
+      Prop("fontSize") { view: TermixTerminalView, size: Float? -> size?.let { view.setFontSize(it) } }
+      Prop("fontFamily") { view: TermixTerminalView, family: String? -> view.setFontFamily(family) }
+      Prop("lineHeight") { view: TermixTerminalView, value: Float? -> view.setLineHeight(value ?: 1f) }
+      Prop("letterSpacing") { view: TermixTerminalView, value: Float? -> view.setLetterSpacing(value ?: 0f) }
+      Prop("cursor") { view: TermixTerminalView, cursor: CursorRecord? ->
+        view.setCursor(cursor?.style, cursor?.blink ?: true)
       }
+      Prop("scrollback") { view: TermixTerminalView, lines: Int? -> lines?.let { view.setScrollback(it) } }
+      Prop("bell") { view: TermixTerminalView, bell: BellRecord? ->
+        view.setBell(bell?.style, bell?.haptics ?: true)
+      }
+      Prop("accentColor") { view: TermixTerminalView, color: String? -> view.setAccentColor(color) }
+      // iOS only; Android reads Alt from the keyboard itself.
+      Prop("optionAsMeta") { _: TermixTerminalView, _: Boolean? -> }
 
       Prop("theme") { view: TermixTerminalView, theme: TerminalThemeRecord? ->
         view.setTheme(theme)
@@ -36,8 +51,15 @@ class TermixTerminalModule : Module() {
       AsyncFunction("paste") { view: TermixTerminalView, text: String -> view.paste(text) }
       AsyncFunction("scrollToBottom") { view: TermixTerminalView -> view.scrollToBottom() }
       AsyncFunction("copySelection") { view: TermixTerminalView -> view.copySelection() }
+      AsyncFunction("selectAll") { view: TermixTerminalView -> view.selectAll() }
       AsyncFunction("focus") { view: TermixTerminalView -> view.focusTerminal() }
       AsyncFunction("blur") { view: TermixTerminalView -> view.blurTerminal() }
+      AsyncFunction("toggleModifier") { view: TermixTerminalView, name: String -> view.toggleModifier(name) }
+      AsyncFunction("sendKey") { view: TermixTerminalView, name: String, shift: Boolean -> view.sendKey(name, shift) }
+      AsyncFunction("typeText") { view: TermixTerminalView, text: String -> view.typeText(text) }
+      AsyncFunction("answerClipboard") { view: TermixTerminalView, id: Int, allow: Boolean ->
+        view.answerClipboard(id, allow)
+      }
       AsyncFunction("getStats") { view: TermixTerminalView -> view.stats() }
 
       OnViewDestroys { view: TermixTerminalView -> view.destroy() }
@@ -52,7 +74,18 @@ internal class TerminalThemeRecord : Record {
   @Field val background: String? = null
   @Field val foreground: String? = null
   @Field val cursorColor: String? = null
+  @Field val cursorAccent: String? = null
   @Field val selectionBackground: String? = null
   @Field val selectionForeground: String? = null
   @Field val palette: List<String?>? = null
+}
+
+internal class CursorRecord : Record {
+  @Field val style: String? = null
+  @Field val blink: Boolean = true
+}
+
+internal class BellRecord : Record {
+  @Field val style: String? = null
+  @Field val haptics: Boolean = true
 }

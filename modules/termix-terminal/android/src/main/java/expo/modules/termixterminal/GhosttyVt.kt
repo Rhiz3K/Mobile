@@ -5,8 +5,8 @@ import java.nio.ByteBuffer
 /**
  * JNI bindings for libghostty-vt (see src/main/cpp/ghostty_jni.cpp).
  *
- * All functions must be called from the main thread; the native side keeps
- * per-handle state without locking.
+ * The native side keeps per-handle state without locking, so callers hold the
+ * view's lock around every call that takes a handle.
  */
 internal object GhosttyVt {
   /** libghostty-vt is built for arm64-v8a and x86_64 only, so 32 bit phones have none. */
@@ -21,6 +21,12 @@ internal object GhosttyVt {
   const val EVENT_BELL = 1
   const val EVENT_TITLE = 1 shl 1
   const val EVENT_PWD = 1 shl 2
+  const val EVENT_CLIPBOARD = 1 shl 3
+
+  // Cursor styles for nativeSetDefaultCursor, ghostty's GhosttyTerminalCursorStyle.
+  const val CURSOR_BAR = 0
+  const val CURSOR_BLOCK = 1
+  const val CURSOR_UNDERLINE = 2
 
   /** Create a terminal session. Returns 0 on failure. */
   external fun nativeCreate(cols: Int, rows: Int, maxScrollback: Long): Long
@@ -130,4 +136,19 @@ internal object GhosttyVt {
     cellWidthPx: Int,
     cellHeightPx: Int
   ): ByteArray?
+
+  /** Text a program copied with OSC 52 as UTF-8, or null. Clears on read. */
+  external fun nativeTakeClipboard(handle: Long): ByteArray?
+
+  /** OSC 8 link of a viewport cell as UTF-8, or null. */
+  external fun nativeHyperlinkAt(handle: Long, col: Int, row: Int): ByteArray?
+
+  /** The cursor shown until a program picks its own (DECSCUSR), applied now. */
+  external fun nativeSetDefaultCursor(handle: Long, style: Int, blink: Boolean)
+
+  /** [mouse tracking, alt screen, alt scroll, focus events], each 0 or 1. */
+  external fun nativeModes(handle: Long): IntArray?
+
+  /** Focus in or out report, for programs that turned on mode 1004. */
+  external fun nativeEncodeFocus(focused: Boolean): ByteArray?
 }

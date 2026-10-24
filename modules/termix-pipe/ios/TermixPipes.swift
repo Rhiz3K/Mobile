@@ -101,6 +101,20 @@ public final class BytePipe: @unchecked Sendable {
     notify?.pipeReadable()
   }
 
+  /// Clears the sink only if it is still `value`, so a new view is never cut off by an old one.
+  public func detachSink(_ value: PipeSink) {
+    lock.lock()
+    if sink === value { sink = nil }
+    lock.unlock()
+  }
+
+  /// Same as `detachSink` for producers.
+  public func detachProducer(_ value: PipeProducer) {
+    lock.lock()
+    if producer === value { producer = nil }
+    lock.unlock()
+  }
+
   /// Drops queued bytes, for a fresh connection.
   public func clear() {
     lock.lock()

@@ -91,6 +91,20 @@ class BytePipe(val high: Int = HIGH_WATER, val low: Int = LOW_WATER) {
     notify?.onReadable()
   }
 
+  /** Clears the sink only if it is still [value], so a new view is never cut off by an old one. */
+  fun detachSink(value: PipeSink) {
+    synchronized(lock) {
+      if (sink === value) sink = null
+    }
+  }
+
+  /** Same as [detachSink] for producers. */
+  fun detachProducer(value: PipeProducer) {
+    synchronized(lock) {
+      if (producer === value) producer = null
+    }
+  }
+
   /** Drops queued bytes, for a fresh connection. */
   fun clear() {
     var resume: PipeProducer? = null

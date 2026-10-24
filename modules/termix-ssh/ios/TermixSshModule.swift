@@ -252,9 +252,9 @@ private final class ShellSink: ShellCallbacks, @unchecked Sendable {
   }
   func onExit(exitCode: UInt32?, exitSignal: String?) {
     _ = module?.shells.remove(shellId)
-    _ = module?.producers.remove(shellId)
+    let producer = module?.producers.remove(shellId)
     if let pipe, let pipeId {
-      pipe.setProducer(nil)
+      if let producer { pipe.detachProducer(producer) }
       TermixPipes.release(pipeId)
     }
     module?.sendEvent("onShellExit", [

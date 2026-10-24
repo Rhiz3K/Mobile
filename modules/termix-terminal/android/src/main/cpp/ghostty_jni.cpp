@@ -1,8 +1,8 @@
 // JNI bridge between expo.modules.termixterminal.GhosttyVt and libghostty-vt.
 //
 // One native handle owns a terminal, its render state, reusable row/cell
-// iterators, and a key encoder. All calls come from the Android main thread
-// (Expo view functions run on the main queue), so no locking is needed.
+// iterators, and a key encoder. Calls come from the view's parse thread and
+// the main thread; GhosttyTerminalView holds one lock around every call.
 //
 // nativeSnapshot flattens the dirty viewport rows into a caller-provided
 // direct ByteBuffer (little-endian) so Kotlin can repaint without any
@@ -32,6 +32,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <string>
 #include <vector>
 
 #include <ghostty/vt.h>
@@ -64,6 +65,7 @@ constexpr uint32_t kMaxCellTextUnits = 32;
 constexpr jint kEventBell = 1;
 constexpr jint kEventTitle = 1 << 1;
 constexpr jint kEventPwd = 1 << 2;
+constexpr jint kEventClipboard = 1 << 3;
 
 struct Session {
   GhosttyTerminal term = nullptr;
@@ -79,6 +81,8 @@ struct Session {
   std::vector<uint8_t> ptyOut;
   // Effects observed during vt_write, drained by nativeTakeEventFlags.
   jint pendingEvents = 0;
+  // Last OSC 52 text the program asked to copy, taken by nativeTakeClipboard.
+  std::string clipboard;
 };
 
 void writePtyCallback(GhosttyTerminal, void* userdata, const uint8_t* data, size_t len) {
@@ -96,6 +100,32 @@ void titleChangedCallback(GhosttyTerminal, void* userdata) {
 
 void pwdChangedCallback(GhosttyTerminal, void* userdata) {
   static_cast<Session*>(userdata)->pendingEvents |= kEventPwd;
+}
+
+// OSC 52 copy. Only text goes to the phone clipboard; the view asks nothing
+// for writes, reads are never answered.
+GhosttyClipboardWriteResult clipboardWriteCallback(GhosttyTerminal, void* userdata,
+                                                   const GhosttyClipboardWrite* write) {
+  auto* session = static_cast<Session*>(userdata);
+  if (write == nullptr || write->location != GHOSTTY_CLIPBOARD_LOCATION_STANDARD) {
+    return GHOSTTY_CLIPBOARD_WRITE_RESULT_UNSUPPORTED;
+  }
+  for (size_t i = 0; i < write->contents_len; i++) {
+    const GhosttyClipboardContent& content = write->contents[i];
+    const std::string mime(reinterpret_cast<const char*>(content.mime.ptr), content.mime.len);
+    if (mime.rfind("text/plain", 0) != 0) continue;
+    session->clipboard.assign(reinterpret_cast<const char*>(content.data.ptr), content.data.len);
+    session->pendingEvents |= kEventClipboard;
+    return GHOSTTY_CLIPBOARD_WRITE_RESULT_SUCCESS;
+  }
+  return GHOSTTY_CLIPBOARD_WRITE_RESULT_UNSUPPORTED;
+}
+
+jbyteArray toByteArray(JNIEnv* env, const void* data, size_t len) {
+  jbyteArray out = env->NewByteArray(static_cast<jsize>(len));
+  if (out == nullptr) return nullptr;
+  env->SetByteArrayRegion(out, 0, static_cast<jsize>(len), reinterpret_cast<const jbyte*>(data));
+  return out;
 }
 
 // DATA_TITLE / DATA_PWD return borrowed, non-null-terminated UTF-8; copy to a
@@ -299,6 +329,8 @@ Java_expo_modules_termixterminal_GhosttyVt_nativeCreate(
                        reinterpret_cast<const void*>(&titleChangedCallback));
   ghostty_terminal_set(session->term, GHOSTTY_TERMINAL_OPT_PWD_CHANGED,
                        reinterpret_cast<const void*>(&pwdChangedCallback));
+  ghostty_terminal_set(session->term, GHOSTTY_TERMINAL_OPT_CLIPBOARD_WRITE,
+                       reinterpret_cast<const void*>(&clipboardWriteCallback));
 
   GhosttyColorRgb bg{0x00, 0x00, 0x00};
   GhosttyColorRgb fg{0xFF, 0xFF, 0xFF};
@@ -940,6 +972,89 @@ Java_expo_modules_termixterminal_GhosttyVt_nativeEncodeMouse(
   env->SetByteArrayRegion(out, 0, static_cast<jsize>(written),
                           reinterpret_cast<const jbyte*>(buf));
   return out;
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_expo_modules_termixterminal_GhosttyVt_nativeTakeClipboard(
+    JNIEnv* env, jobject, jlong handle) {
+  auto* session = fromHandle(handle);
+  if (session == nullptr || session->clipboard.empty()) return nullptr;
+  jbyteArray out = toByteArray(env, session->clipboard.data(), session->clipboard.size());
+  session->clipboard.clear();
+  return out;
+}
+
+// The OSC 8 link URI of a viewport cell, or null when it has none.
+JNIEXPORT jbyteArray JNICALL
+Java_expo_modules_termixterminal_GhosttyVt_nativeHyperlinkAt(
+    JNIEnv* env, jobject, jlong handle, jint col, jint row) {
+  auto* session = fromHandle(handle);
+  if (session == nullptr) return nullptr;
+  GhosttyGridRef ref{};
+  ref.size = sizeof(ref);
+  if (!viewportGridRef(session, col, row, &ref)) return nullptr;
+  size_t needed = 0;
+  GhosttyResult result = ghostty_grid_ref_hyperlink_uri(&ref, nullptr, 0, &needed);
+  if (result == GHOSTTY_SUCCESS || needed == 0) return nullptr;
+  if (result != GHOSTTY_OUT_OF_SPACE) return nullptr;
+  std::vector<uint8_t> buf(needed);
+  size_t written = 0;
+  if (ghostty_grid_ref_hyperlink_uri(&ref, buf.data(), buf.size(), &written) != GHOSTTY_SUCCESS ||
+      written == 0) {
+    return nullptr;
+  }
+  return toByteArray(env, buf.data(), written);
+}
+
+// Sets the cursor a program gets back with DECSCUSR 0, then applies it now.
+JNIEXPORT void JNICALL
+Java_expo_modules_termixterminal_GhosttyVt_nativeSetDefaultCursor(
+    JNIEnv*, jobject, jlong handle, jint style, jboolean blink) {
+  auto* session = fromHandle(handle);
+  if (session == nullptr) return;
+  auto cursorStyle = static_cast<GhosttyTerminalCursorStyle>(style);
+  const bool blinks = blink == JNI_TRUE;
+  ghostty_terminal_set(session->term, GHOSTTY_TERMINAL_OPT_DEFAULT_CURSOR_STYLE, &cursorStyle);
+  ghostty_terminal_set(session->term, GHOSTTY_TERMINAL_OPT_DEFAULT_CURSOR_BLINK, &blinks);
+  static const char kReset[] = "\x1b[0 q";
+  session->ptyOut.clear();
+  ghostty_terminal_vt_write(session->term, reinterpret_cast<const uint8_t*>(kReset),
+                            sizeof(kReset) - 1);
+  markRenderDirtyFull(session);
+}
+
+// Modes the view acts on: [mouse tracking, alt screen, alt scroll, focus events].
+JNIEXPORT jintArray JNICALL
+Java_expo_modules_termixterminal_GhosttyVt_nativeModes(JNIEnv* env, jobject, jlong handle) {
+  auto* session = fromHandle(handle);
+  if (session == nullptr) return nullptr;
+  bool mouse = false;
+  ghostty_terminal_get(session->term, GHOSTTY_TERMINAL_DATA_MOUSE_TRACKING, &mouse);
+  GhosttyTerminalScreen screen = GHOSTTY_TERMINAL_SCREEN_PRIMARY;
+  ghostty_terminal_get(session->term, GHOSTTY_TERMINAL_DATA_ACTIVE_SCREEN, &screen);
+  bool altScroll = false;
+  ghostty_terminal_mode_get(session->term, GHOSTTY_MODE_ALT_SCROLL, &altScroll);
+  bool focus = false;
+  ghostty_terminal_mode_get(session->term, GHOSTTY_MODE_FOCUS_EVENT, &focus);
+  const jint values[4] = {mouse ? 1 : 0, screen == GHOSTTY_TERMINAL_SCREEN_ALTERNATE ? 1 : 0,
+                          altScroll ? 1 : 0, focus ? 1 : 0};
+  jintArray out = env->NewIntArray(4);
+  if (out == nullptr) return nullptr;
+  env->SetIntArrayRegion(out, 0, 4, values);
+  return out;
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_expo_modules_termixterminal_GhosttyVt_nativeEncodeFocus(
+    JNIEnv* env, jobject, jboolean focused) {
+  char buf[16];
+  size_t written = 0;
+  if (ghostty_focus_encode(focused == JNI_TRUE ? GHOSTTY_FOCUS_GAINED : GHOSTTY_FOCUS_LOST, buf,
+                           sizeof(buf), &written) != GHOSTTY_SUCCESS ||
+      written == 0) {
+    return nullptr;
+  }
+  return toByteArray(env, buf, written);
 }
 
 }  // extern "C"
