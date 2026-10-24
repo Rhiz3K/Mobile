@@ -74,9 +74,19 @@
 - Switching between Wi-Fi and mobile data, or a VPN going up or down, checks the connection and reconnects right away
 - A Tailscale host that can't be reached says to check that Tailscale is connected
 - Low power mode makes the app check connections less often
+- The file manager works on This device and on hosts that connect from the phone, over SFTP, with no server needed
+- Download files and whole folders, and upload many files at once, with progress, pause, resume and cancel
+- Downloads go to Termix in the Files app on iOS, and to any folder you pick on Android
+- Share files and photos from other apps to a host and folder of your choice
+- A code editor with syntax highlighting, find, text size and line wrap. Big files ask first
+- Preview images and videos, PDFs on iOS, and open any file in another app
+- Copy, move, cut and paste, permissions, properties with owner and folder size, symbolic links and the host's trash
+- A files panel beside the terminal on tablets, and Files here in the tab menu on phones. It follows the terminal's folder and can cd the terminal to the folder on screen
+- Settings, Files for the trash prompt, transfers at once, hidden files, the editor and the files panel
 
 ### Changed
 
+- The file list scrolls smoothly in folders with thousands of files and remembers where you were in each folder
 - Your server sign in is now kept in the phone's secure storage
 - You stay signed in to a linked server and the app renews the session on its own, so you are not asked for your second factor again
 - Secrets in the phone's secure storage stay on this device and are left out of iCloud and phone backups

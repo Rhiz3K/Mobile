@@ -26,7 +26,7 @@
 
 Termix Mobile is an SSH client for phones and tablets that works on its own: keep hosts on This device and connect straight from the phone. Link a [Termix](https://github.com/Termix-SSH/Termix) server to sync your hosts, logins and snippets with it, see the [install docs](https://docs.termix.site/install).
 
-Features like the file manager, Docker, tunnels and metrics show up when the matching plugin is on in your server.
+Features like Docker, tunnels and metrics show up when the matching plugin is on in your server. The terminal and the file manager also work straight from the phone.
 
 Try Termix at [demo.termix.site](https://demo.termix.site/). Any username and password works.
 
@@ -35,7 +35,7 @@ Try Termix at [demo.termix.site](https://demo.termix.site/). Any username and pa
 ## Features
 
 - SSH terminal: several sessions in tabs you can rename, drag and swipe between, key rows with a tmux row that you can change per host, snippets with variables, history with search and suggestions, find, sudo password fill, tmux and screen attach, share links, hardware keyboard shortcuts, dictation and VoiceOver. Tabs reconnect on their own and come back after the app was closed. On Android sessions keep running in the background with a notification; on iOS they reconnect when you come back.
-- File manager: browse, edit, move, compress and download files over SSH. Pin files, add folder shortcuts and restore from trash.
+- File manager: browse, edit and move files over SFTP from the phone or through your server. Download and upload with pause and resume, share files in from other apps, edit code with syntax highlighting, and keep a files panel beside the terminal.
 - Host metrics: CPU, memory, disk, network, uptime, processes, ports, firewall rules and login history, plus server alerts on the hosts screen.
 - SSH tunnels: create, start and stop tunnels, set up per host in the host editor.
 - Docker: view and manage containers.
