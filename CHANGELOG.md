@@ -26,6 +26,18 @@
 - Sign in through the browser, which works with passkeys and security keys (needs Termix 26.10.6 or newer)
 - Servers behind a reverse proxy: extra headers, Cloudflare service tokens, basic auth, client certificates and the proxy's own sign in page
 - When a server signs you out, the Hosts screen says why and offers the quickest fix
+- A new native terminal that is faster, scrolls smoothly and stays responsive when a program prints a lot
+- Select text with handles and a magnifier, then copy, paste or select all
+- Tap a link in the terminal to open it, with a question first that you can turn off
+- All of Termix's terminal themes, a theme that follows the app theme, and a custom theme with your own colors
+- JetBrains Mono and Fira Code fonts, with ligatures and Nerd Font icons
+- Settings for the cursor style and blink, the bell (sound, flash, vibrate), scrollback and line spacing
+- Pinch the terminal to change the font size, and it is kept
+- Mouse support for tmux, vim and other programs, by tapping and dragging
+- Programs can copy to your clipboard (OSC 52) and show clickable links (OSC 8); reading the clipboard asks first
+- Pasting text that could run commands asks first, and paste works with bracketed paste
+- Screen readers read new terminal output, and the terminal follows the system text size
+- Option sends Alt on iPad hardware keyboards when you turn it on, and Cmd+. sends Escape
 
 ### Changed
 
@@ -46,6 +58,11 @@
 ### Fixed
 
 - A reverse proxy asking you to sign in again no longer signs you out of Termix
+- The first letter typed in the terminal is no longer a capital (#93)
+- Copying text no longer freezes the terminal on Android (#101)
+- Japanese, Chinese and Korean keyboards and voice typing now work in the terminal
+- Space, "=" and other symbols type right on every keyboard
+- Hardware keyboards on Android and iPad send arrows, Tab, Esc, F keys and Ctrl combos to the terminal
 
 - The Android app icon is no longer cut off and now uses the same logo and color as Termix on the web and desktop
 - The splash screen uses the same logo and color as the app icon
