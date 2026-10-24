@@ -4,6 +4,14 @@
 
 ### Added
 
+- Home tab with live cards for your pinned hosts: metrics, Docker and failed services
+- Docker on the phone with no server: containers, logs, stats, start, stop, restart, remove and a shell in a container, with sudo when your user can't reach Docker
+- See Docker compose stacks, their services and compose files, read only
+- Host metrics on the phone with no server: CPU, memory, disk, network, uptime and processes
+- Metrics history for the last hour up to a week, saved on the phone or read from the server
+- Services: list systemd and OpenRC services, see their status, start, stop and restart them, and read the journal with live follow, on the phone or through the Service Manager plugin
+- Turn on Services per host in the host editor
+- When a change needs root the app asks for the sudo password, or uses the one saved on the host, and keeps it until you close the app
 - Run tunnels on the phone: local, remote and dynamic forwards with start and stop, auto start and retries (#86)
 - Choose per host whether tunnels run on the phone or on the server
 - Running tunnels show in the Android notification, and iOS tells you when it stopped them
@@ -98,6 +106,8 @@
 
 ### Changed
 
+- The app opens on Home
+- Docker and host metrics only go through the server when the host connects through it, and the cards and screens stop asking the host while the app is in the background
 - The file list scrolls smoothly in folders with thousands of files and remembers where you were in each folder
 - Your server sign in is now kept in the phone's secure storage
 - You stay signed in to a linked server and the app renews the session on its own, so you are not asked for your second factor again
