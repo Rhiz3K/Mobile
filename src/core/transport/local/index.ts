@@ -31,7 +31,7 @@ export function createLocalTransport(
   const refuse = () => new AppError(reason() ?? "", "TRANSPORT_UNAVAILABLE");
   return {
     kind: "local",
-    provides: ["shell", "exec", "sftp"],
+    provides: ["shell", "exec", "sftp", "forward"],
     get available() {
       return !reason();
     },
@@ -54,6 +54,7 @@ export function createLocalTransport(
       return {
         exec: (command, opts) => target.exec(command, opts),
         sftp: target.sftp,
+        ssh: target,
         close: async () => closeAll([...chain.hops, target]),
       };
     },

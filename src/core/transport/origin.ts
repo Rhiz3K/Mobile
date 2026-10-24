@@ -131,6 +131,7 @@ const NEED_WORDS: Record<TransportCapability, string> = {
   shell: "an SSH connection",
   exec: "an SSH connection",
   sftp: "an SSH connection",
+  forward: "an SSH connection",
   server: "a Termix server",
   guacd: "a Termix server",
 };

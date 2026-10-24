@@ -1,4 +1,9 @@
-import type { ExecOptions, SshExecResult, SshSftp } from "@/modules/termix-ssh";
+import type {
+  ExecOptions,
+  SshExecResult,
+  SshSession,
+  SshSftp,
+} from "@/modules/termix-ssh";
 import type { ConnectFailure } from "./errors";
 
 /**
@@ -15,9 +20,10 @@ export type TransportKind = "relay" | "local";
  * - `exec`, `sftp`: commands and files opened by the app itself
  * - `server`: the server's own routes (file manager, docker, metrics, ...)
  * - `guacd`: remote desktop through the server
+ * - `forward`: port forwards opened by the app itself (tunnels on the phone)
  */
 export type TransportCapability =
-  "shell" | "exec" | "sftp" | "server" | "guacd";
+  "shell" | "exec" | "sftp" | "server" | "guacd" | "forward";
 
 export interface TerminalHostConfig {
   id: number;
@@ -167,6 +173,8 @@ export interface ShellChannel {
 export interface HostSession {
   exec(command: string, options?: ExecOptions): Promise<SshExecResult>;
   sftp: SshSftp;
+  /** The logged in connection, for port forwards and keepalive checks. */
+  ssh: SshSession;
   close(): Promise<void>;
 }
 
