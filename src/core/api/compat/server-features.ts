@@ -1,6 +1,7 @@
 export interface ServerPlugin {
   id: string;
   protocols?: string[];
+  version?: string;
 }
 
 /** Keeps only the plugins that are turned on and running. */
@@ -22,6 +23,9 @@ export function activePlugins(list: unknown): ServerPlugin[] | null {
       const protocols = Array.isArray(raw)
         ? raw.filter((id: unknown): id is string => typeof id === "string")
         : undefined;
-      return protocols ? { id: p.id, protocols } : { id: p.id };
+      const out: ServerPlugin = { id: p.id };
+      if (protocols) out.protocols = protocols;
+      if (typeof p.version === "string") out.version = p.version;
+      return out;
     });
 }

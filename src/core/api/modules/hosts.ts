@@ -82,8 +82,12 @@ export function createHostsApi(c: AccountClient) {
       );
     };
 
+    // Plugin 1.2.0+ keeps tunnels in its own table, written below.
+    const savedTunnels = c.supportsSavedTunnels();
     const entries = Object.entries(
-      buildPluginHostSettings(hostData as Record<string, any>),
+      buildPluginHostSettings(hostData as Record<string, any>, {
+        savedTunnels,
+      }),
     )
       .filter(([pluginId]) => c.isPluginEnabled(pluginId))
       .map(([pluginId, values]): [string, Record<string, unknown>] => {
@@ -104,6 +108,13 @@ export function createHostsApi(c: AccountClient) {
     );
 
     const failures: string[] = [];
+    if (savedTunnels && Array.isArray(hostData.tunnelConnections)) {
+      try {
+        await c.api.tunnels.putSavedTunnels(hostId, hostData.tunnelConnections);
+      } catch (err) {
+        failures.push(`tunnels: ${(err as Error)?.message}`);
+      }
+    }
     results.forEach((result, i) => {
       if (result.status !== "rejected") return;
       const err = result.reason;

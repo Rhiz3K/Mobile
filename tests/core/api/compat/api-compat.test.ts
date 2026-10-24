@@ -167,3 +167,40 @@ test("the file manager's showPanel host setting turns the files panel off", () =
   });
   expect(host.showFilesPanel).toBe(false);
 });
+
+describe("saved tunnels", () => {
+  const {
+    hasSavedTunnels,
+    toSavedTunnel,
+    buildPluginHostSettings,
+  } = require("@/core/api/compat/api-compat");
+
+  test("needs plugin 1.2.0 or newer, unknown version counts as yes", () => {
+    expect(hasSavedTunnels(undefined)).toBe(false);
+    expect(hasSavedTunnels({})).toBe(true);
+    expect(hasSavedTunnels({ version: "1.1.9" })).toBe(false);
+    expect(hasSavedTunnels({ version: "1.2.1" })).toBe(true);
+  });
+
+  test("drops fields the plugin does not take", () => {
+    expect(
+      toSavedTunnel({
+        sourcePort: 1,
+        scope: "c2s",
+        endpointPassword: "x",
+        sourceHostName: "h",
+      }),
+    ).toEqual({ sourcePort: 1 });
+  });
+
+  test("host settings skip the list when saved routes exist", () => {
+    const data = { enableTunnel: true, tunnelConnections: [{ sourcePort: 1 }] };
+    expect(buildPluginHostSettings(data).tunnels).toEqual({
+      enableTunnel: true,
+      tunnelConnections: [{ sourcePort: 1 }],
+    });
+    expect(
+      buildPluginHostSettings(data, { savedTunnels: true }).tunnels,
+    ).toEqual({ enableTunnel: true });
+  });
+});

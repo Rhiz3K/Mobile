@@ -176,6 +176,7 @@ export function flattenPluginSettings<T extends Record<string, any>>(
 /** The per plugin host settings a host form save writes on 2.9. */
 export function buildPluginHostSettings(
   data: Record<string, any>,
+  options: { savedTunnels?: boolean } = {},
 ): Record<string, Record<string, unknown>> {
   const tunnelConnections = data.enableTunnel
     ? data.tunnelConnections || []
@@ -191,10 +192,10 @@ export function buildPluginHostSettings(
       defaultPath: data.enableFileManager ? data.defaultPath || "/" : "/",
     },
     docker: { enableDocker: Boolean(data.enableDocker) },
-    tunnels: {
-      enableTunnel: Boolean(data.enableTunnel),
-      tunnelConnections,
-    },
+    // With saved routes the list goes to PUT /saved and the plugin mirrors it.
+    tunnels: options.savedTunnels
+      ? { enableTunnel: Boolean(data.enableTunnel) }
+      : { enableTunnel: Boolean(data.enableTunnel), tunnelConnections },
     "remote-desktop": {
       enableRdp: Boolean(data.enableRdp),
       rdpPort: Number(data.rdpPort) || 3389,
@@ -250,4 +251,37 @@ export function pluginTunnelName(
 ): string {
   const label = host.name || `${host.username ?? ""}@${host.ip}`;
   return `${host.id}::${index}::${label}::${tunnel.sourcePort}::${(tunnel.endpointHost ?? "").trim()}::${tunnel.endpointPort ?? 0}`;
+}
+
+/** First Tunnels plugin version with the saved routes. */
+export const SAVED_TUNNELS_SINCE = "1.2.0";
+
+/**
+ * Whether the Tunnels plugin keeps its own saved list (1.2.0+). An unknown
+ * version counts as yes: a 404 on the first call drops back to host settings.
+ */
+export function hasSavedTunnels(
+  plugin: { version?: string } | undefined,
+): boolean {
+  if (!plugin) return false;
+  if (!plugin.version) return true;
+  return isVersionAtLeast(plugin.version, SAVED_TUNNELS_SINCE);
+}
+
+const STRIP_FROM_SAVED = [
+  "endpointPassword",
+  "endpointKey",
+  "endpointKeyPassword",
+  "endpointAuthType",
+  "endpointKeyType",
+  "sourceHostId",
+  "sourceHostName",
+];
+
+/** A tunnel as PUT /saved takes it: the plugin's fields only, always s2s. */
+export function toSavedTunnel<T extends Record<string, any>>(tunnel: T): T {
+  const out: Record<string, any> = { ...tunnel };
+  for (const key of STRIP_FROM_SAVED) delete out[key];
+  if (out.scope === "c2s") delete out.scope;
+  return out as T;
 }

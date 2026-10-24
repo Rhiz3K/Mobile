@@ -17,6 +17,7 @@ import {
 import {
   type ApiGeneration,
   buildTerminalWebSocketUrl,
+  hasSavedTunnels,
   isVersionAtLeast,
   toPluginRequest,
   toWebSocketBase,
@@ -511,6 +512,12 @@ export class AccountClient implements HttpOwner {
    * True when the plugin is on. Pre 2.9 servers have everything built in,
    * and before the list has loaded this says true, so nothing flickers off.
    */
+  supportsSavedTunnels(): boolean {
+    if (this.apiGeneration !== "plugin") return false;
+    if (!this.enabledPlugins) return true;
+    return hasSavedTunnels(this.enabledPlugins.find((p) => p.id === "tunnels"));
+  }
+
   isPluginEnabled(pluginId: string): boolean {
     if (this.apiGeneration !== "plugin" || !this.enabledPlugins) return true;
     return this.enabledPlugins.some((p) => p.id === pluginId);
