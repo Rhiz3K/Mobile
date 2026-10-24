@@ -1,4 +1,5 @@
 import { AppError } from "@/core/errors";
+import { SHELL_CWD_COMMAND } from "./shell-cwd";
 import type { HostConnectRepository } from "@/core/data/types";
 import {
   SshError,
@@ -406,6 +407,19 @@ export class LocalShell implements ShellChannel {
       stdout: utf8Decode(result.stdout),
       exitCode: result.exitCode,
     };
+  }
+
+  async getCwd(timeoutMs = 4000): Promise<string | null> {
+    try {
+      const { stdout, exitCode } = await this.exec(
+        SHELL_CWD_COMMAND,
+        Math.max(1, Math.ceil(timeoutMs / 1000)),
+      );
+      const path = stdout.trim().split("\n").pop()?.trim();
+      return exitCode === 0 && path?.startsWith("/") ? path : null;
+    } catch {
+      return null;
+    }
   }
 
   destroy(): void {

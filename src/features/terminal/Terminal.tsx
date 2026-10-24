@@ -805,6 +805,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
           XTERM_FALLBACK ? (xtermRef.current?.isSelecting() ?? false) : false,
         keyTarget: () => (XTERM_FALLBACK ? null : keyTarget),
         command: runCommand,
+        getCwd: () => connRef.current?.getCwd() ?? Promise.resolve(null),
       }),
       [isDialogOpen, sendInput, keyTarget, runCommand],
     );

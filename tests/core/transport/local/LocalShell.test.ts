@@ -1,3 +1,4 @@
+import { SHELL_CWD_COMMAND } from "@/core/transport/local/shell-cwd";
 import type { HostConnectProfile } from "@/core/data/types";
 import { LocalShell, Utf8Stream } from "@/core/transport/local/LocalShell";
 import { createLocalTransport } from "@/core/transport/local";
@@ -498,4 +499,20 @@ test("side commands run on the shell's own connection", async () => {
     exitCode: 0,
   });
   expect(s.exec).toHaveBeenCalledWith("tmux ls", { timeoutSecs: 3 });
+});
+
+test("the working directory comes from the shell-cwd command on the same connection", async () => {
+  const s = fakeSession();
+  mockConnect.mockResolvedValue(s);
+  const { shell, events } = setup();
+  events.onHostKeyVerificationRequired.mockImplementation(() =>
+    shell.sendHostKeyResponse("accept"),
+  );
+  await expect(shell.getCwd()).resolves.toBeNull();
+  await shell.connect(80, 24);
+  s.exec.mockResolvedValue({ stdout: enc("/srv/app\n"), exitCode: 0 });
+  await expect(shell.getCwd()).resolves.toBe("/srv/app");
+  expect(s.exec.mock.calls.at(-1)[0]).toBe(SHELL_CWD_COMMAND);
+  s.exec.mockResolvedValue({ stdout: enc("oops"), exitCode: 1 });
+  await expect(shell.getCwd()).resolves.toBeNull();
 });

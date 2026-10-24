@@ -42,6 +42,7 @@ export class RelayShell implements ShellChannel {
   private everConnected = false;
   private dropped = false;
   private probes: ((ok: boolean) => void)[] = [];
+  private cwdWaiters: ((path: string | null) => void)[] = [];
   private destroyed = false;
   private cols = 80;
   private rows = 24;
@@ -103,6 +104,7 @@ export class RelayShell implements ShellChannel {
     this.shouldNotReconnect = true;
     this.awaitingAuthCredentials = false;
     this.settleProbes(false);
+    this.settleCwd(null);
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       try {
         this.ws.send(JSON.stringify({ type: "disconnect" }));
@@ -305,6 +307,36 @@ export class RelayShell implements ShellChannel {
         this.settleProbes(false);
       }
     });
+  }
+
+  /** Asks the server for the shell's working directory. Null after `timeoutMs`. */
+  getCwd(timeoutMs = 4000): Promise<string | null> {
+    const ws = this.ws;
+    if (!ws || ws.readyState !== WebSocket.OPEN || this.destroyed) {
+      return Promise.resolve(null);
+    }
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        this.cwdWaiters = this.cwdWaiters.filter((w) => w !== done);
+        resolve(null);
+      }, timeoutMs);
+      const done = (path: string | null) => {
+        clearTimeout(timer);
+        resolve(path);
+      };
+      this.cwdWaiters.push(done);
+      try {
+        ws.send(JSON.stringify({ type: "get_cwd" }));
+      } catch (_) {
+        this.settleCwd(null);
+      }
+    });
+  }
+
+  private settleCwd(path: string | null) {
+    const waiting = this.cwdWaiters;
+    this.cwdWaiters = [];
+    waiting.forEach((w) => w(path));
   }
 
   private settleProbes(ok: boolean) {
@@ -561,6 +593,9 @@ export class RelayShell implements ShellChannel {
         } else if (msg.type === "disconnected") {
           this.setServerSessionId(null);
           this.config.onDisconnected(this.config.hostConfig.name);
+        } else if (msg.type === "cwd") {
+          const waiter = this.cwdWaiters.shift();
+          waiter?.(typeof msg.path === "string" && msg.path ? msg.path : null);
         } else if (msg.type === "resized" || msg.type === "pong") {
         } else if (msg.type === "sessionCreated") {
           this.setServerSessionId(msg.sessionId as string);

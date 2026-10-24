@@ -838,6 +838,14 @@ export class HostConnection {
     return exec(command, timeoutSecs);
   }
 
+  /** The shell's working directory, when the connection can tell. */
+  getCwd(timeoutMs?: number): Promise<string | null> {
+    if (this.state.status !== "connected" || !this.channel?.getCwd) {
+      return Promise.resolve(null);
+    }
+    return this.channel.getCwd(timeoutMs);
+  }
+
   attachTmux(sessionName: string) {
     this.channel?.attachTmux?.(sessionName);
   }

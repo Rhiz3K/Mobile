@@ -215,6 +215,26 @@ test("probe waits for the server to answer the ping", async () => {
   m.destroy();
 });
 
+test("getCwd asks the server and waits for its cwd answer", async () => {
+  const { m } = manager(fakeClient(), { onDropped: jest.fn() });
+  await expect(m.getCwd()).resolves.toBeNull();
+  await m.connect(80, 24);
+  const socket = FakeSocket.all[0];
+  openAndConnect(socket);
+
+  const cwd = m.getCwd();
+  expect(socket.sent.at(-1)).toEqual({ type: "get_cwd" });
+  socket.onmessage?.({
+    data: JSON.stringify({ type: "cwd", path: "/var/log" }),
+  });
+  await expect(cwd).resolves.toBe("/var/log");
+
+  const silent = m.getCwd(4000);
+  jest.advanceTimersByTime(4000);
+  await expect(silent).resolves.toBeNull();
+  m.destroy();
+});
+
 test("coming back with a closed socket is a drop; low power pings less often", async () => {
   const onDropped = jest.fn();
   const { m } = manager(fakeClient(), { onDropped });

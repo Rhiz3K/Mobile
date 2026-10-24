@@ -150,6 +150,8 @@ export interface ShellChannel {
   sendWarpgateContinue(): void;
   /** Runs a command next to the shell, on the same connection. Phone shells only. */
   exec?(command: string, timeoutSecs?: number): Promise<ShellExecResult>;
+  /** The shell's working directory, or null when it can't tell. */
+  getCwd?(timeoutMs?: number): Promise<string | null>;
   /** Picks a tmux session the server listed; empty starts a new one. Relay only. */
   attachTmux?(sessionName: string): void;
   notifyBackgrounded(): void;
