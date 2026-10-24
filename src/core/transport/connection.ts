@@ -3,6 +3,8 @@ import { fromRelayMessage, unavailable, type ConnectFailure } from "./errors";
 import type { Blocked } from "./origin";
 import type {
   HostKeyData,
+  RelayTmuxSession,
+  ShellExecResult,
   ShellChannel,
   ShellOptions,
   TerminalHostConfig,
@@ -120,6 +122,7 @@ export interface HostConnectionOptions {
   onSessionIdChange?: (sessionId: string | null) => void;
   /** Fires when a try starts, with the way it goes. */
   onOriginResolved?: (kind: TransportKind) => void;
+  onTmuxSessions?: (sessions: RelayTmuxSession[]) => void;
 }
 
 export interface ConnectionSnapshot {
@@ -344,6 +347,9 @@ export class HostConnection {
       onPostConnectionSetup: guard(() =>
         this.options.onPostConnectionSetup?.(),
       ),
+      onTmuxSessions: guard((sessions) =>
+        this.options.onTmuxSessions?.(sessions),
+      ),
       onDisconnected: guard((hostName) => {
         this.log({
           level: "warning",
@@ -474,6 +480,18 @@ export class HostConnection {
   }
 
   // Passthrough
+
+  /** A side command on the shell's connection, when the shell can run one. */
+  exec(command: string, timeoutSecs?: number): Promise<ShellExecResult> {
+    const exec = this.channel?.exec?.bind(this.channel);
+    if (!exec)
+      return Promise.reject(new Error("This connection can't run commands"));
+    return exec(command, timeoutSecs);
+  }
+
+  attachTmux(sessionName: string) {
+    this.channel?.attachTmux?.(sessionName);
+  }
 
   sendInput(data: string) {
     this.channel?.sendInput(data);

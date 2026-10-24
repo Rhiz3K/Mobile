@@ -46,8 +46,17 @@ export interface StartupInput {
   snippet?: { content: string } | null;
   host: SnippetHostContext;
   mosh?: string | null;
-  /** A command that replaces the shell, like a tmux attach. Runs last. */
-  attach?: string | null;
+  /**
+   * A tmux attach typed first. `fresh` is a new session, which then gets the
+   * startup snippet and mosh; an existing one keeps its own state.
+   */
+  tmux?: { line: string; fresh: boolean } | null;
+}
+
+export interface StartupLine {
+  text: string;
+  /** Wait before the next line, for tmux to take the terminal. */
+  waitAfterMs?: number;
 }
 
 /**
@@ -55,21 +64,24 @@ export interface StartupInput {
  * variables when it opened, so only a relay shell gets export lines, like
  * the web terminal. Snippets that ask for input are skipped.
  */
-export function startupLines(input: StartupInput): string[] {
-  const lines: string[] = [];
+export function startupLines(input: StartupInput): StartupLine[] {
+  const lines: StartupLine[] = [];
   if (input.transport === "relay") {
     for (const { key, value } of envList(
       input.legacyEnv,
       input.sshOptions?.environmentVariables,
     )) {
-      lines.push(`export ${key}=${shellQuote(value)}`);
+      lines.push({ text: `export ${key}=${shellQuote(value)}` });
     }
+  }
+  if (input.tmux) {
+    lines.push({ text: input.tmux.line, waitAfterMs: 800 });
+    if (!input.tmux.fresh) return lines;
   }
   const content = input.snippet?.content?.trim();
   if (content && !hasSnippetInputs(content)) {
-    lines.push(resolveSnippetContent(content, input.host));
+    lines.push({ text: resolveSnippetContent(content, input.host) });
   }
-  if (input.mosh?.trim()) lines.push(input.mosh.trim());
-  if (input.attach?.trim()) lines.push(input.attach.trim());
+  if (input.mosh?.trim()) lines.push({ text: input.mosh.trim() });
   return lines;
 }

@@ -246,3 +246,35 @@ test("the host config can be swapped for the server's before connecting", async 
     data: { hostConfig: { id: 77, name: "host" } },
   });
 });
+
+test("tmux session lists reach the tab and a pick goes back", async () => {
+  const picked: unknown[] = [];
+  const logs: unknown[] = [];
+  const { m } = manager(fakeClient(), {
+    onTmuxSessions: (s: unknown) => picked.push(s),
+    onConnectionLog: (e: unknown) => logs.push(e),
+  });
+  await m.connect(80, 24);
+  const socket = FakeSocket.all[0];
+  socket.readyState = FakeSocket.OPEN;
+  socket.onmessage?.({
+    data: JSON.stringify({
+      type: "tmux_sessions_available",
+      sessions: [
+        { name: "main", attachedClients: 1, lastActivity: 5, created: 1 },
+        { bad: true },
+      ],
+    }),
+  });
+  expect(picked).toEqual([
+    [{ name: "main", windows: undefined, attachedClients: 1, lastActivity: 5 }],
+  ]);
+  m.attachTmux("main");
+  expect(socket.sent.at(-1)).toEqual({
+    type: "tmux_attach",
+    data: { sessionName: "main" },
+  });
+  socket.onmessage?.({ data: JSON.stringify({ type: "tmux_unavailable" }) });
+  expect(logs).toHaveLength(1);
+  m.destroy();
+});

@@ -126,6 +126,16 @@ export class RelayShell implements ShellChannel {
     }
   }
 
+  attachTmux(sessionName: string): void {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      try {
+        this.ws.send(
+          JSON.stringify({ type: "tmux_attach", data: { sessionName } }),
+        );
+      } catch (e) {}
+    }
+  }
+
   sendResize(cols: number, rows: number): void {
     this.cols = cols;
     this.rows = rows;
@@ -557,6 +567,25 @@ export class RelayShell implements ShellChannel {
           this.setServerSessionId(null);
           this.shouldNotReconnect = true;
           this.config.onDisconnected(this.config.hostConfig.name);
+        } else if (msg.type === "tmux_sessions_available") {
+          const list = Array.isArray(msg.sessions) ? msg.sessions : [];
+          this.config.onTmuxSessions?.(
+            list
+              .filter((s: any) => typeof s?.name === "string")
+              .map((s: any) => ({
+                name: s.name,
+                windows: Number(s.windows) || undefined,
+                attachedClients: Number(s.attachedClients) || 0,
+                lastActivity: Number(s.lastActivity) || 0,
+              })),
+          );
+        } else if (msg.type === "tmux_unavailable") {
+          this.config.onConnectionLog?.({
+            level: "warning",
+            stage: "tmux",
+            message:
+              "tmux is not installed on this host. Using the plain shell.",
+          });
         } else if (msg.type === "connection_log") {
           if (msg.data) {
             this.config.onConnectionLog?.(

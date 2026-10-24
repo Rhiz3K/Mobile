@@ -464,3 +464,20 @@ describe("local transport", () => {
     expect(s.disconnect).toHaveBeenCalled();
   });
 });
+
+test("side commands run on the shell's own connection", async () => {
+  const s = fakeSession();
+  mockConnect.mockResolvedValue(s);
+  const { shell, events } = setup();
+  events.onHostKeyVerificationRequired.mockImplementation(() =>
+    shell.sendHostKeyResponse("accept"),
+  );
+  await expect(shell.exec("tmux ls")).rejects.toThrow("Not connected");
+  await shell.connect(80, 24);
+  s.exec.mockResolvedValue({ stdout: enc("main"), exitCode: 0 });
+  await expect(shell.exec("tmux ls", 3)).resolves.toEqual({
+    stdout: "main",
+    exitCode: 0,
+  });
+  expect(s.exec).toHaveBeenCalledWith("tmux ls", { timeoutSecs: 3 });
+});

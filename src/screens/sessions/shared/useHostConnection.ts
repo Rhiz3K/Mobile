@@ -14,6 +14,7 @@ import {
   saveOrigin,
   type ConnectionOrigin,
   type ConnectionStatus,
+  type RelayTmuxSession,
   type TerminalHostConfig,
   type TransportKind,
 } from "@/core/transport";
@@ -30,6 +31,7 @@ export interface HostConnectionHandlers {
   onDisconnected?: (hostName: string) => void;
   onSessionIdChange?: (sessionId: string | null) => void;
   onTransportResolved?: (kind: TransportKind) => void;
+  onTmuxSessions?: (sessions: RelayTmuxSession[]) => void;
 }
 
 // Failures where trying the other way can help.
@@ -82,6 +84,7 @@ export function useHostConnection(
         onDisconnected: (n) => handlers.current.onDisconnected?.(n),
         onSessionIdChange: (id) => handlers.current.onSessionIdChange?.(id),
         onOriginResolved: (k) => handlers.current.onTransportResolved?.(k),
+        onTmuxSessions: (s) => handlers.current.onTmuxSessions?.(s),
       }),
     // A new connection only for another host or account.
     // eslint-disable-next-line react-hooks/exhaustive-deps

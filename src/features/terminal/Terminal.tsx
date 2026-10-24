@@ -37,10 +37,33 @@ import { useClient } from "@/core/accounts";
 import { useSessionAccountId } from "@/core/accounts/session";
 import { useSessionRepositories } from "@/core/data/hooks";
 import { resolveTerminalSettings } from "./settings";
-import { findStartupSnippet, startupLines } from "./startup";
+import {
+  findStartupSnippet,
+  startupLines,
+  type StartupInput,
+  type StartupLine,
+} from "./startup";
 import { CommandLineTracker } from "./history/capture";
 import { SuggestionStrip } from "./history/SuggestionStrip";
 import { SearchBar } from "./SearchBar";
+import {
+  attachLine,
+  listSessionsCommand,
+  listWindowsCommand,
+  newSessionName,
+  parseSessions,
+  parseWindows,
+  planTmuxAttach,
+  selectWindowKeys,
+  type TmuxWindow,
+} from "./tmux/tmux";
+import {
+  TmuxPickerSheet,
+  TmuxWindowsSheet,
+  type PickSession,
+} from "./tmux/TmuxSheets";
+import { controlCode } from "./keys/dispatch";
+import { useKeyLayout } from "./keys/useKeyLayout";
 import type { TerminalSearchResult } from "@/modules/termix-terminal";
 import { PromptWatcher, pickPassword } from "./password-prompt";
 import { PasswordFillSheet, type FillChoice } from "./PasswordFillSheet";
@@ -238,6 +261,46 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
     const handlePostConnectionSetup = useCallback(() => {
       startupPending.current = true;
     }, []);
+    // tmux: sessions to pick from, and the one this tab attached to.
+    const [tmuxPick, setTmuxPick] = useState<{
+      sessions: PickSession[];
+      relay: boolean;
+    } | null>(null);
+    const [tmuxWindows, setTmuxWindows] = useState<TmuxWindow[] | null>(null);
+    const tmuxSessionRef = useRef<string | null>(null);
+    const startupBase = useRef<StartupInput | null>(null);
+
+    const typeLines = useCallback((lines: StartupLine[]) => {
+      let at = 0;
+      for (const line of lines) {
+        setTimeout(() => connRef.current?.sendInput(`${line.text}\r`), at);
+        at += line.waitAfterMs ?? 100;
+      }
+    }, []);
+
+    const attachLocalTmux = useCallback(
+      (name: string | null) => {
+        const base = startupBase.current;
+        if (!base) return;
+        if (name === null) {
+          typeLines(startupLines(base));
+          return;
+        }
+        const fresh = name === "";
+        const target = fresh
+          ? newSessionName(String(hostRef.current.syncId ?? hostRef.current.id))
+          : name;
+        tmuxSessionRef.current = target;
+        typeLines(
+          startupLines({
+            ...base,
+            tmux: { line: attachLine(target, fresh), fresh },
+          }),
+        );
+      },
+      [typeLines],
+    );
+
     const runStartup = useCallback(async () => {
       const terminalConfig: Partial<TerminalConfig> = {
         ...MOBILE_DEFAULT_TERMINAL_CONFIG,
@@ -251,7 +314,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
           terminalConfig.startupSnippetId,
         );
       }
-      const lines = startupLines({
+      const base: StartupInput = {
         transport: transportRef.current,
         sshOptions: host.sshOptions,
         legacyEnv: terminalConfig.environmentVariables,
@@ -263,11 +326,50 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
           name: hostConfig.name,
         },
         mosh: terminalConfig.autoMosh ? terminalConfig.moshCommand : null,
-      });
-      lines.forEach((line, i) => {
-        setTimeout(() => connRef.current?.sendInput(`${line}\r`), i * 100);
-      });
-    }, [config, hostConfig, host.sshOptions, repos]);
+      };
+      startupBase.current = base;
+      // A relay shell's tmux is the server's; a phone shell checks itself.
+      if (terminalConfig.autoTmux && transportRef.current === "local") {
+        const found = await connRef.current
+          ?.exec(listSessionsCommand(), 10)
+          .catch(() => null);
+        if (found?.exitCode === 127) {
+          showToast.info("tmux is not installed on this host");
+        } else if (found) {
+          const sessions = parseSessions(found.stdout);
+          const plan = planTmuxAttach(sessions.length);
+          if (plan === "pick") {
+            setTmuxPick({ sessions, relay: false });
+            return;
+          }
+          attachLocalTmux(plan === "create" ? "" : sessions[0].name);
+          return;
+        }
+      }
+      typeLines(startupLines(base));
+    }, [
+      config,
+      hostConfig,
+      host.sshOptions,
+      repos,
+      attachLocalTmux,
+      typeLines,
+    ]);
+
+    const onTmuxPick = useCallback(
+      (name: string | null) => {
+        const pick = tmuxPick;
+        setTmuxPick(null);
+        if (!pick) return;
+        if (pick.relay) {
+          if (name) tmuxSessionRef.current = name;
+          connRef.current?.attachTmux(name ?? "");
+        } else {
+          attachLocalTmux(name);
+        }
+      },
+      [tmuxPick, attachLocalTmux],
+    );
 
     // One pipe for the tab's life: reconnects and new views attach to it again.
     const [pipeId] = useState(() => `term-${++pipeSeq}`);
@@ -312,6 +414,16 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
           else nativeRef.current?.write(data);
         },
         onPostConnectionSetup: () => handlePostConnectionSetup(),
+        onTmuxSessions: (sessions) =>
+          setTmuxPick({
+            relay: true,
+            sessions: sessions.map((s) => ({
+              name: s.name,
+              windows: s.windows,
+              attached: s.attachedClients,
+              activity: s.lastActivity,
+            })),
+          }),
         onDisconnected: (hostName) => {
           showToast.warning(`Disconnected from ${hostName}`);
           onClose?.();
@@ -378,14 +490,41 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
       setSearchResult({ total: 0, index: -1 });
       nativeRef.current?.clearSearch();
     }, []);
-    const runCommand = useCallback((id: string) => {
-      if (XTERM_FALLBACK) return false;
-      if (id === "search") {
-        setSearchOpen(true);
-        return true;
+    const { layout: keyLayout } = useKeyLayout(host);
+    const tmuxPrefix = controlCode(keyLayout.tmuxPrefix || "b");
+    const openTmuxWindows = useCallback(async () => {
+      // Only a phone shell can list them; through the server, tmux's own chooser.
+      if (transportRef.current !== "local") {
+        connRef.current?.sendInput(`${tmuxPrefix}w`);
+        return;
       }
-      return false;
-    }, []);
+      const found = await connRef.current
+        ?.exec(listWindowsCommand(), 10)
+        .catch(() => null);
+      const all = parseWindows(found?.stdout ?? "");
+      const session = tmuxSessionRef.current;
+      const mine = session ? all.filter((w) => w.session === session) : all;
+      if (mine.length === 0) {
+        showToast.info("No tmux windows found");
+        return;
+      }
+      setTmuxWindows(mine);
+    }, [tmuxPrefix]);
+    const runCommand = useCallback(
+      (id: string) => {
+        if (id === "tmux.windows") {
+          void openTmuxWindows();
+          return true;
+        }
+        if (XTERM_FALLBACK) return false;
+        if (id === "search") {
+          setSearchOpen(true);
+          return true;
+        }
+        return false;
+      },
+      [openTmuxWindows],
+    );
 
     const modifiersRef = useRef<ModifierState>({
       ctrl: "inactive",
@@ -612,6 +751,24 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
             />
           )}
         </View>
+
+        <TmuxPickerSheet
+          sessions={tmuxPick?.sessions ?? null}
+          allowPlain={!tmuxPick?.relay}
+          onPick={onTmuxPick}
+        />
+        <TmuxWindowsSheet
+          windows={tmuxWindows}
+          onClose={() => setTmuxWindows(null)}
+          onNew={() => {
+            setTmuxWindows(null);
+            connRef.current?.sendInput(`${tmuxPrefix}c`);
+          }}
+          onPick={(w) => {
+            setTmuxWindows(null);
+            connRef.current?.sendInput(tmuxPrefix + selectWindowKeys(w.index));
+          }}
+        />
 
         <PasswordFillSheet
           ask={fillAsk}

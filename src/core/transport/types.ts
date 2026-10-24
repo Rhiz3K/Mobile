@@ -84,6 +84,22 @@ export interface ShellEvents {
     stage?: string;
     message: string;
   }) => void;
+  /** The server found several tmux sessions; answer with `attachTmux`. */
+  onTmuxSessions?: (sessions: RelayTmuxSession[]) => void;
+}
+
+/** A tmux session as the server's ssh-terminal plugin lists it. */
+export interface RelayTmuxSession {
+  name: string;
+  windows?: number;
+  attachedClients?: number;
+  lastActivity?: number;
+}
+
+/** A side command's result on the shell's own SSH connection. */
+export interface ShellExecResult {
+  stdout: string;
+  exitCode: number | null;
 }
 
 export interface ShellOptions extends ShellEvents {
@@ -115,6 +131,10 @@ export interface ShellChannel {
     rows: number,
   ): void;
   sendWarpgateContinue(): void;
+  /** Runs a command next to the shell, on the same connection. Phone shells only. */
+  exec?(command: string, timeoutSecs?: number): Promise<ShellExecResult>;
+  /** Picks a tmux session the server listed; empty starts a new one. Relay only. */
+  attachTmux?(sessionName: string): void;
   notifyBackgrounded(): void;
   notifyForegrounded(): void;
   destroy(): void;

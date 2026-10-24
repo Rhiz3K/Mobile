@@ -50,6 +50,8 @@
 - Shift in the key row stays on for the next key like Ctrl and Alt, and a quick double tap keeps it on
 - The terminal offers to fill the saved password at password prompts, and the sudo password at sudo prompts when the host turns that on. Pick Always fill to stop asking for that host
 - Find text in the terminal and its scrollback from the Find key, with the count and next and previous. Match case, whole word and regex on Android
+- Open tmux for a host from its Terminal tab: it attaches to the only session, starts one when there is none and asks when there are several, also on This device
+- The tmux Windows key lists the session's windows to switch between them
 - Search the command history, and long press a command to run, copy or delete it
 - Past commands that start with what you type can show above the keys, if you turn it on
 - Command history of a linked server shows on the phone, and commands typed on the phone show in Termix
@@ -82,6 +84,7 @@
 
 - A reverse proxy asking you to sign in again no longer signs you out of Termix
 - Terminal settings saved on a host in Termix 2.9 and newer are now used on the phone
+- A host with tmux turned on in Termix no longer hangs when the host has more than one tmux session
 - A host's environment variables and startup snippet from Termix 2.9 and newer now apply in the terminal
 - The first letter typed in the terminal is no longer a capital (#93)
 - Copying text no longer freezes the terminal on Android (#101)

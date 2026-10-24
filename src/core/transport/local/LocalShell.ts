@@ -9,7 +9,12 @@ import {
   type SshShell,
 } from "@/modules/termix-ssh";
 import { fromError, type ConnectFailure } from "../errors";
-import type { HostKeyData, ShellChannel, ShellOptions } from "../types";
+import type {
+  HostKeyData,
+  ShellChannel,
+  ShellExecResult,
+  ShellOptions,
+} from "../types";
 import {
   closeAll,
   openChain,
@@ -399,6 +404,16 @@ export class LocalShell implements ShellChannel {
 
   notifyBackgrounded(): void {
     this.background = true;
+  }
+
+  async exec(command: string, timeoutSecs = 10): Promise<ShellExecResult> {
+    const target = this.chain?.target;
+    if (!target || target.isClosed) throw new Error("Not connected");
+    const result = await target.exec(command, { timeoutSecs });
+    return {
+      stdout: utf8Decode(result.stdout),
+      exitCode: result.exitCode,
+    };
   }
 
   notifyForegrounded(): void {
