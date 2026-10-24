@@ -2,13 +2,21 @@
 
 mod algorithms;
 mod cancel;
+mod display;
 mod exec;
 mod forward;
 mod keys;
 mod proxy;
+#[cfg(feature = "rdp")]
+mod rdp;
+mod remote;
 mod session;
 mod sftp;
 mod shell;
+#[cfg(feature = "telnet")]
+mod telnet;
+#[cfg(feature = "vnc")]
+mod vnc;
 
 pub use cancel::CancelToken;
 pub use exec::ExecHandle;
@@ -16,7 +24,11 @@ pub use forward::Forward;
 pub use keys::{convert_key_to_openssh, inspect_certificate, inspect_key, CertInfo, KeyInfo};
 pub use session::{connect, Session};
 pub use sftp::Sftp;
+pub use display::{display_protocols, open_display, DisplayCallbacks, DisplayConfig, DisplayProtocol, RemoteDisplay};
+pub use remote::DialConfig;
 pub use shell::{EnvVar, Shell};
+#[cfg(feature = "telnet")]
+pub use telnet::{connect_telnet, TelnetConfig, TelnetShell};
 
 uniffi::setup_scaffolding!();
 

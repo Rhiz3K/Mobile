@@ -5,12 +5,21 @@ import expo.modules.kotlin.exception.CodedException
 import expo.modules.kotlin.functions.Coroutine
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import expo.modules.termixdisplay.FrameBuffer
+import expo.modules.termixdisplay.TermixFrames
 import expo.modules.termixpipe.PipeProducer
 import expo.modules.termixpipe.TermixPipes
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
 import uniffi.termix_ssh_core.CancelToken
 import uniffi.termix_ssh_core.ConnectConfig
+import uniffi.termix_ssh_core.DialConfig
+import uniffi.termix_ssh_core.DisplayCallbacks
+import uniffi.termix_ssh_core.DisplayConfig
+import uniffi.termix_ssh_core.DisplayProtocol
+import uniffi.termix_ssh_core.RemoteDisplay
+import uniffi.termix_ssh_core.TelnetConfig
+import uniffi.termix_ssh_core.TelnetShell
 import uniffi.termix_ssh_core.DisconnectKind
 import uniffi.termix_ssh_core.EnvVar
 import uniffi.termix_ssh_core.ExecCallbacks
@@ -31,6 +40,9 @@ import uniffi.termix_ssh_core.Shell
 import uniffi.termix_ssh_core.ShellCallbacks
 import uniffi.termix_ssh_core.SshException
 import uniffi.termix_ssh_core.connect
+import uniffi.termix_ssh_core.connectTelnet
+import uniffi.termix_ssh_core.displayProtocols
+import uniffi.termix_ssh_core.openDisplay
 import uniffi.termix_ssh_core.convertKeyToOpenssh
 import uniffi.termix_ssh_core.engineVersion
 import uniffi.termix_ssh_core.inspectCertificate
@@ -87,6 +99,39 @@ private fun Map<String, Any?>.bool(key: String, fallback: Boolean) = this[key] a
 @Suppress("UNCHECKED_CAST")
 private fun Map<String, Any?>.list(key: String) = (this[key] as? List<Map<String, Any?>>) ?: emptyList()
 
+private fun parseProxies(c: Map<String, Any?>) = c.list("proxies").map {
+    ProxyHop(
+        kind = when (it.str("kind")) {
+            "socks4" -> ProxyKind.SOCKS4
+            "http" -> ProxyKind.HTTP
+            else -> ProxyKind.SOCKS5
+        },
+        host = it.str("host") ?: "",
+        port = it.int("port", 1080).toUShort(),
+        username = it.str("username"),
+        password = it.str("password"),
+    )
+}
+
+private fun parseDial(c: Map<String, Any?>) = DialConfig(
+    host = c.str("host") ?: throw SshCodedException("SSH_CONNECT", "No host"),
+    port = c.int("port", 23).toUShort(),
+    proxies = parseProxies(c),
+    connectTimeoutSecs = c.int("connectTimeoutSecs", 15).toUInt(),
+)
+
+private fun parseDisplay(c: Map<String, Any?>) = DisplayConfig(
+    dial = parseDial(c),
+    protocol = if (c.str("protocol") == "rdp") DisplayProtocol.RDP else DisplayProtocol.VNC,
+    username = c.str("username"),
+    password = c.str("password"),
+    domain = c.str("domain"),
+    width = c.int("width", 1280).toUInt(),
+    height = c.int("height", 720).toUInt(),
+    scale = c.int("scale", 0).toUInt(),
+    security = c.str("security") ?: "",
+)
+
 private fun parseConfig(c: Map<String, Any?>) = ConnectConfig(
     host = c.str("host") ?: throw SshCodedException("SSH_CONNECT", "No host"),
     port = c.int("port", 22).toUShort(),
@@ -101,19 +146,7 @@ private fun parseConfig(c: Map<String, Any?>) = ConnectConfig(
     connectTimeoutSecs = c.int("connectTimeoutSecs", 15).toUInt(),
     keepaliveIntervalSecs = c.int("keepaliveIntervalSecs", 30).toUInt(),
     keepaliveCountMax = c.int("keepaliveCountMax", 5).toUInt(),
-    proxies = c.list("proxies").map {
-        ProxyHop(
-            kind = when (it.str("kind")) {
-                "socks4" -> ProxyKind.SOCKS4
-                "http" -> ProxyKind.HTTP
-                else -> ProxyKind.SOCKS5
-            },
-            host = it.str("host") ?: "",
-            port = it.int("port", 1080).toUShort(),
-            username = it.str("username"),
-            password = it.str("password"),
-        )
-    },
+    proxies = parseProxies(c),
     portKnock = c.list("portKnock").map {
         PortKnock(port = it.int("port", 0).toUShort(), udp = it.bool("udp", false), delayMs = it.int("delayMs", 100).toUInt())
     },
@@ -168,6 +201,8 @@ private class Pending<T>(val sessionId: String, val answer: CompletableDeferred<
 class TermixSshModule : Module() {
     private val sessions = ConcurrentHashMap<String, Live>()
     private val shells = ConcurrentHashMap<String, Owned<Shell>>()
+    private val telnets = ConcurrentHashMap<String, Owned<TelnetShell>>()
+    private val displays = ConcurrentHashMap<String, Owned<RemoteDisplay>>()
     private val execs = ConcurrentHashMap<String, Owned<ExecHandle>>()
     private val forwards = ConcurrentHashMap<String, Owned<Forward>>()
     private val cancels = ConcurrentHashMap<String, CancelToken>()
@@ -198,6 +233,10 @@ class TermixSshModule : Module() {
     private fun dropChannels(sessionId: String) {
         sessions[sessionId]?.let { l -> l.sftp?.destroy(); l.sftp = null }
         shells.entries.removeIf { (_, o) -> (o.sessionId == sessionId).also { if (it) o.value.destroy() } }
+        telnets.entries.removeIf { (_, o) -> (o.sessionId == sessionId).also { if (it) o.value.destroy() } }
+        displays.entries.removeIf { (_, o) ->
+            (o.sessionId == sessionId).also { if (it) { o.value.close(); o.value.destroy() } }
+        }
         execs.entries.removeIf { (_, o) -> (o.sessionId == sessionId).also { if (it) o.value.destroy() } }
         forwards.entries.removeIf { (_, o) ->
             (o.sessionId == sessionId).also { if (it) { o.value.stop(); o.value.destroy() } }
@@ -249,6 +288,56 @@ class TermixSshModule : Module() {
         }
     }
 
+    // With a pipe the bytes go straight to the terminal view; JS only hears that output started.
+    private fun shellSink(shellId: String, pipeId: String?, producer: () -> PipeProducer?) = object : ShellCallbacks {
+        private val pipe = pipeId?.let { TermixPipes.get(it) }
+        private var announced = false
+
+        override fun onData(data: ByteArray) {
+            if (pipe == null) {
+                sendEvent("onShellData", mapOf("shellId" to shellId, "data" to b64(data)))
+                return
+            }
+            pipe.push(data)
+            if (!announced) {
+                announced = true
+                sendEvent("onShellActive", mapOf("shellId" to shellId))
+            }
+        }
+
+        override fun onExit(exitCode: UInt?, exitSignal: String?) {
+            shells.remove(shellId)?.value?.destroy()
+            telnets.remove(shellId)?.value?.destroy()
+            if (pipe != null && pipeId != null) {
+                producer()?.let { pipe.detachProducer(it) }
+                TermixPipes.release(pipeId)
+            }
+            sendEvent("onShellExit", mapOf("shellId" to shellId, "exitCode" to exitCode?.toInt(), "exitSignal" to exitSignal))
+        }
+    }
+
+    // Frames go straight into the display view's buffer; JS only hears size, clipboard and the end.
+    private fun displaySink(displayId: String) = object : DisplayCallbacks {
+        private val frame: FrameBuffer = TermixFrames.get(displayId)
+
+        override fun onResize(width: UInt, height: UInt) {
+            frame.resize(width.toInt(), height.toInt())
+            sendEvent("onDisplayResize", mapOf("displayId" to displayId, "width" to width.toInt(), "height" to height.toInt()))
+        }
+
+        override fun onFrame(x: UInt, y: UInt, width: UInt, height: UInt, rgba: ByteArray) {
+            frame.blit(x.toInt(), y.toInt(), width.toInt(), height.toInt(), rgba)
+        }
+
+        override fun onClipboard(text: String) = sendEvent("onDisplayClipboard", mapOf("displayId" to displayId, "text" to text))
+
+        override fun onClosed(reason: String?) {
+            displays.remove(displayId)?.value?.destroy()
+            TermixFrames.release(displayId)
+            sendEvent("onDisplayClosed", mapOf("displayId" to displayId, "reason" to reason))
+        }
+    }
+
     private fun progress(opId: String) = object : ProgressCallback {
         override fun onProgress(done: ULong, total: ULong) {
             sendEvent("onProgress", mapOf("opId" to opId, "done" to done.toDouble(), "total" to total.toDouble()))
@@ -261,6 +350,7 @@ class TermixSshModule : Module() {
         Events(
             "onHostKey", "onKeyboardInteractive", "onBanner", "onDisconnect",
             "onShellData", "onShellActive", "onShellExit", "onExecData", "onExecExit", "onProgress",
+            "onDisplayResize", "onDisplayClipboard", "onDisplayClosed",
         )
 
         Function("engineVersion") { engineVersion() }
@@ -350,38 +440,32 @@ class TermixSshModule : Module() {
         AsyncFunction("execClose") Coroutine { execId: String -> execs[execId]?.value?.let { runCatching { it.end() } } }
 
         AsyncFunction("openShell") Coroutine { id: String, shellId: String, term: String, cols: Int, rows: Int, env: Map<String, String>, pipeId: String? ->
-            // With a pipe the bytes go straight to the terminal view; JS only hears that output started.
-            val pipe = pipeId?.let { TermixPipes.get(it) }
-            var announced = false
             var producer: PipeProducer? = null
             val shell = ssh {
                 live(id).session.openShell(
                     term, cols.toUInt(), rows.toUInt(), env.map { EnvVar(it.key, it.value) },
-                    object : ShellCallbacks {
-                        override fun onData(data: ByteArray) {
-                            if (pipe == null) {
-                                sendEvent("onShellData", mapOf("shellId" to shellId, "data" to b64(data)))
-                                return
-                            }
-                            pipe.push(data)
-                            if (!announced) {
-                                announced = true
-                                sendEvent("onShellActive", mapOf("shellId" to shellId))
-                            }
-                        }
-                        override fun onExit(exitCode: UInt?, exitSignal: String?) {
-                            shells.remove(shellId)?.value?.destroy()
-                            if (pipe != null && pipeId != null) {
-                                producer?.let { pipe.detachProducer(it) }
-                                TermixPipes.release(pipeId)
-                            }
-                            sendEvent("onShellExit", mapOf("shellId" to shellId, "exitCode" to exitCode?.toInt(), "exitSignal" to exitSignal))
-                        }
-                    },
+                    shellSink(shellId, pipeId) { producer },
                 )
             }
             shells[shellId] = Owned(id, shell)
-            if (pipe != null) {
+            pipeId?.let { TermixPipes.get(it) }?.let { pipe ->
+                val p = object : PipeProducer {
+                    override fun pause() = shell.pause()
+                    override fun resume() = shell.resume()
+                }
+                producer = p
+                pipe.setProducer(p)
+            }
+        }
+
+        // Telnet shells use the same write, resize and close calls as SSH shells.
+        AsyncFunction("openTelnet") Coroutine { shellId: String, dial: Map<String, Any?>, term: String, cols: Int, rows: Int, login: Map<String, String>, viaId: String?, pipeId: String? ->
+            val config = TelnetConfig(parseDial(dial), term, cols.toUInt(), rows.toUInt(), login["username"], login["password"])
+            val via = viaId?.let { live(it).session }
+            var producer: PipeProducer? = null
+            val shell = ssh { connectTelnet(config, via, shellSink(shellId, pipeId) { producer }) }
+            telnets[shellId] = Owned(viaId ?: "", shell)
+            pipeId?.let { TermixPipes.get(it) }?.let { pipe ->
                 val p = object : PipeProducer {
                     override fun pause() = shell.pause()
                     override fun resume() = shell.resume()
@@ -392,12 +476,22 @@ class TermixSshModule : Module() {
         }
 
         AsyncFunction("writeShell") Coroutine { shellId: String, data: String ->
-            val shell = shells[shellId]?.value ?: throw SshCodedException("SSH_DISCONNECTED", "Shell closed")
-            ssh { shell.write(unb64(data)) }
+            val telnet = telnets[shellId]?.value
+            if (telnet != null) {
+                ssh { telnet.write(unb64(data)) }
+            } else {
+                val shell = shells[shellId]?.value ?: throw SshCodedException("SSH_DISCONNECTED", "Shell closed")
+                ssh { shell.write(unb64(data)) }
+            }
         }
 
         AsyncFunction("resizeShell") Coroutine { shellId: String, cols: Int, rows: Int ->
-            shells[shellId]?.value?.let { ssh { it.resize(cols.toUInt(), rows.toUInt()) } }
+            val telnet = telnets[shellId]?.value
+            if (telnet != null) {
+                ssh { telnet.resize(cols.toUInt(), rows.toUInt()) }
+            } else {
+                shells[shellId]?.value?.let { ssh { it.resize(cols.toUInt(), rows.toUInt()) } }
+            }
         }
 
         AsyncFunction("signalShell") Coroutine { shellId: String, name: String ->
@@ -406,6 +500,36 @@ class TermixSshModule : Module() {
 
         AsyncFunction("closeShell") Coroutine { shellId: String ->
             shells[shellId]?.value?.let { s -> runCatching { s.end() } }
+            telnets[shellId]?.value?.let { t -> runCatching { t.end() } }
+        }
+
+        Function("displayProtocols") { displayProtocols().map { if (it == DisplayProtocol.RDP) "rdp" else "vnc" } }
+
+        AsyncFunction("openDisplay") Coroutine { displayId: String, c: Map<String, Any?>, viaId: String? ->
+            val config = parseDisplay(c)
+            val via = viaId?.let { live(it).session }
+            val display = ssh { openDisplay(config, via, displaySink(displayId)) }
+            displays[displayId] = Owned(viaId ?: "", display)
+        }
+
+        Function("displayPointer") { displayId: String, x: Int, y: Int, buttons: Int ->
+            displays[displayId]?.value?.pointer(maxOf(0, x).toUInt(), maxOf(0, y).toUInt(), (buttons and 0xff).toUByte())
+        }
+
+        Function("displayKeySym") { displayId: String, sym: Int, down: Boolean -> displays[displayId]?.value?.keySym(sym.toUInt(), down) }
+
+        Function("displayUnicode") { displayId: String, ch: Int, down: Boolean -> displays[displayId]?.value?.unicode(ch.toUInt(), down) }
+
+        Function("displayClipboard") { displayId: String, text: String -> displays[displayId]?.value?.clipboardSet(text) }
+
+        Function("displayResize") { displayId: String, width: Int, height: Int, scale: Int ->
+            displays[displayId]?.value?.resize(width.toUInt(), height.toUInt(), scale.toUInt())
+        }
+
+        Function("displayRefresh") { displayId: String -> displays[displayId]?.value?.refresh() }
+
+        Function("closeDisplay") { displayId: String ->
+            displays.remove(displayId)?.value?.let { it.close(); it.destroy() }
         }
 
         AsyncFunction("sftpList") Coroutine { id: String, path: String -> ssh { sftp(id).list(path) }.map { it.toMap() } }
@@ -511,6 +635,10 @@ class TermixSshModule : Module() {
             execs.clear()
             shells.values.forEach { it.value.destroy() }
             shells.clear()
+            telnets.values.forEach { it.value.destroy() }
+            telnets.clear()
+            displays.values.forEach { it.value.close(); it.value.destroy() }
+            displays.clear()
             sessions.values.forEach { it.destroy() }
             sessions.clear()
         }

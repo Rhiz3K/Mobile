@@ -33,6 +33,29 @@ The phone's own SSH and SFTP engine. A Rust core on [russh](https://github.com/w
   `allowLegacyAlgorithms` (on by default, like core). Not supported: `sntrup761x25519-sha512`. Agent
   auth and browser sign-ins (OPKSSH, Step CA, Vault) need a Termix server
 
+## Telnet and remote desktops
+
+The engine also opens plain TCP for non-SSH hosts, directly, through the proxies, or through an SSH
+session (a direct-tcpip channel, so jump hosts work with no forward listener). Each protocol is a cargo
+feature (`telnet`, `vnc`, `rdp`, all on by default), so one can be left out to save size.
+
+- `connectTelnet`: Telnet (RFC 854) driven like a shell. It answers BINARY, SGA, ECHO, terminal type and
+  window size, escapes IAC and sends a bare CR as CR NUL. A saved login is typed at the first `login:` and
+  `password:` prompts. Output can go to a terminal pipe like an SSH shell.
+- `openDisplay`: VNC or RDP. Frames go to `modules/termix-display` by frame id and never cross JS; JS sends
+  pointer, keys, text, clipboard and resize, and hears size, clipboard and the end. A refused login
+  throws `auth`.
+  - VNC is a port of the remote desktop plugin's client: RFB 3.3 to 3.8 (macOS 3.889 too), None, VNC
+    password and Apple Remote Desktop logins, Raw, CopyRect, Hextile and ZRLE, desktop resize.
+  - RDP is [IronRDP](https://github.com/Devolutions/IronRDP) (MIT or Apache-2.0) at the plugin's revision,
+    with TLS on rustls and NLA through NTLM. It runs on its own thread because IronRDP's futures are not
+    all `Send`. Kerberos, RD Gateway, clipboard, audio and drives are not in yet.
+
+VNC and RDP on the phone are a prototype: only the dev display lab opens them.
+
+Size of a release build (Windows x64 DLL, the same profile as the phones): 4.0 MB with no remote
+protocols, 4.2 MB with Telnet and VNC, 8.8 MB with RDP too.
+
 Secrets stay in Rust once a login starts: the config kept for `reconnect()` is wiped when the session
 goes, and `ConnectConfig` never prints secrets in logs.
 

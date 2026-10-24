@@ -9,12 +9,15 @@ import { requireOptionalNativeModule } from "expo-modules-core";
 
 import { fromBase64, toBase64, utf8Encode } from "./src/base64";
 import type {
+  DisplayConfig,
+  DisplayProtocol,
   NativeEvents,
   NativeExecResult,
   NativeSessionInfo,
   SshAlgorithms,
   SshCertInfo,
   SshConnectConfig,
+  SshDialConfig,
   SshDisconnect,
   SshErrorKind,
   SshExecResult,
@@ -719,4 +722,147 @@ export function connect(
   options: ConnectOptions = {},
 ): Promise<SshSession> {
   return connectSession(config, prompts, null, options);
+}
+
+export interface TelnetOptions {
+  dial: SshDialConfig;
+  cols: number;
+  rows: number;
+  term?: string;
+  /** Typed at the first login and password prompts. */
+  username?: string;
+  password?: string;
+  /** Reach the Telnet host through this SSH session, like a jump host. */
+  via?: SshSession;
+  /** Send output to a terminal view's pipe instead of `onData`. */
+  pipeId?: string;
+}
+
+/** Opens a Telnet session. It is driven like a shell: write, resize, close. */
+export async function connectTelnet(
+  options: TelnetOptions,
+  handlers: ShellHandlers,
+): Promise<SshShell> {
+  const shell = new SshShell(newId("telnet"), handlers);
+  try {
+    await call(() =>
+      native().openTelnet(
+        shell.id,
+        options.dial,
+        options.term ?? "xterm-256color",
+        options.cols,
+        options.rows,
+        { username: options.username, password: options.password },
+        options.via?.id ?? null,
+        options.pipeId ?? null,
+      ),
+    );
+  } catch (err) {
+    shell.release();
+    throw err;
+  }
+  return shell;
+}
+
+/** The remote desktop protocols this build of the engine has. */
+export function displayProtocols(): DisplayProtocol[] {
+  return Native?.displayProtocols?.() ?? [];
+}
+
+export interface DisplayHandlers {
+  onResize?(width: number, height: number): void;
+  onClipboard?(text: string): void;
+  /** `reason` is null when this side closed it. */
+  onClosed?(reason: string | null): void;
+}
+
+/**
+ * A VNC or RDP session. Pixels go to the native display view with the same id as `frameId`;
+ * this only sends input and hears size, clipboard and the end.
+ */
+export class RemoteDisplay {
+  private subs: { remove(): void }[] = [];
+
+  constructor(
+    readonly frameId: string,
+    handlers: DisplayHandlers,
+  ) {
+    this.subs.push(
+      on("onDisplayResize", (e) => {
+        if (e.displayId === frameId) handlers.onResize?.(e.width, e.height);
+      }),
+      on("onDisplayClipboard", (e) => {
+        if (e.displayId === frameId) handlers.onClipboard?.(e.text);
+      }),
+      on("onDisplayClosed", (e) => {
+        if (e.displayId !== frameId) return;
+        this.release();
+        handlers.onClosed?.(e.reason ?? null);
+      }),
+    );
+  }
+
+  /** Buttons: 1 left, 2 middle, 4 right, 8 wheel up, 16 wheel down. */
+  pointer(x: number, y: number, buttons: number): void {
+    native().displayPointer(
+      this.frameId,
+      Math.round(x),
+      Math.round(y),
+      buttons,
+    );
+  }
+
+  keySym(sym: number, down: boolean): void {
+    native().displayKeySym(this.frameId, sym, down);
+  }
+
+  /** Types text, one character at a time. */
+  type(text: string): void {
+    for (const ch of text) {
+      const cp = ch.codePointAt(0);
+      if (cp == null) continue;
+      native().displayUnicode(this.frameId, cp, true);
+      native().displayUnicode(this.frameId, cp, false);
+    }
+  }
+
+  clipboard(text: string): void {
+    native().displayClipboard(this.frameId, text);
+  }
+
+  resize(width: number, height: number, scale = 0): void {
+    native().displayResize(this.frameId, width, height, scale);
+  }
+
+  refresh(): void {
+    native().displayRefresh(this.frameId);
+  }
+
+  close(): void {
+    native().closeDisplay(this.frameId);
+    this.release();
+  }
+
+  release(): void {
+    this.subs.forEach((s) => s.remove());
+    this.subs = [];
+  }
+}
+
+/** Connects and logs in to a VNC or RDP host. A refused login throws `auth`. */
+export async function openDisplay(
+  config: DisplayConfig,
+  handlers: DisplayHandlers,
+  via?: SshSession,
+): Promise<RemoteDisplay> {
+  const display = new RemoteDisplay(newId("display"), handlers);
+  try {
+    await call(() =>
+      native().openDisplay(display.frameId, config, via?.id ?? null),
+    );
+  } catch (err) {
+    display.release();
+    throw err;
+  }
+  return display;
 }

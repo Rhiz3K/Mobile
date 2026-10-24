@@ -38,6 +38,32 @@ export interface SshConnectConfig {
   portKnock?: SshPortKnock[];
 }
 
+/** A plain TCP connection for Telnet, VNC or RDP. */
+export interface SshDialConfig {
+  host: string;
+  port: number;
+  /** Ignored when going through an SSH host. */
+  proxies?: SshProxyHop[];
+  connectTimeoutSecs?: number;
+}
+
+export type DisplayProtocol = "vnc" | "rdp";
+
+export interface DisplayConfig extends SshDialConfig {
+  protocol: DisplayProtocol;
+  username?: string;
+  password?: string;
+  /** RDP only. */
+  domain?: string;
+  /** The size to ask for. VNC servers pick their own. */
+  width: number;
+  height: number;
+  /** RDP desktop scale in percent, 100 to 500. 0 leaves it to the server. */
+  scale?: number;
+  /** RDP: any, nla or tls, like the plugin's setting. */
+  security?: string;
+}
+
 export interface SshHostKey {
   host: string;
   port: number;
@@ -206,6 +232,39 @@ export interface TermixSshNativeModule {
     env: Record<string, string>,
     pipeId: string | null,
   ): Promise<void>;
+  openTelnet(
+    shellId: string,
+    dial: SshDialConfig,
+    term: string,
+    cols: number,
+    rows: number,
+    login: { username?: string; password?: string },
+    viaSessionId: string | null,
+    pipeId: string | null,
+  ): Promise<void>;
+  displayProtocols(): DisplayProtocol[];
+  openDisplay(
+    displayId: string,
+    config: DisplayConfig,
+    viaSessionId: string | null,
+  ): Promise<void>;
+  displayPointer(
+    displayId: string,
+    x: number,
+    y: number,
+    buttons: number,
+  ): void;
+  displayKeySym(displayId: string, sym: number, down: boolean): void;
+  displayUnicode(displayId: string, ch: number, down: boolean): void;
+  displayClipboard(displayId: string, text: string): void;
+  displayResize(
+    displayId: string,
+    width: number,
+    height: number,
+    scale: number,
+  ): void;
+  displayRefresh(displayId: string): void;
+  closeDisplay(displayId: string): void;
   writeShell(shellId: string, data: string): Promise<void>;
   resizeShell(shellId: string, cols: number, rows: number): Promise<void>;
   signalShell(shellId: string, name: string): Promise<void>;
@@ -315,4 +374,7 @@ export interface NativeEvents {
     exitSignal: string | null;
   };
   onProgress: { opId: string; done: number; total: number };
+  onDisplayResize: { displayId: string; width: number; height: number };
+  onDisplayClipboard: { displayId: string; text: string };
+  onDisplayClosed: { displayId: string; reason: string | null };
 }

@@ -23,6 +23,16 @@ const mockNative = {
   execSignal: fn(),
   execClose: fn(),
   openShell: fn(),
+  openTelnet: fn(),
+  displayProtocols: jest.fn(() => ["vnc", "rdp"]),
+  openDisplay: fn(),
+  displayPointer: jest.fn(),
+  displayKeySym: jest.fn(),
+  displayUnicode: jest.fn(),
+  displayClipboard: jest.fn(),
+  displayResize: jest.fn(),
+  displayRefresh: jest.fn(),
+  closeDisplay: jest.fn(),
   writeShell: fn(),
   resizeShell: fn(),
   signalShell: fn(),
@@ -583,5 +593,131 @@ describe("termix-ssh keys", () => {
     expect(() => ssh.inspectCertificate("c")).toThrow(
       expect.objectContaining({ kind: "invalidKey" }),
     );
+  });
+});
+
+describe("termix-ssh telnet and displays", () => {
+  it("opens telnet like a shell, through an SSH host when asked", async () => {
+    const { ssh, s } = await session();
+    const onExit = jest.fn();
+    const shell = await ssh.connectTelnet(
+      {
+        dial: { host: "box", port: 23 },
+        cols: 80,
+        rows: 24,
+        username: "me",
+        via: s,
+        pipeId: "p1",
+      },
+      { onData: jest.fn(), onExit },
+    );
+    expect(mockNative.openTelnet).toHaveBeenCalledWith(
+      shell.id,
+      { host: "box", port: 23 },
+      "xterm-256color",
+      80,
+      24,
+      { username: "me", password: undefined },
+      s.id,
+      "p1",
+    );
+    await shell.resize(100, 30);
+    expect(mockNative.resizeShell).toHaveBeenCalledWith(shell.id, 100, 30);
+    emit("onShellExit", { shellId: shell.id, exitCode: 0, exitSignal: null });
+    expect(onExit).toHaveBeenCalledWith(0, null);
+  });
+
+  it("drops listeners when telnet fails to open", async () => {
+    const ssh = load();
+    mockNative.openTelnet.mockRejectedValueOnce({
+      code: "SSH_TIMEOUT",
+      message: "Timed out",
+    });
+    await expect(
+      ssh.connectTelnet(
+        { dial: { host: "box", port: 23 }, cols: 80, rows: 24 },
+        { onData: jest.fn() },
+      ),
+    ).rejects.toMatchObject({ kind: "timeout" });
+    expect(mockListeners.get("onShellExit")?.size ?? 0).toBe(0);
+  });
+
+  it("sends display input and hears size, clipboard and close", async () => {
+    const ssh = load();
+    expect(ssh.displayProtocols()).toEqual(["vnc", "rdp"]);
+    const onResize = jest.fn();
+    const onClipboard = jest.fn();
+    const onClosed = jest.fn();
+    const config = {
+      protocol: "vnc" as const,
+      host: "mac",
+      port: 5900,
+      width: 1280,
+      height: 720,
+    };
+    const d = await ssh.openDisplay(config, {
+      onResize,
+      onClipboard,
+      onClosed,
+    });
+    expect(mockNative.openDisplay).toHaveBeenCalledWith(
+      d.frameId,
+      config,
+      null,
+    );
+
+    d.pointer(10.4, 20.6, 1);
+    expect(mockNative.displayPointer).toHaveBeenCalledWith(
+      d.frameId,
+      10,
+      21,
+      1,
+    );
+    d.type("hé");
+    expect(mockNative.displayUnicode.mock.calls).toEqual([
+      [d.frameId, 0x68, true],
+      [d.frameId, 0x68, false],
+      [d.frameId, 0xe9, true],
+      [d.frameId, 0xe9, false],
+    ]);
+    d.resize(800, 600, 200);
+    expect(mockNative.displayResize).toHaveBeenCalledWith(
+      d.frameId,
+      800,
+      600,
+      200,
+    );
+
+    emit("onDisplayResize", { displayId: "other", width: 1, height: 1 });
+    emit("onDisplayResize", {
+      displayId: d.frameId,
+      width: 1920,
+      height: 1080,
+    });
+    emit("onDisplayClipboard", { displayId: d.frameId, text: "hi" });
+    expect(onResize).toHaveBeenCalledWith(1920, 1080);
+    expect(onClipboard).toHaveBeenCalledWith("hi");
+    emit("onDisplayClosed", { displayId: d.frameId, reason: "bye" });
+    expect(onClosed).toHaveBeenCalledWith("bye");
+    expect(mockListeners.get("onDisplayResize")?.size).toBe(0);
+  });
+
+  it("reports a refused display login as auth", async () => {
+    const ssh = load();
+    mockNative.openDisplay.mockRejectedValueOnce({
+      code: "SSH_AUTH",
+      message: "The RDP server refused the login",
+    });
+    await expect(
+      ssh.openDisplay(
+        { protocol: "rdp", host: "pc", port: 3389, width: 1, height: 1 },
+        {},
+      ),
+    ).rejects.toMatchObject({ kind: "auth" });
+  });
+
+  it("lists no protocols without the engine", () => {
+    mockAvailable = false;
+    expect(load().displayProtocols()).toEqual([]);
   });
 });

@@ -1,5 +1,6 @@
 import ExpoModulesCore
 import Foundation
+import TermixDisplay
 import TermixPipe
 
 // How long a login waits for the user to answer a host key or prompt.
@@ -48,14 +49,38 @@ private func localPath(_ path: String) -> String {
 
 private func num(_ v: Any?, _ fallback: Int) -> Int { (v as? NSNumber)?.intValue ?? fallback }
 
-private func parseConfig(_ c: [String: Any]) throws -> ConnectConfig {
-  guard let host = c["host"] as? String else { throw SshCodedException("SSH_CONNECT", "No host") }
-  let proxies = (c["proxies"] as? [[String: Any]] ?? []).map { p -> ProxyHop in
+private func parseProxies(_ c: [String: Any]) -> [ProxyHop] {
+  (c["proxies"] as? [[String: Any]] ?? []).map { p -> ProxyHop in
     let kind: ProxyKind = p["kind"] as? String == "socks4" ? .socks4 : p["kind"] as? String == "http" ? .http : .socks5
     return ProxyHop(
       kind: kind, host: p["host"] as? String ?? "", port: UInt16(num(p["port"], 1080)),
       username: p["username"] as? String, password: p["password"] as? String)
   }
+}
+
+private func parseDial(_ c: [String: Any]) throws -> DialConfig {
+  guard let host = c["host"] as? String else { throw SshCodedException("SSH_CONNECT", "No host") }
+  return DialConfig(
+    host: host, port: UInt16(num(c["port"], 23)), proxies: parseProxies(c),
+    connectTimeoutSecs: UInt32(num(c["connectTimeoutSecs"], 15)))
+}
+
+private func parseDisplay(_ c: [String: Any]) throws -> DisplayConfig {
+  DisplayConfig(
+    dial: try parseDial(c),
+    protocol: c["protocol"] as? String == "rdp" ? .rdp : .vnc,
+    username: c["username"] as? String,
+    password: c["password"] as? String,
+    domain: c["domain"] as? String,
+    width: UInt32(num(c["width"], 1280)),
+    height: UInt32(num(c["height"], 720)),
+    scale: UInt32(num(c["scale"], 0)),
+    security: c["security"] as? String ?? "")
+}
+
+private func parseConfig(_ c: [String: Any]) throws -> ConnectConfig {
+  guard let host = c["host"] as? String else { throw SshCodedException("SSH_CONNECT", "No host") }
+  let proxies = parseProxies(c)
   let knocks = (c["portKnock"] as? [[String: Any]] ?? []).map {
     PortKnock(port: UInt16(num($0["port"], 0)), udp: $0["udp"] as? Bool ?? false, delayMs: UInt32(num($0["delayMs"], 100)))
   }
@@ -252,6 +277,7 @@ private final class ShellSink: ShellCallbacks, @unchecked Sendable {
   }
   func onExit(exitCode: UInt32?, exitSignal: String?) {
     _ = module?.shells.remove(shellId)
+    _ = module?.telnets.remove(shellId)
     let producer = module?.producers.remove(shellId)
     if let pipe, let pipeId {
       if let producer { pipe.detachProducer(producer) }
@@ -265,10 +291,45 @@ private final class ShellSink: ShellCallbacks, @unchecked Sendable {
 
 /// Pauses the Rust reader while the terminal view catches up.
 private final class ShellProducer: PipeProducer, @unchecked Sendable {
-  let shell: Shell
-  init(_ shell: Shell) { self.shell = shell }
-  func pause() { shell.pause() }
-  func resume() { shell.resume() }
+  private let onPause: () -> Void
+  private let onResume: () -> Void
+  init(_ shell: Shell) {
+    onPause = { shell.pause() }
+    onResume = { shell.resume() }
+  }
+  init(_ telnet: TelnetShell) {
+    onPause = { telnet.pause() }
+    onResume = { telnet.resume() }
+  }
+  func pause() { onPause() }
+  func resume() { onResume() }
+}
+
+/// Frames go straight into the display view's buffer; JS only hears size, clipboard and the end.
+private final class DisplaySink: DisplayCallbacks, @unchecked Sendable {
+  let displayId: String
+  weak var module: TermixSshModule?
+  let frame: FrameBuffer
+  init(_ displayId: String, _ module: TermixSshModule) {
+    self.displayId = displayId
+    self.module = module
+    frame = TermixFrames.get(displayId)
+  }
+  func onResize(width: UInt32, height: UInt32) {
+    frame.resize(width: Int(width), height: Int(height))
+    module?.sendEvent("onDisplayResize", ["displayId": displayId, "width": Int(width), "height": Int(height)])
+  }
+  func onFrame(x: UInt32, y: UInt32, width: UInt32, height: UInt32, rgba: Data) {
+    frame.blit(x: Int(x), y: Int(y), width: Int(width), height: Int(height), rgba: rgba)
+  }
+  func onClipboard(text: String) {
+    module?.sendEvent("onDisplayClipboard", ["displayId": displayId, "text": text])
+  }
+  func onClosed(reason: String?) {
+    _ = module?.displays.remove(displayId)
+    TermixFrames.release(displayId)
+    module?.sendEvent("onDisplayClosed", ["displayId": displayId, "reason": reason as Any])
+  }
 }
 
 private final class ExecSink: ExecCallbacks, @unchecked Sendable {
@@ -307,6 +368,8 @@ private final class OpProgress: ProgressCallback, @unchecked Sendable {
 public final class TermixSshModule: Module {
   fileprivate let sessions = Store<Live>()
   fileprivate let shells = Store<Owned<Shell>>()
+  fileprivate let telnets = Store<Owned<TelnetShell>>()
+  fileprivate let displays = Store<Owned<RemoteDisplay>>()
   // The pipe holds its producer weakly, so the module keeps it.
   fileprivate let producers = Store<ShellProducer>()
   fileprivate let execs = Store<Owned<ExecHandle>>()
@@ -349,6 +412,8 @@ public final class TermixSshModule: Module {
   fileprivate func dropChannels(_ sessionId: String) {
     sessions[sessionId]?.sftp = nil
     _ = shells.removeWhere { $0.sessionId == sessionId }
+    _ = telnets.removeWhere { $0.sessionId == sessionId }
+    displays.removeWhere { $0.sessionId == sessionId }.forEach { $0.value.close() }
     _ = execs.removeWhere { $0.sessionId == sessionId }
     forwards.removeWhere { $0.sessionId == sessionId }.forEach { $0.value.stop() }
   }
@@ -358,7 +423,8 @@ public final class TermixSshModule: Module {
 
     Events(
       "onHostKey", "onKeyboardInteractive", "onBanner", "onDisconnect",
-      "onShellData", "onShellActive", "onShellExit", "onExecData", "onExecExit", "onProgress"
+      "onShellData", "onShellActive", "onShellExit", "onExecData", "onExecExit", "onProgress",
+      "onDisplayResize", "onDisplayClipboard", "onDisplayClosed"
     )
 
     Function("engineVersion") { engineVersion() }
@@ -464,12 +530,38 @@ public final class TermixSshModule: Module {
       }
     }
 
+    // Telnet shells use the same write, resize and close calls as SSH shells.
+    AsyncFunction("openTelnet") {
+      (shellId: String, dial: [String: Any], term: String, cols: Int, rows: Int, login: [String: String], viaId: String?, pipeId: String?) async throws in
+      let config = TelnetConfig(
+        dial: try parseDial(dial), term: term, cols: UInt32(cols), rows: UInt32(rows),
+        username: login["username"], password: login["password"])
+      let via = try viaId.map { try self.live($0).session }
+      let sink = ShellSink(shellId, self, pipeId: pipeId)
+      let shell = try await ssh { try await connectTelnet(config: config, via: via, callbacks: sink) }
+      self.telnets[shellId] = Owned(sessionId: viaId ?? "", value: shell)
+      if let pipe = sink.pipe {
+        let producer = ShellProducer(shell)
+        self.producers[shellId] = producer
+        pipe.setProducer(producer)
+      }
+    }
+
     AsyncFunction("writeShell") { (shellId: String, data: String) async throws in
+      let bytes = Data(base64Encoded: data) ?? Data()
+      if let telnet = self.telnets[shellId]?.value {
+        try await ssh { try await telnet.write(data: bytes) }
+        return
+      }
       guard let shell = self.shells[shellId]?.value else { throw SshCodedException("SSH_DISCONNECTED", "Shell closed") }
-      try await ssh { try await shell.write(data: Data(base64Encoded: data) ?? Data()) }
+      try await ssh { try await shell.write(data: bytes) }
     }
 
     AsyncFunction("resizeShell") { (shellId: String, cols: Int, rows: Int) async throws in
+      if let telnet = self.telnets[shellId]?.value {
+        try await ssh { try await telnet.resize(cols: UInt32(cols), rows: UInt32(rows)) }
+        return
+      }
       guard let shell = self.shells[shellId]?.value else { return }
       try await ssh { try await shell.resize(cols: UInt32(cols), rows: UInt32(rows)) }
     }
@@ -481,6 +573,44 @@ public final class TermixSshModule: Module {
 
     AsyncFunction("closeShell") { (shellId: String) async in
       try? await self.shells[shellId]?.value.end()
+      try? await self.telnets[shellId]?.value.end()
+    }
+
+    Function("displayProtocols") { displayProtocols().map { $0 == .rdp ? "rdp" : "vnc" } }
+
+    AsyncFunction("openDisplay") { (displayId: String, c: [String: Any], viaId: String?) async throws in
+      let config = try parseDisplay(c)
+      let via = try viaId.map { try self.live($0).session }
+      let display = try await ssh {
+        try await openDisplay(config: config, via: via, callbacks: DisplaySink(displayId, self))
+      }
+      self.displays[displayId] = Owned(sessionId: viaId ?? "", value: display)
+    }
+
+    Function("displayPointer") { (displayId: String, x: Int, y: Int, buttons: Int) in
+      self.displays[displayId]?.value.pointer(x: UInt32(max(0, x)), y: UInt32(max(0, y)), buttons: UInt8(buttons & 0xff))
+    }
+
+    Function("displayKeySym") { (displayId: String, sym: Int, down: Bool) in
+      self.displays[displayId]?.value.keySym(sym: UInt32(sym), down: down)
+    }
+
+    Function("displayUnicode") { (displayId: String, ch: Int, down: Bool) in
+      self.displays[displayId]?.value.unicode(ch: UInt32(ch), down: down)
+    }
+
+    Function("displayClipboard") { (displayId: String, text: String) in
+      self.displays[displayId]?.value.clipboardSet(text: text)
+    }
+
+    Function("displayResize") { (displayId: String, width: Int, height: Int, scale: Int) in
+      self.displays[displayId]?.value.resize(width: UInt32(width), height: UInt32(height), scale: UInt32(scale))
+    }
+
+    Function("displayRefresh") { (displayId: String) in self.displays[displayId]?.value.refresh() }
+
+    Function("closeDisplay") { (displayId: String) in
+      self.displays.remove(displayId)?.value.close()
     }
 
     AsyncFunction("sftpList") { (id: String, path: String) async throws -> [[String: Any?]] in
@@ -620,6 +750,8 @@ public final class TermixSshModule: Module {
       self.forwards.removeAll().forEach { $0.value.stop() }
       _ = self.execs.removeAll()
       _ = self.shells.removeAll()
+      _ = self.telnets.removeAll()
+      self.displays.removeAll().forEach { $0.value.close() }
       _ = self.producers.removeAll()
       _ = self.sessions.removeAll()
     }

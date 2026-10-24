@@ -471,6 +471,22 @@ private let UNIFFI_CALLBACK_UNEXPECTED_ERROR: Int32 = 2
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterUInt8: FfiConverterPrimitive {
+    typealias FfiType = UInt8
+    typealias SwiftType = UInt8
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UInt8 {
+        return try lift(readInt(&buf))
+    }
+
+    public static func write(_ value: UInt8, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterUInt16: FfiConverterPrimitive {
     typealias FfiType = UInt16
     typealias SwiftType = UInt16
@@ -741,6 +757,342 @@ public func FfiConverterTypeCancelToken_lift(_ handle: UInt64) throws -> CancelT
 #endif
 public func FfiConverterTypeCancelToken_lower(_ value: CancelToken) -> UInt64 {
     return FfiConverterTypeCancelToken.lower(value)
+}
+
+
+
+
+
+
+public protocol DisplayCallbacks: AnyObject, Sendable {
+    
+    /**
+     * The framebuffer is now this size. Every pixel comes again in frames.
+     */
+    func onResize(width: UInt32, height: UInt32) 
+    
+    /**
+     * RGBA pixels for one changed rectangle, `width * height * 4` bytes.
+     */
+    func onFrame(x: UInt32, y: UInt32, width: UInt32, height: UInt32, rgba: Data) 
+    
+    func onClipboard(text: String) 
+    
+    /**
+     * The session ended. `reason` is None when this side closed it.
+     */
+    func onClosed(reason: String?) 
+    
+}
+open class DisplayCallbacksImpl: DisplayCallbacks, @unchecked Sendable {
+    fileprivate let handle: UInt64
+
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoHandle {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noHandle: NoHandle) {
+        self.handle = 0
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_termix_ssh_core_fn_clone_displaycallbacks(self.handle, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        if handle == 0 {
+            // Mock objects have handle=0 don't try to free them
+            return
+        }
+
+        try! rustCall { uniffi_termix_ssh_core_fn_free_displaycallbacks(handle, $0) }
+    }
+
+    
+
+    
+    /**
+     * The framebuffer is now this size. Every pixel comes again in frames.
+     */
+open func onResize(width: UInt32, height: UInt32)  {try! rustCall() {
+        uniffiCallStatus in
+    uniffi_termix_ssh_core_fn_method_displaycallbacks_on_resize(
+            self.uniffiCloneHandle(),
+        FfiConverterUInt32.lower(width),
+        FfiConverterUInt32.lower(height),uniffiCallStatus
+    )
+}
+}
+    
+    /**
+     * RGBA pixels for one changed rectangle, `width * height * 4` bytes.
+     */
+open func onFrame(x: UInt32, y: UInt32, width: UInt32, height: UInt32, rgba: Data)  {try! rustCall() {
+        uniffiCallStatus in
+    uniffi_termix_ssh_core_fn_method_displaycallbacks_on_frame(
+            self.uniffiCloneHandle(),
+        FfiConverterUInt32.lower(x),
+        FfiConverterUInt32.lower(y),
+        FfiConverterUInt32.lower(width),
+        FfiConverterUInt32.lower(height),
+        FfiConverterData.lower(rgba),uniffiCallStatus
+    )
+}
+}
+    
+open func onClipboard(text: String)  {try! rustCall() {
+        uniffiCallStatus in
+    uniffi_termix_ssh_core_fn_method_displaycallbacks_on_clipboard(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(text),uniffiCallStatus
+    )
+}
+}
+    
+    /**
+     * The session ended. `reason` is None when this side closed it.
+     */
+open func onClosed(reason: String?)  {try! rustCall() {
+        uniffiCallStatus in
+    uniffi_termix_ssh_core_fn_method_displaycallbacks_on_closed(
+            self.uniffiCloneHandle(),
+        FfiConverterOptionString.lower(reason),uniffiCallStatus
+    )
+}
+}
+    
+
+    
+}
+
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceDisplayCallbacks {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    //
+    // Store the vtable directly.
+    static let vtable: UniffiVTableCallbackInterfaceDisplayCallbacks = UniffiVTableCallbackInterfaceDisplayCallbacks(
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            do {
+                try FfiConverterTypeDisplayCallbacks.handleMap.remove(handle: uniffiHandle)
+            } catch {
+                print("Uniffi callback interface DisplayCallbacks: handle missing in uniffiFree")
+            }
+        },
+        uniffiClone: { (uniffiHandle: UInt64) -> UInt64 in
+            do {
+                return try FfiConverterTypeDisplayCallbacks.handleMap.clone(handle: uniffiHandle)
+            } catch {
+                fatalError("Uniffi callback interface DisplayCallbacks: handle missing in uniffiClone")
+            }
+        },
+        onResize: { (
+            uniffiHandle: UInt64,
+            width: UInt32,
+            height: UInt32,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterTypeDisplayCallbacks.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onResize(
+                     width: try FfiConverterUInt32.lift(width),
+                     height: try FfiConverterUInt32.lift(height)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        },
+        onFrame: { (
+            uniffiHandle: UInt64,
+            x: UInt32,
+            y: UInt32,
+            width: UInt32,
+            height: UInt32,
+            rgba: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterTypeDisplayCallbacks.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onFrame(
+                     x: try FfiConverterUInt32.lift(x),
+                     y: try FfiConverterUInt32.lift(y),
+                     width: try FfiConverterUInt32.lift(width),
+                     height: try FfiConverterUInt32.lift(height),
+                     rgba: try FfiConverterData.lift(rgba)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        },
+        onClipboard: { (
+            uniffiHandle: UInt64,
+            text: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterTypeDisplayCallbacks.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onClipboard(
+                     text: try FfiConverterString.lift(text)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        },
+        onClosed: { (
+            uniffiHandle: UInt64,
+            reason: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterTypeDisplayCallbacks.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onClosed(
+                     reason: try FfiConverterOptionString.lift(reason)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        }
+    )
+
+    // Rust stores this pointer for future callback invocations, so it must live
+    // for the process lifetime (not just for the init function call).
+    //
+    // `nonisolated(unsafe)` is needed under Swift 6 strict concurrency.
+    // This is safe because the pointee is initialized once during static init
+    // and never mutated by either side of the FFI.  Its fields are C function pointers.
+    nonisolated(unsafe) static let vtablePtr: UnsafePointer<UniffiVTableCallbackInterfaceDisplayCallbacks> = {
+        let ptr = UnsafeMutablePointer<UniffiVTableCallbackInterfaceDisplayCallbacks>.allocate(capacity: 1)
+        ptr.initialize(to: vtable)
+        return UnsafePointer(ptr)
+    }()
+}
+
+private func uniffiCallbackInitDisplayCallbacks() {
+    uniffi_termix_ssh_core_fn_init_callback_vtable_displaycallbacks(UniffiCallbackInterfaceDisplayCallbacks.vtablePtr)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeDisplayCallbacks: FfiConverter {
+    fileprivate static let handleMap = UniffiHandleMap<DisplayCallbacks>()
+
+    typealias FfiType = UInt64
+    typealias SwiftType = DisplayCallbacks
+
+    public static func lift(_ handle: UInt64) throws -> DisplayCallbacks {
+        if ((handle & 1) == 0) {
+            // Rust-generated handle, construct a new class that uses the handle to implement the
+            // interface
+            return DisplayCallbacksImpl(unsafeFromHandle: handle)
+        } else {
+            // Swift-generated handle, get the object from the handle map
+            return try handleMap.remove(handle: handle)
+        }
+    }
+
+    public static func lower(_ value: DisplayCallbacks) -> UInt64 {
+         if let rustImpl = value as? DisplayCallbacksImpl {
+             // Rust-implemented object.  Clone the handle and return it
+            return rustImpl.uniffiCloneHandle()
+         } else {
+            // Swift object, generate a new vtable handle and return that.
+            return handleMap.insert(obj: value)
+         }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DisplayCallbacks {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func write(_ value: DisplayCallbacks, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDisplayCallbacks_lift(_ handle: UInt64) throws -> DisplayCallbacks {
+    return try FfiConverterTypeDisplayCallbacks.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDisplayCallbacks_lower(_ value: DisplayCallbacks) -> UInt64 {
+    return FfiConverterTypeDisplayCallbacks.lower(value)
 }
 
 
@@ -1566,6 +1918,211 @@ public func FfiConverterTypeProgressCallback_lift(_ handle: UInt64) throws -> Pr
 #endif
 public func FfiConverterTypeProgressCallback_lower(_ value: ProgressCallback) -> UInt64 {
     return FfiConverterTypeProgressCallback.lower(value)
+}
+
+
+
+
+
+
+public protocol RemoteDisplayProtocol: AnyObject, Sendable {
+    
+    func clipboardSet(text: String) 
+    
+    func close() 
+    
+    /**
+     * An X11 keysym, as Guacamole and VNC use.
+     */
+    func keySym(sym: UInt32, down: Bool) 
+    
+    func pointer(x: UInt32, y: UInt32, buttons: UInt8) 
+    
+    /**
+     * Asks for every pixel again, after the view was recreated.
+     */
+    func refresh() 
+    
+    func resize(width: UInt32, height: UInt32, scale: UInt32) 
+    
+    /**
+     * A typed character, for text from the on-screen keyboard.
+     */
+    func unicode(ch: UInt32, down: Bool) 
+    
+}
+open class RemoteDisplay: RemoteDisplayProtocol, @unchecked Sendable {
+    fileprivate let handle: UInt64
+
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoHandle {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noHandle: NoHandle) {
+        self.handle = 0
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_termix_ssh_core_fn_clone_remotedisplay(self.handle, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        if handle == 0 {
+            // Mock objects have handle=0 don't try to free them
+            return
+        }
+
+        try! rustCall { uniffi_termix_ssh_core_fn_free_remotedisplay(handle, $0) }
+    }
+
+    
+
+    
+open func clipboardSet(text: String)  {try! rustCall() {
+        uniffiCallStatus in
+    uniffi_termix_ssh_core_fn_method_remotedisplay_clipboard_set(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(text),uniffiCallStatus
+    )
+}
+}
+    
+open func close()  {try! rustCall() {
+        uniffiCallStatus in
+    uniffi_termix_ssh_core_fn_method_remotedisplay_close(
+            self.uniffiCloneHandle(),uniffiCallStatus
+    )
+}
+}
+    
+    /**
+     * An X11 keysym, as Guacamole and VNC use.
+     */
+open func keySym(sym: UInt32, down: Bool)  {try! rustCall() {
+        uniffiCallStatus in
+    uniffi_termix_ssh_core_fn_method_remotedisplay_key_sym(
+            self.uniffiCloneHandle(),
+        FfiConverterUInt32.lower(sym),
+        FfiConverterBool.lower(down),uniffiCallStatus
+    )
+}
+}
+    
+open func pointer(x: UInt32, y: UInt32, buttons: UInt8)  {try! rustCall() {
+        uniffiCallStatus in
+    uniffi_termix_ssh_core_fn_method_remotedisplay_pointer(
+            self.uniffiCloneHandle(),
+        FfiConverterUInt32.lower(x),
+        FfiConverterUInt32.lower(y),
+        FfiConverterUInt8.lower(buttons),uniffiCallStatus
+    )
+}
+}
+    
+    /**
+     * Asks for every pixel again, after the view was recreated.
+     */
+open func refresh()  {try! rustCall() {
+        uniffiCallStatus in
+    uniffi_termix_ssh_core_fn_method_remotedisplay_refresh(
+            self.uniffiCloneHandle(),uniffiCallStatus
+    )
+}
+}
+    
+open func resize(width: UInt32, height: UInt32, scale: UInt32)  {try! rustCall() {
+        uniffiCallStatus in
+    uniffi_termix_ssh_core_fn_method_remotedisplay_resize(
+            self.uniffiCloneHandle(),
+        FfiConverterUInt32.lower(width),
+        FfiConverterUInt32.lower(height),
+        FfiConverterUInt32.lower(scale),uniffiCallStatus
+    )
+}
+}
+    
+    /**
+     * A typed character, for text from the on-screen keyboard.
+     */
+open func unicode(ch: UInt32, down: Bool)  {try! rustCall() {
+        uniffiCallStatus in
+    uniffi_termix_ssh_core_fn_method_remotedisplay_unicode(
+            self.uniffiCloneHandle(),
+        FfiConverterUInt32.lower(ch),
+        FfiConverterBool.lower(down),uniffiCallStatus
+    )
+}
+}
+    
+
+    
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRemoteDisplay: FfiConverter {
+    typealias FfiType = UInt64
+    typealias SwiftType = RemoteDisplay
+
+    public static func lift(_ handle: UInt64) throws -> RemoteDisplay {
+        return RemoteDisplay(unsafeFromHandle: handle)
+    }
+
+    public static func lower(_ value: RemoteDisplay) -> UInt64 {
+        return value.uniffiCloneHandle()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RemoteDisplay {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func write(_ value: RemoteDisplay, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRemoteDisplay_lift(_ handle: UInt64) throws -> RemoteDisplay {
+    return try FfiConverterTypeRemoteDisplay.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRemoteDisplay_lower(_ value: RemoteDisplay) -> UInt64 {
+    return FfiConverterTypeRemoteDisplay.lower(value)
 }
 
 
@@ -3278,6 +3835,186 @@ public func FfiConverterTypeShellCallbacks_lower(_ value: ShellCallbacks) -> UIn
 
 
 
+
+
+public protocol TelnetShellProtocol: AnyObject, Sendable {
+    
+    func end() async throws 
+    
+    func pause() 
+    
+    func resize(cols: UInt32, rows: UInt32) async throws 
+    
+    func resume() 
+    
+    func write(data: Data) async throws 
+    
+}
+open class TelnetShell: TelnetShellProtocol, @unchecked Sendable {
+    fileprivate let handle: UInt64
+
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoHandle {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noHandle: NoHandle) {
+        self.handle = 0
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_termix_ssh_core_fn_clone_telnetshell(self.handle, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        if handle == 0 {
+            // Mock objects have handle=0 don't try to free them
+            return
+        }
+
+        try! rustCall { uniffi_termix_ssh_core_fn_free_telnetshell(handle, $0) }
+    }
+
+    
+
+    
+open func end()async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_termix_ssh_core_fn_method_telnetshell_end(
+                        self.uniffiCloneHandle()
+                )
+            },
+            pollFunc: ffi_termix_ssh_core_rust_future_poll_void,
+            completeFunc: ffi_termix_ssh_core_rust_future_complete_void,
+            freeFunc: ffi_termix_ssh_core_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeSshError_lift
+        )
+}
+    
+open func pause()  {try! rustCall() {
+        uniffiCallStatus in
+    uniffi_termix_ssh_core_fn_method_telnetshell_pause(
+            self.uniffiCloneHandle(),uniffiCallStatus
+    )
+}
+}
+    
+open func resize(cols: UInt32, rows: UInt32)async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_termix_ssh_core_fn_method_telnetshell_resize(
+                        self.uniffiCloneHandle(),FfiConverterUInt32.lower(cols),FfiConverterUInt32.lower(rows)
+                )
+            },
+            pollFunc: ffi_termix_ssh_core_rust_future_poll_void,
+            completeFunc: ffi_termix_ssh_core_rust_future_complete_void,
+            freeFunc: ffi_termix_ssh_core_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeSshError_lift
+        )
+}
+    
+open func resume()  {try! rustCall() {
+        uniffiCallStatus in
+    uniffi_termix_ssh_core_fn_method_telnetshell_resume(
+            self.uniffiCloneHandle(),uniffiCallStatus
+    )
+}
+}
+    
+open func write(data: Data)async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_termix_ssh_core_fn_method_telnetshell_write(
+                        self.uniffiCloneHandle(),FfiConverterData.lower(data)
+                )
+            },
+            pollFunc: ffi_termix_ssh_core_rust_future_poll_void,
+            completeFunc: ffi_termix_ssh_core_rust_future_complete_void,
+            freeFunc: ffi_termix_ssh_core_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeSshError_lift
+        )
+}
+    
+
+    
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeTelnetShell: FfiConverter {
+    typealias FfiType = UInt64
+    typealias SwiftType = TelnetShell
+
+    public static func lift(_ handle: UInt64) throws -> TelnetShell {
+        return TelnetShell(unsafeFromHandle: handle)
+    }
+
+    public static func lower(_ value: TelnetShell) -> UInt64 {
+        return value.uniffiCloneHandle()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TelnetShell {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func write(_ value: TelnetShell, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTelnetShell_lift(_ handle: UInt64) throws -> TelnetShell {
+    return try FfiConverterTypeTelnetShell.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTelnetShell_lower(_ value: TelnetShell) -> UInt64 {
+    return FfiConverterTypeTelnetShell.lower(value)
+}
+
+
+
+
 public struct CertInfo: Equatable, Hashable {
     public var keyType: String
     public var keyId: String
@@ -3485,6 +4222,174 @@ public func FfiConverterTypeConnectConfig_lift(_ buf: RustBuffer) throws -> Conn
 #endif
 public func FfiConverterTypeConnectConfig_lower(_ value: ConnectConfig) -> RustBuffer {
     return FfiConverterTypeConnectConfig.lower(value)
+}
+
+
+public struct DialConfig: Equatable, Hashable {
+    public var host: String
+    public var port: UInt16
+    public var proxies: [ProxyHop]
+    public var connectTimeoutSecs: UInt32
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(host: String, port: UInt16, proxies: [ProxyHop], connectTimeoutSecs: UInt32) {
+        self.host = host
+        self.port = port
+        self.proxies = proxies
+        self.connectTimeoutSecs = connectTimeoutSecs
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension DialConfig: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeDialConfig: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DialConfig {
+        return
+            try DialConfig(
+                host: FfiConverterString.read(from: &buf), 
+                port: FfiConverterUInt16.read(from: &buf), 
+                proxies: FfiConverterSequenceTypeProxyHop.read(from: &buf), 
+                connectTimeoutSecs: FfiConverterUInt32.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: DialConfig, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.host, into: &buf)
+        FfiConverterUInt16.write(value.port, into: &buf)
+        FfiConverterSequenceTypeProxyHop.write(value.proxies, into: &buf)
+        FfiConverterUInt32.write(value.connectTimeoutSecs, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDialConfig_lift(_ buf: RustBuffer) throws -> DialConfig {
+    return try FfiConverterTypeDialConfig.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDialConfig_lower(_ value: DialConfig) -> RustBuffer {
+    return FfiConverterTypeDialConfig.lower(value)
+}
+
+
+public struct DisplayConfig: Equatable, Hashable {
+    public var dial: DialConfig
+    public var `protocol`: DisplayProtocol
+    public var username: String?
+    public var password: String?
+    /**
+     * RDP only.
+     */
+    public var domain: String?
+    /**
+     * The size to ask for. VNC servers pick their own.
+     */
+    public var width: UInt32
+    public var height: UInt32
+    /**
+     * RDP desktop scale in percent, 100 to 500. 0 leaves it to the server.
+     */
+    public var scale: UInt32
+    /**
+     * RDP security like the plugin's setting: any, nla, tls. Empty means any.
+     */
+    public var security: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(dial: DialConfig, `protocol`: DisplayProtocol, username: String?, password: String?, 
+        /**
+         * RDP only.
+         */domain: String?, 
+        /**
+         * The size to ask for. VNC servers pick their own.
+         */width: UInt32, height: UInt32, 
+        /**
+         * RDP desktop scale in percent, 100 to 500. 0 leaves it to the server.
+         */scale: UInt32, 
+        /**
+         * RDP security like the plugin's setting: any, nla, tls. Empty means any.
+         */security: String) {
+        self.dial = dial
+        self.`protocol` = `protocol`
+        self.username = username
+        self.password = password
+        self.domain = domain
+        self.width = width
+        self.height = height
+        self.scale = scale
+        self.security = security
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension DisplayConfig: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeDisplayConfig: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DisplayConfig {
+        return
+            try DisplayConfig(
+                dial: FfiConverterTypeDialConfig.read(from: &buf), 
+                protocol: FfiConverterTypeDisplayProtocol.read(from: &buf), 
+                username: FfiConverterOptionString.read(from: &buf), 
+                password: FfiConverterOptionString.read(from: &buf), 
+                domain: FfiConverterOptionString.read(from: &buf), 
+                width: FfiConverterUInt32.read(from: &buf), 
+                height: FfiConverterUInt32.read(from: &buf), 
+                scale: FfiConverterUInt32.read(from: &buf), 
+                security: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: DisplayConfig, into buf: inout [UInt8]) {
+        FfiConverterTypeDialConfig.write(value.dial, into: &buf)
+        FfiConverterTypeDisplayProtocol.write(value.`protocol`, into: &buf)
+        FfiConverterOptionString.write(value.username, into: &buf)
+        FfiConverterOptionString.write(value.password, into: &buf)
+        FfiConverterOptionString.write(value.domain, into: &buf)
+        FfiConverterUInt32.write(value.width, into: &buf)
+        FfiConverterUInt32.write(value.height, into: &buf)
+        FfiConverterUInt32.write(value.scale, into: &buf)
+        FfiConverterString.write(value.security, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDisplayConfig_lift(_ buf: RustBuffer) throws -> DisplayConfig {
+    return try FfiConverterTypeDisplayConfig.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDisplayConfig_lower(_ value: DisplayConfig) -> RustBuffer {
+    return FfiConverterTypeDisplayConfig.lower(value)
 }
 
 
@@ -4287,6 +5192,88 @@ public func FfiConverterTypePtySize_lower(_ value: PtySize) -> RustBuffer {
 }
 
 
+public struct TelnetConfig: Equatable, Hashable {
+    public var dial: DialConfig
+    public var term: String
+    public var cols: UInt32
+    public var rows: UInt32
+    /**
+     * Typed at the first `login:` prompt.
+     */
+    public var username: String?
+    /**
+     * Typed at the first `password:` prompt after that.
+     */
+    public var password: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(dial: DialConfig, term: String, cols: UInt32, rows: UInt32, 
+        /**
+         * Typed at the first `login:` prompt.
+         */username: String?, 
+        /**
+         * Typed at the first `password:` prompt after that.
+         */password: String?) {
+        self.dial = dial
+        self.term = term
+        self.cols = cols
+        self.rows = rows
+        self.username = username
+        self.password = password
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension TelnetConfig: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeTelnetConfig: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TelnetConfig {
+        return
+            try TelnetConfig(
+                dial: FfiConverterTypeDialConfig.read(from: &buf), 
+                term: FfiConverterString.read(from: &buf), 
+                cols: FfiConverterUInt32.read(from: &buf), 
+                rows: FfiConverterUInt32.read(from: &buf), 
+                username: FfiConverterOptionString.read(from: &buf), 
+                password: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: TelnetConfig, into buf: inout [UInt8]) {
+        FfiConverterTypeDialConfig.write(value.dial, into: &buf)
+        FfiConverterString.write(value.term, into: &buf)
+        FfiConverterUInt32.write(value.cols, into: &buf)
+        FfiConverterUInt32.write(value.rows, into: &buf)
+        FfiConverterOptionString.write(value.username, into: &buf)
+        FfiConverterOptionString.write(value.password, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTelnetConfig_lift(_ buf: RustBuffer) throws -> TelnetConfig {
+    return try FfiConverterTypeTelnetConfig.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTelnetConfig_lower(_ value: TelnetConfig) -> RustBuffer {
+    return FfiConverterTypeTelnetConfig.lower(value)
+}
+
+
 public struct TransferResult: Equatable, Hashable {
     public var bytes: UInt64
     public var millis: UInt64
@@ -4432,6 +5419,72 @@ public func FfiConverterTypeDisconnectKind_lift(_ buf: RustBuffer) throws -> Dis
 #endif
 public func FfiConverterTypeDisconnectKind_lower(_ value: DisconnectKind) -> RustBuffer {
     return FfiConverterTypeDisconnectKind.lower(value)
+}
+
+
+
+
+public enum DisplayProtocol: Equatable, Hashable {
+    
+    case vnc
+    case rdp
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension DisplayProtocol: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeDisplayProtocol: FfiConverterRustBuffer {
+    typealias SwiftType = DisplayProtocol
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DisplayProtocol {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .vnc
+        
+        case 2: return .rdp
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: DisplayProtocol, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .vnc:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .rdp:
+            writeInt(&buf, Int32(2))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDisplayProtocol_lift(_ buf: RustBuffer) throws -> DisplayProtocol {
+    return try FfiConverterTypeDisplayProtocol.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDisplayProtocol_lower(_ value: DisplayProtocol) -> RustBuffer {
+    return FfiConverterTypeDisplayProtocol.lower(value)
 }
 
 
@@ -4787,6 +5840,30 @@ fileprivate struct FfiConverterOptionTypeProgressCallback: FfiConverterRustBuffe
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeSession: FfiConverterRustBuffer {
+    typealias SwiftType = Session?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeSession.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeSession.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeNegotiatedAlgorithms: FfiConverterRustBuffer {
     typealias SwiftType = NegotiatedAlgorithms?
 
@@ -5005,6 +6082,31 @@ fileprivate struct FfiConverterSequenceTypeProxyHop: FfiConverterRustBuffer {
         return seq
     }
 }
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeDisplayProtocol: FfiConverterRustBuffer {
+    typealias SwiftType = [DisplayProtocol]
+
+    public static func write(_ value: [DisplayProtocol], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeDisplayProtocol.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [DisplayProtocol] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [DisplayProtocol]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeDisplayProtocol.read(from: &buf))
+        }
+        return seq
+    }
+}
 private let UNIFFI_RUST_FUTURE_POLL_READY: Int8 = 0
 private let UNIFFI_RUST_FUTURE_POLL_WAKE: Int8 = 1
 
@@ -5154,6 +6256,33 @@ public func engineVersion() -> String  {
 })
 }
 /**
+ * The protocols this build was compiled with.
+ */
+public func displayProtocols() -> [DisplayProtocol]  {
+    return try!  FfiConverterSequenceTypeDisplayProtocol.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_termix_ssh_core_fn_func_display_protocols(uniffiCallStatus
+    )
+})
+}
+/**
+ * Connects and logs in. Login errors come back here; later errors go to `on_closed`.
+ */
+public func openDisplay(config: DisplayConfig, via: Session?, callbacks: DisplayCallbacks)async throws  -> RemoteDisplay  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_termix_ssh_core_fn_func_open_display(FfiConverterTypeDisplayConfig_lower(config),FfiConverterOptionTypeSession.lower(via),FfiConverterTypeDisplayCallbacks_lower(callbacks)
+                )
+            },
+            pollFunc: ffi_termix_ssh_core_rust_future_poll_u64,
+            completeFunc: ffi_termix_ssh_core_rust_future_complete_u64,
+            freeFunc: ffi_termix_ssh_core_rust_future_free_u64,
+            liftFunc: FfiConverterTypeRemoteDisplay_lift,
+            errorHandler: FfiConverterTypeSshError_lift
+        )
+}
+/**
  * Returns the key as OpenSSH text, so PuTTY, PEM and PKCS8 keys are stored one way.
  * A non-empty `new_passphrase` encrypts the result.
  */
@@ -5207,6 +6336,23 @@ public func connect(config: ConnectConfig, callbacks: SessionCallbacks, cancel: 
             errorHandler: FfiConverterTypeSshError_lift
         )
 }
+/**
+ * Opens a Telnet session. With `via` the SSH host dials it, like a jump host.
+ */
+public func connectTelnet(config: TelnetConfig, via: Session?, callbacks: ShellCallbacks)async throws  -> TelnetShell  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_termix_ssh_core_fn_func_connect_telnet(FfiConverterTypeTelnetConfig_lower(config),FfiConverterOptionTypeSession.lower(via),FfiConverterTypeShellCallbacks_lower(callbacks)
+                )
+            },
+            pollFunc: ffi_termix_ssh_core_rust_future_poll_u64,
+            completeFunc: ffi_termix_ssh_core_rust_future_complete_u64,
+            freeFunc: ffi_termix_ssh_core_rust_future_free_u64,
+            liftFunc: FfiConverterTypeTelnetShell_lift,
+            errorHandler: FfiConverterTypeSshError_lift
+        )
+}
 
 private enum InitializationResult {
     case ok
@@ -5226,6 +6372,12 @@ private let initializationResult: InitializationResult = {
     if (uniffi_termix_ssh_core_checksum_func_engine_version() != 33488) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_termix_ssh_core_checksum_func_display_protocols() != 38609) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_func_open_display() != 42634) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_termix_ssh_core_checksum_func_convert_key_to_openssh() != 11626) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -5236,6 +6388,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_termix_ssh_core_checksum_func_connect() != 5080) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_func_connect_telnet() != 5658) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_termix_ssh_core_checksum_method_execcallbacks_on_stdout() != 32055) {
@@ -5272,6 +6427,39 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_termix_ssh_core_checksum_method_canceltoken_is_cancelled() != 54838) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_displaycallbacks_on_resize() != 12983) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_displaycallbacks_on_frame() != 7615) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_displaycallbacks_on_clipboard() != 53336) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_displaycallbacks_on_closed() != 9560) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_remotedisplay_clipboard_set() != 37491) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_remotedisplay_close() != 27184) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_remotedisplay_key_sym() != 39667) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_remotedisplay_pointer() != 58333) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_remotedisplay_refresh() != 6268) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_remotedisplay_resize() != 34941) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_remotedisplay_unicode() != 50722) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_termix_ssh_core_checksum_method_exechandle_end() != 56423) {
@@ -5409,10 +6597,26 @@ private let initializationResult: InitializationResult = {
     if (uniffi_termix_ssh_core_checksum_method_shell_write() != 39054) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_termix_ssh_core_checksum_method_telnetshell_end() != 31661) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_telnetshell_pause() != 27104) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_telnetshell_resize() != 3539) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_telnetshell_resume() != 22258) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_telnetshell_write() != 21623) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_termix_ssh_core_checksum_constructor_canceltoken_new() != 54914) {
         return InitializationResult.apiChecksumMismatch
     }
 
+    uniffiCallbackInitDisplayCallbacks()
     uniffiCallbackInitExecCallbacks()
     uniffiCallbackInitProgressCallback()
     uniffiCallbackInitSessionCallbacks()
