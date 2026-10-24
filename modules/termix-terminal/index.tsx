@@ -65,6 +65,8 @@ interface NativeProps {
   onClipboardRequest?: (e: Ev<ClipboardRequest>) => void;
   onFontSize?: (e: Ev<{ size: number }>) => void;
   onModifiers?: (e: Ev<{ ctrl: StickyState; alt: StickyState }>) => void;
+  watchPrompt?: boolean;
+  onPromptLine?: (e: Ev<{ line: string }>) => void;
   style?: StyleProp<ViewStyle>;
   ref?: Ref<NativeHandle>;
 }
@@ -162,6 +164,8 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(
         bell={props.bell}
         optionAsMeta={props.optionAsMeta}
         accentColor={props.accentColor}
+        watchPrompt={props.watchPrompt ?? false}
+        onPromptLine={(e) => props.onPromptLine?.(e.nativeEvent.line)}
         onInput={(e) => props.onInput(e.nativeEvent.data)}
         onResize={(e) => {
           queue.markReady();

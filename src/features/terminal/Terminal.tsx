@@ -40,6 +40,9 @@ import { resolveTerminalSettings } from "./settings";
 import { findStartupSnippet, startupLines } from "./startup";
 import { CommandLineTracker } from "./history/capture";
 import { SuggestionStrip } from "./history/SuggestionStrip";
+import { PromptWatcher, pickPassword } from "./password-prompt";
+import { PasswordFillSheet, type FillChoice } from "./PasswordFillSheet";
+import { PASSWORD_FILL_PREF, hostCanFill } from "./password-fill";
 import {
   TerminalView,
   type ModifierState,
@@ -129,8 +132,6 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
     hostRef.current = host;
     const historyOnRef = useRef(historyOn);
     historyOnRef.current = historyOn;
-    // Set while the shell shows a password prompt.
-    const passwordPromptRef = useRef(false);
     const [tracker] = useState(
       () =>
         new CommandLineTracker({
@@ -139,8 +140,75 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
             if (!save || !historyOnRef.current || !(h.id > 0)) return;
             repos.commandHistory.add(h, line).catch(() => {});
           },
-          isPasswordInput: () => passwordPromptRef.current,
+          isPasswordInput: () =>
+            watcherRef.current?.atPasswordPrompt() ?? false,
         }),
+    );
+
+    // Password and sudo prompts: offer the saved password, asking first.
+    const watcherRef = useRef<PromptWatcher | null>(null);
+    const [fillAsk, setFillAsk] = useState<{ sudo: boolean } | null>(null);
+    const fillOn = hostConfig.terminalConfig?.passwordPromptAutoFill !== false;
+    const fillOnRef = useRef(fillOn);
+    fillOnRef.current = fillOn;
+    const fill = useCallback(
+      async (sudo: boolean) => {
+        const h = hostRef.current;
+        const full = await repos.hosts.get(h.id).catch(() => null);
+        const password = pickPassword(sudo, {
+          password: full?.password ?? h.password,
+          sudoPassword: full?.sudoPassword ?? h.sudoPassword,
+        });
+        if (!password) {
+          watcherRef.current?.settle(false);
+          showToast.warning("No saved password for this host");
+          return;
+        }
+        // Straight to the host, so it never reaches history.
+        connRef.current?.sendInput(`${password}\r`);
+        watcherRef.current?.settle(true);
+      },
+      [repos],
+    );
+    const fillRef = useRef(fill);
+    fillRef.current = fill;
+    if (!watcherRef.current) {
+      watcherRef.current = new PromptWatcher({
+        settings: () => ({
+          passwordPromptAutoFill: fillOnRef.current,
+          sudoPasswordAutoFill:
+            hostRef.current.terminalConfig?.sudoPasswordAutoFill === true,
+        }),
+        canFill: () => hostCanFill(hostRef.current),
+        lastCommand: () => tracker.lastSubmitted(),
+        offer: (sudo) => {
+          repos.hostPrefs
+            .get(hostRef.current, PASSWORD_FILL_PREF)
+            .catch(() => null)
+            .then((pref) => {
+              if (pref === "always") void fillRef.current(sudo);
+              else setFillAsk({ sudo });
+            });
+        },
+      });
+    }
+    const onFillChoice = useCallback(
+      (choice: FillChoice) => {
+        const ask = fillAsk;
+        setFillAsk(null);
+        if (!ask) return;
+        if (choice === "no") {
+          watcherRef.current?.settle(false);
+          return;
+        }
+        if (choice === "always") {
+          repos.hostPrefs
+            .set(hostRef.current, PASSWORD_FILL_PREF, "always")
+            .catch(() => {});
+        }
+        void fill(ask.sudo);
+      },
+      [fillAsk, fill, repos],
     );
     const suggestionsOn = !!config.commandSuggestions && historyOn;
     const [history, setHistory] = useState<string[]>([]);
@@ -195,12 +263,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
         mosh: terminalConfig.autoMosh ? terminalConfig.moshCommand : null,
       });
       lines.forEach((line, i) => {
-        setTimeout(
-          () =>
-            connRef.current?.sendInput(`${line}
-`),
-          i * 100,
-        );
+        setTimeout(() => connRef.current?.sendInput(`${line}\r`), i * 100);
       });
     }, [config, hostConfig, host.sshOptions, repos]);
 
@@ -242,6 +305,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
           }
         },
         onData: (data) => {
+          watcherRef.current?.feed(data);
           if (XTERM_FALLBACK) xtermRef.current?.write(data);
           else nativeRef.current?.write(data);
         },
@@ -416,6 +480,8 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
                   onModifiers={handleModifiers}
                   onFontSize={handleFontSize}
                   showScrollButton={isVisible && isConnected && !isDialogOpen}
+                  watchPrompt={isConnected && (fillOn || historyOn)}
+                  onPromptLine={(line) => watcherRef.current?.line(line)}
                 />
                 {suggestionsOn && isVisible && isConnected ? (
                   <SuggestionStrip
@@ -504,6 +570,12 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
             />
           )}
         </View>
+
+        <PasswordFillSheet
+          ask={fillAsk}
+          hostName={hostConfig.name || hostConfig.ip}
+          onChoose={onFillChoice}
+        />
 
         <ConnectionPrompts
           conn={conn}

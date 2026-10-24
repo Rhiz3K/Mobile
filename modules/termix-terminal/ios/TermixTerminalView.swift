@@ -160,6 +160,19 @@ class TermixTerminalView: ExpoView {
   let onClipboardRequest = EventDispatcher()
   let onFontSize = EventDispatcher()
   let onModifiers = EventDispatcher()
+  let onPromptLine = EventDispatcher()
+
+  /// Reports the line at the prompt once output settles, for password fill.
+  var promptWatch = false {
+    didSet {
+      if !promptWatch {
+        promptWork?.cancel()
+        lastPromptLine = ""
+      }
+    }
+  }
+  private var promptWork: DispatchWorkItem?
+  private var lastPromptLine = ""
 
   required init(appContext: AppContext? = nil) {
     super.init(appContext: appContext)
@@ -416,11 +429,28 @@ class TermixTerminalView: ExpoView {
   // MARK: - Output
 
   private func outputArrived() {
+    if promptWatch {
+      promptWork?.cancel()
+      let work = DispatchWorkItem { [weak self] in self?.reportPromptLine() }
+      promptWork = work
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)
+    }
     guard UIAccessibility.isVoiceOverRunning else { return }
     announceWork?.cancel()
     let work = DispatchWorkItem { [weak self] in self?.announceOutput() }
     announceWork = work
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
+  }
+
+  // The last line with text: the prompt sits at the bottom of what was printed.
+  private func reportPromptLine() {
+    guard promptWatch else { return }
+    let lines = (session.readViewportText() ?? "").components(separatedBy: "\n")
+    let line = lines.last { !$0.trimmingCharacters(in: .whitespaces).isEmpty } ?? ""
+    let trimmed = line.replacingOccurrences(of: "\\s+$", with: "", options: .regularExpression)
+    guard trimmed != lastPromptLine else { return }
+    lastPromptLine = trimmed
+    onPromptLine(["line": trimmed])
   }
 
   private func announceOutput() {

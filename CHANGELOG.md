@@ -48,6 +48,7 @@
 - Key rows above the keyboard in groups: Main, Nav, Symbols, Ctrl and tmux, with the tmux prefix, splits, windows, panes and copy mode. Tap the row button for the next row, hold it to pick one
 - Hold a key with a dot in its corner for more keys, like _ = + on the minus key
 - Shift in the key row stays on for the next key like Ctrl and Alt, and a quick double tap keeps it on
+- The terminal offers to fill the saved password at password prompts, and the sudo password at sudo prompts when the host turns that on. Pick Always fill to stop asking for that host
 - Search the command history, and long press a command to run, copy or delete it
 - Past commands that start with what you type can show above the keys, if you turn it on
 - Command history of a linked server shows on the phone, and commands typed on the phone show in Termix
@@ -70,7 +71,7 @@
 - A terminal that fails to connect stays open with the error instead of closing
 - The keyboard editor now edits rows and groups with drag to reorder, custom keys that type text, run a command or send Ctrl, and the tmux prefix. Your keys from 1.x move over
 - Ctrl, Alt and Shift from the key row also work in the full keys panel
-- Commands that look like they hold a password, token or key are no longer saved to history, like in Termix
+- Commands that look like they hold a password, token or key, and anything typed at a password prompt, are no longer saved to history, like in Termix
 
 ### Removed
 

@@ -101,6 +101,10 @@ export interface TerminalViewProps {
   onFontSize?: (size: number) => void;
   /** The sticky Ctrl and Alt changed. */
   onModifiers?: (state: { ctrl: StickyState; alt: StickyState }) => void;
+  /** Report the line at the prompt when output settles, through `onPromptLine`. */
+  watchPrompt?: boolean;
+  /** The prompt line changed, while `watchPrompt` is on. */
+  onPromptLine?: (line: string) => void;
   style?: StyleProp<ViewStyle>;
 }
 

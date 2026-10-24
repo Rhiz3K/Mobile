@@ -47,6 +47,7 @@ export interface TrackerOptions {
  */
 export class CommandLineTracker {
   private line = "";
+  private last = "";
   private escape: EscapeState = "none";
   private listeners = new Set<() => void>();
 
@@ -54,6 +55,11 @@ export class CommandLineTracker {
 
   current(): string {
     return this.line;
+  }
+
+  /** The last line submitted, kept or not. Tells sudo's bare Password: apart. */
+  lastSubmitted(): string {
+    return this.last;
   }
 
   subscribe(listener: () => void): () => void {
@@ -82,6 +88,7 @@ export class CommandLineTracker {
         const command = next.trim();
         next = "";
         if (this.options.isPasswordInput?.()) continue;
+        if (command) this.last = command;
         if (command)
           this.options.onSubmit(command, !isSensitiveCommand(command));
         continue;

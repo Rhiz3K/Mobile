@@ -12,6 +12,7 @@ import type {
 } from "@/core/features/types";
 import type { Snippet, SSHHost, SSHHostData, TerminalConfig } from "@/types";
 import { BELL_STYLES, CURSOR_STYLES, TERMINAL_FONTS } from "./settings";
+import { PASSWORD_FILL_PREF } from "./password-fill";
 
 type Config = Partial<TerminalConfig>;
 type EnvVar = { key: string; value: string };
@@ -89,10 +90,19 @@ export function envOf(options: Record<string, unknown> | undefined): EnvVar[] {
     .map((e) => ({ key: String(e.key ?? ""), value: String(e.value ?? "") }));
 }
 
-function TerminalTab({ value, onChange }: HostFormTabProps) {
+function TerminalTab({ host, value, onChange }: HostFormTabProps) {
   const color = useThemeColor();
   const repos = useRepositories();
   const [snippets, setSnippets] = useState<Snippet[]>([]);
+  // A phone choice, saved right away and never synced.
+  const [alwaysFill, setAlwaysFill] = useState(false);
+  useEffect(() => {
+    if (!host) return;
+    repos.hostPrefs
+      .get(host, PASSWORD_FILL_PREF)
+      .then((v) => setAlwaysFill(v === "always"))
+      .catch(() => {});
+  }, [host, repos]);
   const config = (value.terminalConfig ?? {}) as Config;
   const options = (value.sshOptions ?? {}) as Record<string, unknown>;
   const env = envOf(options);
@@ -197,8 +207,25 @@ function TerminalTab({ value, onChange }: HostFormTabProps) {
               startupSnippetId: repos.source === "local" ? v : Number(v),
             });
           }}
-          last
+          last={!host}
         />
+        {host ? (
+          <SettingRow
+            label="Fill without asking"
+            description="On this phone only, once you picked Always fill"
+            last
+          >
+            <FakeSwitch
+              checked={alwaysFill}
+              onChange={(v) => {
+                setAlwaysFill(v);
+                repos.hostPrefs
+                  .set(host, PASSWORD_FILL_PREF, v ? "always" : null)
+                  .catch(() => {});
+              }}
+            />
+          </SettingRow>
+        ) : null}
       </View>
 
       <View className="gap-1">

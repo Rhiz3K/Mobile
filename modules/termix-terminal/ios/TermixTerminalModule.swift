@@ -9,7 +9,7 @@ public class TermixTerminalModule: Module {
     View(TermixTerminalView.self) {
       Events(
         "onInput", "onResize", "onBell", "onTitleChange", "onScrollState", "onLink", "onCopy",
-        "onClipboardRequest", "onFontSize", "onModifiers"
+        "onClipboardRequest", "onFontSize", "onModifiers", "onPromptLine"
       )
 
       Prop("pipeId") { (view: TermixTerminalView, id: String?) in
@@ -56,6 +56,10 @@ public class TermixTerminalModule: Module {
 
       Prop("accentColor") { (view: TermixTerminalView, color: String?) in
         view.setAccentColor(color)
+      }
+
+      Prop("watchPrompt") { (view: TermixTerminalView, on: Bool?) in
+        view.promptWatch = on ?? false
       }
 
       Prop("theme") { (view: TermixTerminalView, theme: TerminalThemeRecord?) in

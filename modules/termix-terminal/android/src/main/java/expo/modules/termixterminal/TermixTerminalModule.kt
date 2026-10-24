@@ -16,7 +16,7 @@ class TermixTerminalModule : Module() {
     View(TermixTerminalView::class) {
       Events(
         "onInput", "onResize", "onBell", "onTitleChange", "onScrollState", "onLink", "onCopy",
-        "onClipboardRequest", "onFontSize", "onModifiers"
+        "onClipboardRequest", "onFontSize", "onModifiers", "onPromptLine"
       )
 
       Prop("pipeId") { view: TermixTerminalView, id: String? -> view.setPipe(id) }
@@ -32,6 +32,7 @@ class TermixTerminalModule : Module() {
         view.setBell(bell?.style, bell?.haptics ?: true)
       }
       Prop("accentColor") { view: TermixTerminalView, color: String? -> view.setAccentColor(color) }
+      Prop("watchPrompt") { view: TermixTerminalView, on: Boolean? -> view.setPromptWatch(on == true) }
       // iOS only; Android reads Alt from the keyboard itself.
       Prop("optionAsMeta") { _: TermixTerminalView, _: Boolean? -> }
 

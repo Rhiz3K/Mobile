@@ -59,6 +59,9 @@ interface Props {
   /** Pinch zoom picked a new base size. */
   onFontSize?: (size: number) => void;
   showScrollButton?: boolean;
+  /** Report the prompt line for password fill and history. */
+  watchPrompt?: boolean;
+  onPromptLine?: (line: string) => void;
 }
 
 /** The native terminal every session renders, with its scroll button and prompts. */
@@ -72,6 +75,8 @@ export const TerminalView = forwardRef<TerminalViewApi, Props>(
       onModifiers,
       onFontSize,
       showScrollButton = true,
+      watchPrompt,
+      onPromptLine,
     },
     ref,
   ) {
@@ -177,6 +182,8 @@ export const TerminalView = forwardRef<TerminalViewApi, Props>(
           onClipboardRequest={handleClipboard}
           onFontSize={handleFontSize}
           onModifiers={onModifiers}
+          watchPrompt={watchPrompt}
+          onPromptLine={onPromptLine}
         />
         {showScrollButton && !atBottom ? (
           <TouchableOpacity

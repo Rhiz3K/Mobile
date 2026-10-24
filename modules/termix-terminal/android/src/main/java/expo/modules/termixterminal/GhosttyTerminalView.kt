@@ -70,6 +70,18 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
   var onFontSizeChange: ((dp: Float) -> Unit)? = null
   var onModifiers: ((ctrl: String, alt: String) -> Unit)? = null
   var onOutput: (() -> Unit)? = null
+  /** The line at the cursor once output settles, while [promptWatch] is on. */
+  var onPromptLine: ((line: String) -> Unit)? = null
+  var promptWatch = false
+    set(value) {
+      field = value
+      if (!value) {
+        removeCallbacks(promptRunnable)
+        lastPromptLine = ""
+      }
+    }
+  private var lastPromptLine = ""
+  private val promptRunnable = Runnable { reportPromptLine() }
 
   private val vtLock = Any()
   private var handle: Long = GhosttyVt.nativeCreate(INITIAL_COLS, INITIAL_ROWS, DEFAULT_SCROLLBACK)
@@ -586,6 +598,10 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
     if (flags == 0) return
     if (flags and EVENT_OUTPUT != 0) {
       onOutput?.invoke()
+      if (promptWatch) {
+        removeCallbacks(promptRunnable)
+        postDelayed(promptRunnable, PROMPT_DELAY_MS)
+      }
       if (screenReaderOn()) {
         removeCallbacks(announceRunnable)
         postDelayed(announceRunnable, ANNOUNCE_DELAY_MS)
@@ -645,6 +661,7 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
     blinkScheduled = false
     removeCallbacks(blinkRunnable)
     removeCallbacks(announceRunnable)
+    removeCallbacks(promptRunnable)
     scroller.abortAnimation()
     removeCallbacks(flingRunnable)
     actionMode?.finish()
@@ -1539,6 +1556,16 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
   private fun screenReaderOn(): Boolean =
     context.getSystemService(AccessibilityManager::class.java)?.isTouchExplorationEnabled == true
 
+  // The cursor row, or the last row with text when the cursor is unknown.
+  private fun reportPromptLine() {
+    if (destroyed || !promptWatch) return
+    val line = (rowText.getOrNull(cursorY) ?: rowText.lastOrNull { !it.isNullOrBlank() })
+      ?.trimEnd().orEmpty()
+    if (line == lastPromptLine) return
+    lastPromptLine = line
+    onPromptLine?.invoke(line)
+  }
+
   private fun announceOutput() {
     val now = viewportLines()
     val fresh = OutputAnnouncer.newLines(announcedLines, now)
@@ -1782,6 +1809,7 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
     const val EVENT_OUTPUT = 1 shl 16
 
     const val ANNOUNCE_DELAY_MS = 500L
+    const val PROMPT_DELAY_MS = 150L
     const val BELL_MIN_GAP_MS = 150L
     const val BELL_FLASH_MS = 120L
     const val BELL_TONE_MS = 80
