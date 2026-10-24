@@ -5,15 +5,30 @@ import {
   useCallback,
   useEffect,
 } from "react";
-import { ScrollView, RefreshControl } from "react-native";
+import { ScrollView, RefreshControl, View } from "react-native";
 import { Network } from "lucide-react-native";
 import { pluginTunnelName } from "@/core/api/compat/api-compat";
+import type { Gateway } from "@/core/api/modules/tunnels";
 import type { TunnelStatus, SSHHost, TunnelSessionProps } from "@/types";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { toast } from "@/utils/toast";
+import { toTerminalHostConfig } from "@/utils/hosts";
 import { SessionFrame, usePolling } from "@/screens/sessions/shared";
+import { Tabs, Text } from "@/ui";
+import { useClient } from "@/core/accounts";
+import { useSessionAccountId } from "@/core/accounts/session";
+import { useSessionRepositories } from "@/core/data/hooks";
+import { transportsFor } from "@/core/transport";
+import {
+  loadTunnels,
+  runOnFor,
+  RUN_ON_PREF,
+  tunnelRunner,
+  useLocalTunnelStatuses,
+  type RunOn,
+} from "@/core/tunnels";
 import TunnelCard from "./TunnelCard";
-import { useSessionClient } from "@/core/accounts/session";
+import { Gateways } from "./Gateways";
 
 export type TunnelManagerHandle = {
   refresh: () => void;
@@ -37,10 +52,15 @@ function tunnelKey(
 export const TunnelManager = forwardRef<
   TunnelManagerHandle,
   TunnelSessionProps
->(({ hostConfig, isVisible }, ref) => {
-  const client = useSessionClient();
+>(({ hostConfig, host: savedHost, isVisible }, ref) => {
+  const accountId = useSessionAccountId();
+  const client = useClient(accountId);
+  const repos = useSessionRepositories();
   const color = useThemeColor();
-  const [statuses, setStatuses] = useState<Record<string, TunnelStatus>>({});
+  const localStatuses = useLocalTunnelStatuses();
+  const [serverStatuses, setServerStatuses] = useState<
+    Record<string, TunnelStatus>
+  >({});
   const [loadingKeys, setLoadingKeys] = useState<Set<string>>(new Set());
   const [allHosts, setAllHosts] = useState<SSHHost[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">(
@@ -48,28 +68,57 @@ export const TunnelManager = forwardRef<
   );
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [tunnels, setTunnels] = useState(hostConfig.tunnelConnections || []);
+  const [runOn, setRunOn] = useState<RunOn>(client ? "server" : "phone");
+  const [gateways, setGateways] = useState<Gateway[]>([]);
 
-  const tunnels = hostConfig.tunnelConnections || [];
+  const onPhone = runOn === "phone";
+  const pluginApi = !!client?.isPluginApi();
+  const statuses = onPhone ? localStatuses : serverStatuses;
+
+  const load = useCallback(async () => {
+    if (!savedHost) return;
+    const [list, where] = await Promise.all([
+      loadTunnels(client, savedHost),
+      runOnFor(repos, savedHost, !!client),
+    ]);
+    setTunnels(list);
+    setRunOn(where);
+    if (client?.supportsSavedTunnels()) {
+      client.api.tunnels
+        .getGateways()
+        .then(setGateways)
+        .catch(() => setGateways([]));
+    }
+  }, [client, repos, savedHost]);
 
   const fetchStatuses = useCallback(async () => {
+    if (onPhone || !client) {
+      setStatus("ready");
+      return;
+    }
     try {
-      const data = await client.api.tunnels.getTunnelStatuses();
-      setStatuses(data);
+      setServerStatuses(await client.api.tunnels.getTunnelStatuses());
       setStatus("ready");
       setError("");
     } catch (e: any) {
       setError(e?.message || "Failed to fetch tunnel statuses");
       setStatus((s) => (s === "loading" ? "error" : s));
     }
-  }, []);
+  }, [client, onPhone]);
 
   const fetchHosts = useCallback(async () => {
+    if (!client || onPhone) return;
     try {
       setAllHosts(await client.api.hosts.getSSHHosts());
     } catch {
       // Endpoint lookup is best-effort; connect will surface a clear error.
     }
-  }, []);
+  }, [client, onPhone]);
+
+  useEffect(() => {
+    if (isVisible) void load();
+  }, [isVisible, load]);
 
   useEffect(() => {
     if (isVisible) {
@@ -78,9 +127,54 @@ export const TunnelManager = forwardRef<
     }
   }, [isVisible, fetchStatuses, fetchHosts]);
 
-  usePolling(fetchStatuses, 4000, isVisible && status !== "error");
+  usePolling(fetchStatuses, 4000, isVisible && !onPhone && status !== "error");
 
-  useImperativeHandle(ref, () => ({ refresh: fetchStatuses }), [fetchStatuses]);
+  useImperativeHandle(
+    ref,
+    () => ({
+      refresh: () => {
+        void load();
+        void fetchStatuses();
+      },
+    }),
+    [fetchStatuses, load],
+  );
+
+  const startOnPhone = useCallback(
+    (tunnel: (typeof tunnels)[number], idx: number) => {
+      if (!savedHost) return;
+      const { local } = transportsFor(accountId);
+      tunnelRunner.start({
+        key: tunnelKey(hostConfig, idx, tunnel, pluginApi),
+        hostId: hostConfig.id,
+        hostName: hostConfig.name,
+        tunnel,
+        open: async () => {
+          if (!local.openSession) {
+            throw new Error("This build can't open tunnels on the phone.");
+          }
+          return local.openSession(toTerminalHostConfig(savedHost));
+        },
+      });
+    },
+    [accountId, hostConfig, pluginApi, savedHost],
+  );
+
+  // Auto start tunnels that are marked for it, once per visit to the host.
+  useEffect(() => {
+    if (!isVisible || !onPhone) return;
+    tunnels.forEach((t, idx) => {
+      const key = tunnelKey(hostConfig, idx, t, pluginApi);
+      if (t.autoStart && !tunnelRunner.getSnapshot()[key]) startOnPhone(t, idx);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isVisible, onPhone, tunnels]);
+
+  const chooseRunOn = async (next: RunOn) => {
+    if (!savedHost) return;
+    setRunOn(next);
+    await repos.hostPrefs.set(savedHost, RUN_ON_PREF, next).catch(() => {});
+  };
 
   const handleAction = useCallback(
     async (
@@ -88,10 +182,20 @@ export const TunnelManager = forwardRef<
       tunnel: (typeof tunnels)[number],
       idx: number,
     ) => {
-      const key = tunnelKey(hostConfig, idx, tunnel, client.isPluginApi());
+      const key = tunnelKey(hostConfig, idx, tunnel, pluginApi);
+      if (onPhone) {
+        if (action === "connect") {
+          startOnPhone(tunnel, idx);
+          toast.success(`Starting tunnel on port ${tunnel.sourcePort}`);
+        } else {
+          tunnelRunner.stop(key);
+        }
+        return;
+      }
+      if (!client) return;
       setLoadingKeys((prev) => new Set(prev).add(key));
       try {
-        if (action === "connect" && client.isPluginApi()) {
+        if (action === "connect" && pluginApi) {
           // 2.9 resolves both hosts and their secrets on the server.
           await client.api.tunnels.connectTunnel({
             name: key,
@@ -193,7 +297,15 @@ export const TunnelManager = forwardRef<
         });
       }
     },
-    [allHosts, hostConfig, fetchStatuses],
+    [
+      allHosts,
+      client,
+      hostConfig,
+      fetchStatuses,
+      onPhone,
+      pluginApi,
+      startOnPhone,
+    ],
   );
 
   if (!isVisible) return null;
@@ -203,14 +315,14 @@ export const TunnelManager = forwardRef<
       ? "loading"
       : status === "error"
         ? "error"
-        : tunnels.length === 0
+        : tunnels.length === 0 && gateways.length === 0
           ? "empty"
           : "ready";
 
   return (
     <SessionFrame
       title={hostConfig.name}
-      subtitle={`Tunnels | ${tunnels.length}`}
+      subtitle={`Tunnels | ${tunnels.length} | ${onPhone ? "This phone" : "Server"}`}
       status={frameStatus}
       loadingLabel="Loading tunnels…"
       errorMessage={error}
@@ -232,14 +344,35 @@ export const TunnelManager = forwardRef<
             tintColor={color("accent-brand")}
             onRefresh={async () => {
               setRefreshing(true);
-              await Promise.all([fetchStatuses(), fetchHosts()]);
+              await Promise.all([load(), fetchStatuses(), fetchHosts()]);
               setRefreshing(false);
             }}
           />
         }
       >
+        {client ? (
+          <View className="gap-1.5">
+            <Text className="text-[10px] uppercase tracking-[1px] text-muted-foreground">
+              Run on
+            </Text>
+            <Tabs<RunOn>
+              value={runOn}
+              onChange={chooseRunOn}
+              options={[
+                { id: "server", label: "Server" },
+                { id: "phone", label: "This phone" },
+              ]}
+            />
+          </View>
+        ) : null}
+        {onPhone ? (
+          <Text className="text-[11px] text-muted-foreground">
+            Tunnels on this phone stop when the app is closed. On iOS they also
+            stop soon after the app goes to the background.
+          </Text>
+        ) : null}
         {tunnels.map((tunnel, idx) => {
-          const key = tunnelKey(hostConfig, idx, tunnel, client.isPluginApi());
+          const key = tunnelKey(hostConfig, idx, tunnel, pluginApi);
           return (
             <TunnelCard
               key={`${key}-${idx}`}
@@ -251,6 +384,7 @@ export const TunnelManager = forwardRef<
             />
           );
         })}
+        <Gateways gateways={gateways} />
       </ScrollView>
     </SessionFrame>
   );

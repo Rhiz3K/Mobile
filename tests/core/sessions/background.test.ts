@@ -160,3 +160,11 @@ test("iOS asks for the finishing time when leaving with sessions open, and nothi
   expect(t.service.endGrace).toHaveBeenCalledTimes(1);
   bg.stop();
 });
+
+test("tunnels alone keep the notification", () => {
+  expect(serviceContent([], {}, ["box | Connected"])).toMatchObject({
+    title: "1 tunnel active",
+    lines: ["box | Connected"],
+  });
+  expect(serviceContent([], {}, [])).toBeNull();
+});

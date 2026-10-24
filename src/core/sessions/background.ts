@@ -41,16 +41,27 @@ const STATE_TEXT: Record<SessionState, string> = {
 export function serviceContent(
   tabs: ServiceTab[],
   statuses: Readonly<Record<string, SessionStatusEntry>>,
+  tunnels: string[] = [],
 ): ServiceContent | null {
   const live = tabs.filter((t) => {
     const s = statuses[t.id];
     return !!s && isLive(s.state);
   });
-  if (!live.length) return null;
+  if (!live.length && !tunnels.length) return null;
+  const count = (n: number, one: string, many: string) =>
+    n === 1 ? `1 ${one}` : `${n} ${many}`;
+  const parts = [
+    live.length ? count(live.length, "session open", "sessions open") : "",
+    tunnels.length
+      ? count(tunnels.length, "tunnel active", "tunnels active")
+      : "",
+  ].filter(Boolean);
   return {
-    title:
-      live.length === 1 ? "1 session open" : `${live.length} sessions open`,
-    lines: live.map((t) => `${t.title} | ${STATE_TEXT[statuses[t.id].state]}`),
+    title: parts.join(" | "),
+    lines: [
+      ...live.map((t) => `${t.title} | ${STATE_TEXT[statuses[t.id].state]}`),
+      ...tunnels,
+    ],
     actionLabel: "Disconnect all",
     channelName: "Sessions",
   };
@@ -111,6 +122,7 @@ async function askNotifications(): Promise<void> {
  */
 export class BackgroundSessions {
   private tabs: ServiceTab[] = [];
+  private tunnels: string[] = [];
   private enabled = true;
   private changed = false;
   private shownKey = "";
@@ -151,6 +163,13 @@ export class BackgroundSessions {
     this.sync();
   }
 
+  /** Lines for the running phone tunnels, like "host | Connected". */
+  setTunnels(lines: string[]) {
+    if (JSON.stringify(lines) === JSON.stringify(this.tunnels)) return;
+    this.tunnels = lines;
+    this.sync();
+  }
+
   get isEnabled(): boolean {
     return this.enabled;
   }
@@ -165,7 +184,11 @@ export class BackgroundSessions {
   sync() {
     const deps = this.deps;
     if (!deps) return;
-    const content = serviceContent(this.tabs, deps.status.getSnapshot());
+    const content = serviceContent(
+      this.tabs,
+      deps.status.getSnapshot(),
+      this.tunnels,
+    );
     if (deps.platform === "ios") {
       const away = !deps.lifecycle.isActive;
       if (away && content && !this.grace) {

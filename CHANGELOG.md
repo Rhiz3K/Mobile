@@ -4,6 +4,11 @@
 
 ### Added
 
+- Run tunnels on the phone: local, remote and dynamic forwards with start and stop, auto start and retries (#86)
+- Choose per host whether tunnels run on the phone or on the server
+- Running tunnels show in the Android notification, and iOS tells you when it stopped them
+- Tunnels use the saved tunnel list of the Tunnels plugin, with the old host setting for older servers
+- See gateways from the Tunnels plugin, read only
 - Add hosts from your Tailscale device list when the Tailscale plugin is on
 - Answer the Tailscale SSH check from the terminal
 - Themed app icon on Android 13 and newer

@@ -16,6 +16,7 @@ const TunnelsTab = forwardRef<TunnelManagerHandle, SessionTabProps>(
         enableTunnel: session.host.enableTunnel,
         tunnelConnections: session.host.tunnelConnections,
       }}
+      host={session.host}
       isVisible={isVisible}
       title={session.title}
       onClose={onClose}
@@ -28,14 +29,15 @@ export const tunnelsFeature: FeatureDef = {
   id: "tunnels",
   title: "Tunnels",
   source: "native",
-  requires: { plugin: "tunnels" },
+  availableOn: ["local", "server"],
   sessionTabs: [
     {
       type: "tunnel",
       icon: Network,
       titleSuffix: () => "Tunnels",
       shortLabel: () => "Tunnel",
-      needs: ["server"],
+      needsOneOf: [["forward"], ["server"]],
+      relayRequires: { plugin: "tunnels" },
       serverTabTypes: ["tunnel"],
       toServerTabType: () => "tunnel",
       component: TunnelsTab,

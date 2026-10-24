@@ -506,6 +506,8 @@ export interface TunnelSessionProps {
     enableTunnel: boolean;
     tunnelConnections: TunnelConnection[];
   };
+  /** The saved host, for opening SSH from the phone. */
+  host?: SSHHost;
   isVisible: boolean;
   title?: string;
   onClose?: () => void;

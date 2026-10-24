@@ -891,6 +891,42 @@ export default function HostForm({
                   </Pressable>
                 </View>
 
+                <Field label="Mode">
+                  <Tabs<string>
+                    value={tunnel.mode ?? tunnel.tunnelType ?? "local"}
+                    onChange={(v) =>
+                      setTunnel(idx, {
+                        mode: v as "local" | "remote" | "dynamic",
+                        tunnelType: v === "remote" ? "remote" : "local",
+                      })
+                    }
+                    options={[
+                      { id: "local", label: "Local" },
+                      { id: "remote", label: "Remote" },
+                      { id: "dynamic", label: "Dynamic" },
+                    ]}
+                    fill={false}
+                  />
+                </Field>
+
+                <Field label="Target Host (on this host, for tunnels run on the phone)">
+                  <Input
+                    value={tunnel.targetHost ?? ""}
+                    onChangeText={(v) => setTunnel(idx, { targetHost: v })}
+                    placeholder="127.0.0.1"
+                    autoCapitalize="none"
+                  />
+                </Field>
+
+                <Field label="Bind Host">
+                  <Input
+                    value={tunnel.bindHost ?? ""}
+                    onChangeText={(v) => setTunnel(idx, { bindHost: v })}
+                    placeholder="127.0.0.1"
+                    autoCapitalize="none"
+                  />
+                </Field>
+
                 <Field label="Endpoint Host">
                   <Tabs<string>
                     value={tunnel.endpointHost ?? ""}

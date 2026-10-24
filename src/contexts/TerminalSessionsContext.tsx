@@ -23,6 +23,7 @@ import { checkOpen, features } from "@/core/features";
 import { asServerHost, isSynced, serverHostId } from "@/core/sync";
 import { isSshHost } from "@/utils/hosts";
 import { useLocalStoreState } from "@/core/data/hooks";
+import { tunnelRunner, tunnelStateText } from "@/core/tunnels";
 import { repositoriesFor } from "@/core/data/repositories";
 import {
   backgroundSessions,
@@ -600,8 +601,21 @@ export const TerminalSessionsProvider: React.FC<
   // App wide lifecycle and the background service, for as long as the app runs.
   useEffect(() => {
     sessionLifecycle.start();
-    backgroundSessions.start(closeAllSessions);
-    return () => backgroundSessions.stop();
+    backgroundSessions.start(() => {
+      tunnelRunner.stopAll();
+      closeAllSessions();
+    });
+    const sendTunnels = () =>
+      backgroundSessions.setTunnels(
+        tunnelRunner
+          .active()
+          .map((t) => `${t.hostName} | ${tunnelStateText(t.status?.status)}`),
+      );
+    const unwatch = tunnelRunner.subscribe(sendTunnels);
+    return () => {
+      unwatch();
+      backgroundSessions.stop();
+    };
   }, [closeAllSessions]);
 
   useEffect(() => {

@@ -109,6 +109,7 @@ test("This device gets the terminal, files and snippets, and no server features"
   expect(r.available(ctx).map((f) => f.id)).toEqual([
     "terminal",
     "file-manager",
+    "tunnels",
     "snippets",
     "host-defaults",
     "host-transfer",
@@ -183,4 +184,8 @@ test("the terminal tab brings its own key row and keys panel", () => {
   expect(chrome?.keyRow).toBeDefined();
   expect(chrome?.keyPanel).toBeDefined();
   expect(registry().sessionTab("docker")?.inputChrome).toBeUndefined();
+});
+
+test("tunnels run from the phone or the server", () => {
+  expect(registry().sessionNeeds("tunnel")).toEqual([["forward"], ["server"]]);
 });
