@@ -111,6 +111,7 @@ test("This device gets the features that run on the phone, and no server only on
     "file-manager",
     "docker",
     "tunnels",
+    "host-metrics",
     "snippets",
     "host-defaults",
     "host-transfer",

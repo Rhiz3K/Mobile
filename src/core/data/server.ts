@@ -1,7 +1,7 @@
 import type { AccountClient } from "@/core/api/AccountClient";
 import type { JsonKV } from "@/core/storage/kv";
 import type { Credential, Snippet, SnippetFolder, SSHHost } from "@/types";
-import type { DataRepositories } from "./types";
+import type { DataRepositories, MetricPoint } from "./types";
 
 const asList = <T>(data: unknown, key: string): T[] => {
   if (Array.isArray(data)) return data as T[];
@@ -43,6 +43,7 @@ export function serverRepositories(
   const prefKey = (host: SSHHost, key: string) =>
     `hostPref.${host.syncId || host.id}.${key}`;
   const recentOrigins = new Map<number, string>();
+  const metricMemory = new Map<number, MetricPoint[]>();
 
   return {
     source: "server",
@@ -120,6 +121,22 @@ export function serverRepositories(
             ? (phone?.remove(prefKey(host, key)) ?? Promise.resolve())
             : (phone?.set(prefKey(host, key), value) ?? Promise.resolve()),
         ),
+    },
+    // No local file for a live server, so history lasts until the app closes.
+    metricSamples: {
+      append: async (host, point) => {
+        const list = metricMemory.get(host.id) ?? [];
+        const last = list[list.length - 1];
+        if (last && point.ts - last.ts < 60_000) return;
+        list.push(point);
+        const cutoff = point.ts - 7 * 24 * 60 * 60_000;
+        metricMemory.set(
+          host.id,
+          list.filter((p) => p.ts >= cutoff),
+        );
+      },
+      range: async (host, fromTs) =>
+        (metricMemory.get(host.id) ?? []).filter((p) => p.ts >= fromTs),
     },
     commandHistory: {
       subscribe: historyChanges.subscribe,

@@ -65,6 +65,10 @@ export const emptyRepositories: DataRepositories = {
     get: async () => null,
     set: async () => {},
   },
+  metricSamples: {
+    append: async () => {},
+    range: async () => [],
+  },
 };
 
 const cache = new Map<string, DataRepositories>();

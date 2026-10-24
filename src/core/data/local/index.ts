@@ -1,4 +1,13 @@
-import { and, asc, desc, eq, getTableName, notInArray } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  getTableName,
+  gte,
+  lt,
+  notInArray,
+} from "drizzle-orm";
 import { randomUUID } from "expo-crypto";
 import { AppError } from "@/core/errors";
 import { changes } from "@/core/db/changes";
@@ -6,6 +15,7 @@ import type { LocalDb } from "@/core/db/driver";
 import {
   commandHistory,
   hostPrefs,
+  metricSamples,
   credentials,
   folders,
   hostDefaults,
@@ -43,6 +53,8 @@ export const HISTORY_LIMIT = 500;
 export const ACTIVITY_LIMIT = 100;
 
 const now = () => new Date().toISOString();
+const METRIC_STEP_MS = 60_000;
+const METRIC_KEEP_MS = 7 * 24 * 60 * 60_000;
 
 const notFound = (what: string) =>
   new AppError(`That ${what} no longer exists.`, "NOT_FOUND");
@@ -452,6 +464,50 @@ export function localRepositories(
             .run();
         }
         touched(hostPrefs);
+      },
+    },
+
+    metricSamples: {
+      async append(host, point) {
+        const d = await db();
+        const hostSyncId = hostKey(d, host);
+        const last = d
+          .select({ ts: metricSamples.ts })
+          .from(metricSamples)
+          .where(eq(metricSamples.hostSyncId, hostSyncId))
+          .orderBy(desc(metricSamples.ts))
+          .limit(1)
+          .get();
+        if (last && point.ts - last.ts < METRIC_STEP_MS) return;
+        d.transaction((tx) => {
+          tx.insert(metricSamples)
+            .values({ hostSyncId, ...point })
+            .run();
+          tx.delete(metricSamples)
+            .where(lt(metricSamples.ts, point.ts - METRIC_KEEP_MS))
+            .run();
+        });
+      },
+      async range(host, fromTs) {
+        const d = await db();
+        return d
+          .select({
+            ts: metricSamples.ts,
+            cpu: metricSamples.cpu,
+            mem: metricSamples.mem,
+            disk: metricSamples.disk,
+            rx: metricSamples.rx,
+            tx: metricSamples.tx,
+          })
+          .from(metricSamples)
+          .where(
+            and(
+              eq(metricSamples.hostSyncId, hostKey(d, host)),
+              gte(metricSamples.ts, fromTs),
+            ),
+          )
+          .orderBy(asc(metricSamples.ts))
+          .all();
       },
     },
 

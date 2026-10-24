@@ -239,7 +239,40 @@ export function createMetricsApi(c: AccountClient) {
     }
   }
 
+  /** The server's saved history for a host, oldest first. */
+  async function getMetricsHistory(
+    id: number,
+    range: "1h" | "6h" | "24h" | "7d",
+  ): Promise<
+    {
+      ts: number;
+      cpu: number | null;
+      mem: number | null;
+      disk: number | null;
+    }[]
+  > {
+    try {
+      const response = await c.http.stats.get(`/metrics/history/${id}`, {
+        params: { range },
+      });
+      const rows: Record<string, unknown>[] = response.data?.rows ?? [];
+      const num = (v: unknown) =>
+        typeof v === "number" && Number.isFinite(v) ? v : null;
+      return rows
+        .map((row) => ({
+          ts: parseServerTime(row.ts),
+          cpu: num(row.cpu_percent),
+          mem: num(row.mem_percent),
+          disk: num(row.disk_percent),
+        }))
+        .filter((p) => Number.isFinite(p.ts));
+    } catch (error) {
+      c.fail(error, "fetch metrics history");
+    }
+  }
+
   return {
+    getMetricsHistory,
     getAllServerStatuses,
     getServerStatusById,
     getServerMetricsById,
@@ -255,3 +288,11 @@ export function createMetricsApi(c: AccountClient) {
 }
 
 export type MetricsApi = ReturnType<typeof createMetricsApi>;
+
+/** Server timestamps come as "2026-10-24 12:00:00" in UTC, or ISO. */
+export function parseServerTime(value: unknown): number {
+  if (typeof value === "number") return value;
+  if (typeof value !== "string") return NaN;
+  const iso = value.includes("T") ? value : value.replace(" ", "T");
+  return Date.parse(/(?:[zZ]|[+-]\d\d:?\d\d)$/.test(iso) ? iso : `${iso}Z`);
+}

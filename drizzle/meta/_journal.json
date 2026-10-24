@@ -22,6 +22,13 @@
       "when": 1792820575849,
       "tag": "0002_host_prefs",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1792873748633,
+      "tag": "0003_metric_samples",
+      "breakpoints": true
     }
   ]
 }

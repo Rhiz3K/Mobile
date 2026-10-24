@@ -524,3 +524,33 @@ test("host prefs are kept per host and can be removed", async () => {
   await repos.hostPrefs.set(a, "keyLayout", null);
   expect(await repos.hostPrefs.get(a, "keyLayout")).toBeNull();
 });
+
+test("metric samples keep one point a minute per host and a week of them", async () => {
+  const { repos } = setup();
+  const a = await repos.hosts.create(fullHost);
+  const b = await repos.hosts.create({ ...fullHost, name: "b" });
+  const point = (ts: number, cpu: number) => ({
+    ts,
+    cpu,
+    mem: 50,
+    disk: 10,
+    rx: null,
+    tx: null,
+  });
+  const t0 = Date.UTC(2026, 9, 1);
+  await repos.metricSamples.append(a, point(t0, 1));
+  await repos.metricSamples.append(a, point(t0 + 30_000, 2));
+  await repos.metricSamples.append(a, point(t0 + 60_000, 3));
+  await repos.metricSamples.append(b, point(t0, 9));
+  expect((await repos.metricSamples.range(a, 0)).map((p) => p.cpu)).toEqual([
+    1, 3,
+  ]);
+  expect(await repos.metricSamples.range(a, t0 + 1)).toHaveLength(1);
+  // A point a week later drops everything older than a week.
+  const later = t0 + 8 * 24 * 3600_000;
+  await repos.metricSamples.append(a, point(later, 4));
+  expect((await repos.metricSamples.range(a, 0)).map((p) => p.cpu)).toEqual([
+    4,
+  ]);
+  expect(await repos.metricSamples.range(b, 0)).toHaveLength(0);
+});

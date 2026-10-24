@@ -68,12 +68,15 @@ export function Sparkline({
   data,
   stroke,
   height = 28,
+  max: fixedMax,
 }: {
   data: number[];
   stroke: string;
   height?: number;
+  /** Top of the scale, like 100 for percent. Defaults to the biggest value. */
+  max?: number;
 }) {
-  const max = Math.max(1, ...data);
+  const max = fixedMax ?? Math.max(1, ...data);
   return (
     <View className="flex-row items-end gap-[1px]" style={{ height }}>
       {data.map((v, i) => (

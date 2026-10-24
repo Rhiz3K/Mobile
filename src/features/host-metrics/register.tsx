@@ -19,16 +19,23 @@ function statsConfig(host: SSHHost): StatsConfig {
   }
 }
 
+/**
+ * Off only when the host turned metrics off. Plugin settings with no
+ * host-metrics entry mean a host on this phone, or a server without the
+ * plugin; the phone can sample both. Older servers keep it in statsConfig.
+ */
+export function metricsAllowed(host: SSHHost): boolean {
+  const settings = host.pluginSettings?.["host-metrics"];
+  if (settings) return settings.metricsEnabled !== false;
+  if (host.pluginSettings) return true;
+  return statsConfig(host).metricsEnabled !== false;
+}
+
 const MetricsTab = forwardRef<ServerStatsHandle, SessionTabProps>(
   ({ session, isVisible, onClose }, ref) => (
     <ServerStats
       ref={ref}
-      hostConfig={{
-        id: parseInt(session.host.id.toString()),
-        name: session.host.name,
-        statsConfig: session.host.statsConfig,
-        quickActions: session.host.quickActions,
-      }}
+      host={session.host}
       isVisible={isVisible}
       title={session.title}
       onClose={onClose}
@@ -41,14 +48,16 @@ export const hostMetricsFeature: FeatureDef = {
   id: "host-metrics",
   title: "Host Metrics",
   source: "native",
-  requires: { plugin: "host-metrics" },
+  // Sampled over the phone's SSH, or read from the server's plugin.
+  availableOn: ["local", "server"],
   sessionTabs: [
     {
       type: "stats",
       icon: Activity,
       titleSuffix: () => "Metrics",
       shortLabel: () => "Metrics",
-      needs: ["server"],
+      needsOneOf: [["exec"], ["server"]],
+      relayRequires: { plugin: "host-metrics" },
       serverTabTypes: ["host-metrics", "stats"],
       // 2.9+ web names this tab after its plugin.
       toServerTabType: (_s, client) =>
@@ -64,8 +73,7 @@ export const hostMetricsFeature: FeatureDef = {
       icon: Server,
       group: "connect",
       order: 50,
-      isAvailable: (host) =>
-        isSshHost(host) && statsConfig(host).metricsEnabled !== false,
+      isAvailable: (host) => isSshHost(host) && metricsAllowed(host),
       run: (_host, ctx) => ctx.openSession("stats"),
     },
   ],

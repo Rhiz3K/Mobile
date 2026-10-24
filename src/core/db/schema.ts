@@ -17,6 +17,7 @@ import { sql } from "drizzle-orm";
 import {
   index,
   integer,
+  real,
   sqliteTable,
   text,
   uniqueIndex,
@@ -335,6 +336,28 @@ export const hostPrefs = sqliteTable(
   ],
 );
 
+/**
+ * Device only. Host metrics the phone saw, one row a minute per host and kept
+ * a week, so the history survives closing the tab. `ts` is unix ms; network is
+ * bytes a second.
+ */
+export const metricSamples = sqliteTable(
+  "metric_samples",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    hostSyncId: text("host_sync_id").notNull(),
+    ts: integer("ts").notNull(),
+    cpu: real("cpu"),
+    mem: real("mem"),
+    disk: real("disk"),
+    rx: real("rx"),
+    tx: real("tx"),
+  },
+  (table) => [
+    index("idx_metric_samples_host_ts").on(table.hostSyncId, table.ts),
+  ],
+);
+
 /** Every table, in an order where a row's targets come first. */
 export const allTables = {
   credentials,
@@ -352,6 +375,7 @@ export const allTables = {
   commandHistory,
   recentActivity,
   hostPrefs,
+  metricSamples,
 };
 
 export type HostRow = typeof hosts.$inferSelect;

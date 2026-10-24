@@ -130,6 +130,25 @@ export interface HostPrefsRepository extends Watchable {
   set(host: SSHHost, key: string, value: string | null): Promise<void>;
 }
 
+/** One minute of a host's metrics. Percent for cpu, mem and disk; bytes a second for rx and tx. */
+export interface MetricPoint {
+  /** Unix ms. */
+  ts: number;
+  cpu: number | null;
+  mem: number | null;
+  disk: number | null;
+  rx: number | null;
+  tx: number | null;
+}
+
+/** Device only history of what the phone saw. */
+export interface MetricSamplesRepository {
+  /** Keeps at most one point a minute per host and drops anything older than a week. */
+  append(host: SSHHost, point: MetricPoint): Promise<void>;
+  /** Points since `fromTs`, oldest first. */
+  range(host: SSHHost, fromTs: number): Promise<MetricPoint[]>;
+}
+
 /** Where a default is set: the user's own level, or one folder. */
 export type HostDefaultsTarget = DefaultsTarget;
 
@@ -157,6 +176,7 @@ export interface DataRepositories {
   recentActivity: RecentActivityRepository;
   origins: HostOriginRepository;
   hostPrefs: HostPrefsRepository;
+  metricSamples: MetricSamplesRepository;
   /** Only in an account's local copy. A live server applies its own. */
   hostDefaults?: HostDefaultsRepository;
   /** Only on This device, where the phone opens SSH itself. */
