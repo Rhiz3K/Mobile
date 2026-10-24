@@ -21,7 +21,9 @@
       "infoPlist": {
         "CFBundleAllowMixedLocalizations": true,
         "ITSAppUsesNonExemptEncryption": false,
-        "NSFaceIDUsageDescription": "Use Face ID to unlock Termix."
+        "NSFaceIDUsageDescription": "Use Face ID to unlock Termix.",
+        "UIFileSharingEnabled": true,
+        "LSSupportsOpeningDocumentsInPlace": true
       }
     },
     "android": {
@@ -157,7 +159,29 @@
           "useSQLCipher": true
         }
       ],
-      "expo-background-task"
+      "expo-background-task",
+      "expo-video",
+      [
+        "expo-sharing",
+        {
+          "ios": {
+            "enabled": true,
+            "extensionBundleIdentifier": "com.karmaa.termix.ShareExtension",
+            "appGroupId": "group.com.karmaa.termix",
+            "activationRule": {
+              "supportsText": true,
+              "supportsFileWithMaxCount": 20,
+              "supportsImageWithMaxCount": 20,
+              "supportsMovieWithMaxCount": 20
+            }
+          },
+          "android": {
+            "enabled": true,
+            "singleShareMimeTypes": ["*/*"],
+            "multipleShareMimeTypes": ["*/*"]
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
