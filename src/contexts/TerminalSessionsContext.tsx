@@ -22,6 +22,18 @@ import type {
 import { checkOpen, features } from "@/core/features";
 import { asServerHost, isSynced, serverHostId } from "@/core/sync";
 import { isSshHost } from "@/utils/hosts";
+import { useLocalStoreState } from "@/core/data/hooks";
+import { repositoriesFor } from "@/core/data/repositories";
+import {
+  backgroundSessions,
+  loadSavedTabs,
+  restoreTabs,
+  saveTabs,
+  sessionLifecycle,
+  sessionStatus,
+  toSavedTab,
+  type SavedTab,
+} from "@/core/sessions";
 import { displayTitle, moveTab } from "./session-tabs";
 
 /** Session tab type. The registry knows which feature owns each one. */
@@ -54,6 +66,10 @@ export interface TerminalSession {
   customTitle?: string | null;
   /** The title the program set, shown when the host asks for it. */
   shellTitle?: string | null;
+  /** Brought back after the app was closed. */
+  restored?: boolean;
+  /** What the tab saved to pick up again, like its tmux session. */
+  resumeData?: Record<string, string> | null;
 }
 
 function getSessionTypeLabel(type: SessionType, remoteProtocol?: string) {
@@ -119,6 +135,13 @@ interface TerminalSessionsContextType {
   duplicateSession: (sessionId: string) => string | null;
   setActiveSession: (sessionId: string) => void;
   clearAllSessions: () => void;
+  /** Ends every session and closes its tab (the notification's Disconnect all). */
+  closeAllSessions: () => void;
+  /** Saves what a tab needs to pick up again after a restart. */
+  setResumeData: (
+    sessionId: string,
+    data: Record<string, string> | null,
+  ) => void;
   /** Persist the backend session id created/attached for a tab (cross-device). */
   setBackendSessionId: (sessionId: string, backendId: string | null) => void;
   /** A tab's connection picked its way; relay tabs get listed for other devices. */
@@ -530,6 +553,148 @@ export const TerminalSessionsProvider: React.FC<
     keyboardIntentionallyHiddenRef.current = false;
   }, []);
 
+  const closeAllSessions = useCallback(() => {
+    setSessions((prev) => {
+      for (const s of prev) {
+        if (s.listed) {
+          clientFor(s.accountId)?.api.openTabs.deleteOpenTab(s.instanceId);
+        }
+      }
+      return [];
+    });
+    setActiveSessionId(null);
+    setIsCustomKeyboardVisible(false);
+  }, []);
+
+  const setResumeData = useCallback(
+    (sessionId: string, data: Record<string, string> | null) => {
+      setSessions((prev) =>
+        prev.some(
+          (s) =>
+            s.id === sessionId &&
+            JSON.stringify(s.resumeData ?? null) !== JSON.stringify(data),
+        )
+          ? prev.map((s) =>
+              s.id === sessionId ? { ...s, resumeData: data } : s,
+            )
+          : prev,
+      );
+    },
+    [],
+  );
+
+  // App wide lifecycle and the background service, for as long as the app runs.
+  useEffect(() => {
+    sessionLifecycle.start();
+    backgroundSessions.start(closeAllSessions);
+    return () => backgroundSessions.stop();
+  }, [closeAllSessions]);
+
+  useEffect(() => {
+    sessionStatus.retain(sessions.map((s) => s.id));
+    backgroundSessions.setTabs(
+      sessions.map((s) => ({ id: s.id, title: displayTitle(s) })),
+    );
+  }, [sessions]);
+
+  // Tabs come back after the app was closed. Hosts are read again from their
+  // account's store, so nothing secret is saved with the tab list.
+  const { available: storeAvailable, unlocked } = useLocalStoreState();
+  const restoreStage = useRef<"idle" | "running" | "done">("idle");
+  const laterTabs = useRef<SavedTab[]>([]);
+  const runRestore = useCallback(async (saved: SavedTab[]) => {
+    const result = await restoreTabs(saved, {
+      accountExists: (id) => !!accounts.find(id),
+      findHost: async (tab) => {
+        const account = accounts.find(tab.accountId);
+        if (!account) return null;
+        const repos = repositoriesFor(account, accounts.client(account.id));
+        const host = await repos.hosts.get(tab.hostId);
+        if (!host) return null;
+        return tab.serverHost
+          ? await asServerHost(tab.accountId, host).catch(() => host)
+          : host;
+      },
+    });
+    laterTabs.current = result.later;
+    if (result.missing.length) {
+      toast.info(
+        result.missing.length === 1
+          ? "A tab was not reopened because its host is gone"
+          : `${result.missing.length} tabs were not reopened because their hosts are gone`,
+      );
+    }
+    if (!result.restored.length) return;
+    setSessions((prev) => {
+      const open = new Set(prev.map((s) => s.instanceId));
+      const back: TerminalSession[] = result.restored
+        .filter(({ saved: t }) => !open.has(t.instanceId))
+        .map(({ saved: t, host }) => ({
+          id: t.id,
+          accountId: t.accountId,
+          host,
+          title: t.title,
+          isActive: false,
+          createdAt: new Date(t.createdAt),
+          type: t.type,
+          instanceId: t.instanceId,
+          backendSessionId: t.backendSessionId,
+          restoredSessionId:
+            t.transport === "relay" ? t.backendSessionId : null,
+          remoteProtocol: t.remoteProtocol,
+          // A server session can only be picked up through the server.
+          origin:
+            t.origin ??
+            (t.transport === "relay" && t.backendSessionId
+              ? "server"
+              : undefined),
+          listed: t.listed,
+          transport: t.transport,
+          customTitle: t.customTitle,
+          restored: true,
+          resumeData: t.resumeData,
+        }));
+      if (!back.length) return prev;
+      const next = [...back, ...prev];
+      if (prev.some((s) => s.isActive)) return next;
+      const wanted =
+        result.restored.find((r) => r.saved.active)?.saved.id ?? back[0].id;
+      setActiveSessionId(wanted);
+      return next.map((s) => ({ ...s, isActive: s.id === wanted }));
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!storeAvailable) {
+      restoreStage.current = "done";
+      return;
+    }
+    if (!unlocked || restoreStage.current !== "idle") return;
+    restoreStage.current = "running";
+    void loadSavedTabs()
+      .then(runRestore)
+      .catch(() => {})
+      .finally(() => {
+        restoreStage.current = "done";
+      });
+  }, [storeAvailable, unlocked, runRestore]);
+
+  useEffect(() => {
+    if (restoreStage.current !== "done" || !laterTabs.current.length) return;
+    if (!isAuthenticated) return;
+    const later = laterTabs.current;
+    laterTabs.current = [];
+    void runRestore(later);
+  }, [isAuthenticated, runRestore]);
+
+  useEffect(() => {
+    if (!storeAvailable || restoreStage.current !== "done") return;
+    const timer = setTimeout(() => {
+      void saveTabs([...sessions.map(toSavedTab), ...laterTabs.current]);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [sessions, storeAvailable]);
+
   useEffect(() => {
     if (isAuthenticated) {
       // Hydrate background tab records (e.g. tabs opened on another device).
@@ -568,6 +733,8 @@ export const TerminalSessionsProvider: React.FC<
         duplicateSession,
         setActiveSession,
         clearAllSessions,
+        closeAllSessions,
+        setResumeData,
         setBackendSessionId,
         setSessionTransport,
         forgetBackgroundTab,
