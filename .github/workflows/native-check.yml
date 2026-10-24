@@ -42,7 +42,7 @@ jobs:
         run: npx expo prebuild --platform android --no-install --clean
       - name: Kotlin unit tests
         working-directory: android
-        run: ./gradlew --console=plain :termix-pipe:testDebugUnitTest :termix-terminal:testDebugUnitTest
+        run: ./gradlew --console=plain :termix-pipe:testDebugUnitTest :termix-terminal:testDebugUnitTest :termix-display:testDebugUnitTest
       - name: Build debug APK (x86_64)
         working-directory: android
         run: ./gradlew --console=plain :app:assembleDebug -PreactNativeArchitectures=x86_64
