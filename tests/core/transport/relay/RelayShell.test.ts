@@ -435,3 +435,94 @@ test("tmux session lists reach the tab and a pick goes back", async () => {
   expect(logs).toHaveLength(1);
   m.destroy();
 });
+
+function say(socket: FakeSocket, msg: object) {
+  socket.onmessage?.({ data: JSON.stringify(msg) });
+}
+
+function opened() {
+  const socket = FakeSocket.all[0];
+  socket.readyState = FakeSocket.OPEN;
+  (socket as any).onopen?.();
+  socket.sent.length = 0;
+  return socket;
+}
+
+test.each([
+  ["opkssh", "opkssh_status", "OPKSSH"],
+  ["vault", "vault_auth_url", "Vault"],
+  ["stepca", "stepca_status", "Step CA"],
+])(
+  "%s browser sign in: start, show the page, finish",
+  async (id, urlEvent, title) => {
+    const onBrowserCheckRequired = jest.fn();
+    const onBrowserCheckCompleted = jest.fn();
+    const { m, errors } = manager(fakeClient(), {
+      onBrowserCheckRequired,
+      onBrowserCheckCompleted,
+    });
+    await m.connect(100, 30);
+    const socket = opened();
+
+    say(socket, { type: `${id}_auth_required`, hostId: 1 });
+    expect(socket.sent).toEqual([
+      { type: `${id}_start_auth`, data: { hostId: 1 } },
+    ]);
+
+    say(socket, { type: urlEvent, stage: "chooser", url: "https://s/x" });
+    expect(onBrowserCheckRequired).toHaveBeenCalledWith(
+      "https://s/x",
+      expect.stringContaining(title),
+      `${title} sign in`,
+    );
+
+    say(socket, { type: `${id}_completed`, expiresAt: 1 });
+    expect(onBrowserCheckCompleted).toHaveBeenCalled();
+    expect(socket.sent[1]).toMatchObject({
+      type: `${id}_auth_completed`,
+      data: { hostId: 1, cols: 100, rows: 30 },
+    });
+    expect(errors).toEqual([]);
+    m.destroy();
+  },
+);
+
+test.each([
+  ["opkssh_error", { error: "Denied" }, "host: Denied"],
+  ["vault_config_error", {}, "host: Vault is not set up on the server"],
+  ["stepca_timeout", {}, "host: Step CA sign in timed out"],
+])("%s ends the connect with a message", async (type, extra, message) => {
+  const { m, errors } = manager();
+  await m.connect(80, 24);
+  const socket = opened();
+  say(socket, { type, ...extra });
+  expect(errors).toEqual([message]);
+  m.destroy();
+});
+
+test("closing during a sign in cancels it on the server", async () => {
+  const { m } = manager();
+  await m.connect(80, 24);
+  const socket = opened();
+  say(socket, { type: "opkssh_auth_required" });
+  socket.sent.length = 0;
+  m.destroy();
+  expect(socket.sent[0]).toEqual({
+    type: "opkssh_cancel",
+    data: { hostId: 1 },
+  });
+});
+
+test("a warpgate round with a url still goes to the warpgate prompt", async () => {
+  const onWarpgateAuthRequired = jest.fn();
+  const { m } = manager(fakeClient(), { onWarpgateAuthRequired });
+  await m.connect(80, 24);
+  const socket = opened();
+  say(socket, {
+    type: "warpgate_auth_required",
+    url: "https://w",
+    securityKey: "k",
+  });
+  expect(onWarpgateAuthRequired).toHaveBeenCalledWith("https://w", "k");
+  m.destroy();
+});

@@ -61,6 +61,7 @@ export function ConnectionPrompts({
         visible={prompt?.kind === "browserCheck"}
         url={prompt?.kind === "browserCheck" ? prompt.url : ""}
         message={prompt?.kind === "browserCheck" ? prompt.message : ""}
+        title={prompt?.kind === "browserCheck" ? prompt.title : undefined}
         onCancel={cancel}
       />
     </>

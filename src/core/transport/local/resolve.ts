@@ -3,7 +3,6 @@
  * build-connect-config: the linked login fills the secrets, ssh_options sets
  * keepalive, algorithms and env, and proxies and port knocks carry over.
  */
-import { AppError } from "@/core/errors";
 import type { HostConnectProfile } from "@/core/data/types";
 import type {
   SshConnectConfig,
@@ -11,6 +10,7 @@ import type {
   SshProxyHop,
 } from "@/modules/termix-ssh";
 import type { TerminalHostConfig } from "../types";
+import { assertDeviceAuth } from "./auth-support";
 
 /** One login: the engine config plus what the app keeps to answer prompts. */
 export interface ResolvedLogin {
@@ -26,8 +26,6 @@ export interface ResolvedLogin {
   jumpHostIds: number[];
   savedHostKey: HostConnectProfile["hostKey"];
 }
-
-const AUTH_TYPES = ["password", "key", "credential", "none", "tailscale"];
 
 /** Matches core's ssh-keepalive.ts: seconds, 0 turns it off, at least 5. */
 function keepalive(options: Record<string, unknown>, base: number) {
@@ -119,12 +117,7 @@ export function resolveLogin(
   let certificate: string | undefined;
   let authType: string = src.authType || "none";
 
-  if (!AUTH_TYPES.includes(authType)) {
-    throw new AppError(
-      `This host signs in with "${authType}", which needs a Termix server. Link one to connect.`,
-      "AUTH_NEEDS_SERVER",
-    );
-  }
+  assertDeviceAuth(authType);
 
   const cred = profile?.credential;
   if (src.credentialId && cred) {
@@ -136,6 +129,7 @@ export function resolveLogin(
       username = cred.username;
     }
   }
+  assertDeviceAuth(authType, password, key);
   // Like the server, a linked login decides the type by what it holds.
   if (authType === "credential") {
     authType = key ? "key" : password ? "password" : "none";

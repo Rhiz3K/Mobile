@@ -162,6 +162,13 @@ test("auth types only a server has are refused", () => {
   expect(() => resolveLogin(agent, typed)).toThrow(/needs a Termix server/);
 });
 
+test("a secret reference in a login is refused", () => {
+  const p = profile({
+    host: { ...profile().host, password: "op://V/I/password" } as any,
+  });
+  expect(() => resolveLogin(p, typed)).toThrow(/Secret Sources/);
+});
+
 test("proxies map every chain type and the single proxy", () => {
   expect(proxiesOf({ use: false, host: "p", chain: [] })).toEqual([]);
   expect(

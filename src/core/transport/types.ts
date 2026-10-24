@@ -89,7 +89,11 @@ export interface ShellEvents {
   ) => void;
   onPassphraseRequired?: () => void;
   onWarpgateAuthRequired?: (url: string, securityKey: string) => void;
-  onBrowserCheckRequired?: (url: string, message: string) => void;
+  onBrowserCheckRequired?: (
+    url: string,
+    message: string,
+    title?: string,
+  ) => void;
   onBrowserCheckCompleted?: () => void;
   onPostConnectionSetup: () => void;
   /** The shell ended on purpose (exit, or the server closed the session). */

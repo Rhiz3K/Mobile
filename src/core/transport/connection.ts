@@ -29,7 +29,7 @@ export type ConnectionPrompt =
   | { kind: "hostKey"; scenario: "new" | "changed"; data: HostKeyData }
   | { kind: "passphrase" }
   | { kind: "warpgate"; url: string; securityKey: string }
-  | { kind: "browserCheck"; url: string; message: string };
+  | { kind: "browserCheck"; url: string; message: string; title?: string };
 
 export type ConnectionStatus =
   | { status: "idle" }
@@ -433,8 +433,8 @@ export class HostConnection {
       onWarpgateAuthRequired: guard((url, securityKey) =>
         this.ask({ kind: "warpgate", url, securityKey }),
       ),
-      onBrowserCheckRequired: guard((url, message) =>
-        this.ask({ kind: "browserCheck", url, message }),
+      onBrowserCheckRequired: guard((url, message, title) =>
+        this.ask({ kind: "browserCheck", url, message, title }),
       ),
       onBrowserCheckCompleted: guard(() => {
         const s = this.state;

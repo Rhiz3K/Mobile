@@ -22,6 +22,13 @@ export interface RelayShellConfig extends ShellOptions {
   ) => Promise<TerminalHostConfig>;
 }
 
+const SIGN_IN_TITLES: Record<string, string> = {
+  opkssh: "OPKSSH",
+  vault: "Vault",
+  stepca: "Step CA",
+};
+const SIGN_IN_IDS = Object.keys(SIGN_IN_TITLES);
+
 const PING_MS = 25000;
 const LOW_POWER_PING_MS = 60000;
 
@@ -53,6 +60,7 @@ export class RelayShell implements ShellChannel {
   private awaitingAuthCredentials = false;
   // The last error the server sent, so a close after it says why.
   private lastServerError: string | null = null;
+  private signInId: string | null = null;
 
   constructor(config: RelayShellConfig) {
     this.config = config;
@@ -105,6 +113,8 @@ export class RelayShell implements ShellChannel {
     this.awaitingAuthCredentials = false;
     this.settleProbes(false);
     this.settleCwd(null);
+    if (this.signInId) this.sendSignIn(this.signInId, "cancel");
+    this.signInId = null;
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       try {
         this.ws.send(JSON.stringify({ type: "disconnect" }));
@@ -230,6 +240,83 @@ export class RelayShell implements ShellChannel {
   // Which sign-in handler asked for the browser round. 2.9 names it per
   // handler, older servers only had warpgate.
   private browserSignInId = "warpgate";
+
+  private sendSignIn(id: string, suffix: string, extra: object = {}): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    try {
+      this.ws.send(
+        JSON.stringify({
+          type: `${id}_${suffix}`,
+          data: { hostId: this.config.hostConfig.id, ...extra },
+        }),
+      );
+    } catch (_) {}
+  }
+
+  // The server runs these sign-ins. The app starts one, shows the browser
+  // page and tells the server when the page is done.
+  private handleSignIn(msg: Record<string, any>): boolean {
+    const type = msg.type;
+    if (typeof type !== "string") return false;
+    const id = SIGN_IN_IDS.find((i) => type.startsWith(`${i}_`));
+    if (!id) return false;
+    const event = type.slice(id.length + 1);
+    const title = SIGN_IN_TITLES[id];
+    const done = () => {
+      if (this.connectionTimeout) {
+        clearTimeout(this.connectionTimeout);
+        this.connectionTimeout = null;
+      }
+    };
+    const fail = (fallback: string) => {
+      done();
+      this.signInId = null;
+      this.shouldNotReconnect = true;
+      this.notifyFailureOnce(
+        (msg.error as string) || (msg.message as string) || fallback,
+      );
+    };
+
+    switch (event) {
+      case "auth_required":
+        if (msg.url) return false;
+        done();
+        this.signInId = id;
+        this.sendSignIn(id, "start_auth");
+        return true;
+      case "status":
+      case "auth_url":
+        if (!msg.url) return true;
+        done();
+        this.signInId = id;
+        this.config.onBrowserCheckRequired?.(
+          msg.url as string,
+          `Sign in with ${title} in your browser. This closes when it is done.`,
+          `${title} sign in`,
+        );
+        return true;
+      case "completed":
+        done();
+        this.config.onBrowserCheckCompleted?.();
+        this.sendSignIn(id, "auth_completed", {
+          cols: this.cols,
+          rows: this.rows,
+          hostConfig: this.config.hostConfig,
+        });
+        this.signInId = null;
+        return true;
+      case "error":
+        fail(`${title} sign in failed`);
+        return true;
+      case "config_error":
+        fail(`${title} is not set up on the server`);
+        return true;
+      case "timeout":
+        fail(`${title} sign in timed out`);
+        return true;
+    }
+    return false;
+  }
 
   sendWarpgateContinue(): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
@@ -531,6 +618,8 @@ export class RelayShell implements ShellChannel {
             this.connectionTimeout = null;
           }
           this.config.onPassphraseRequired?.();
+        } else if (this.handleSignIn(msg)) {
+          // opkssh, vault and step-ca browser sign-ins
         } else if (
           typeof msg.type === "string" &&
           msg.type.endsWith("_auth_required")

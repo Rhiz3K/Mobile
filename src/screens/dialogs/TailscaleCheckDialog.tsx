@@ -10,6 +10,7 @@ interface TailscaleCheckDialogProps {
   visible: boolean;
   url: string;
   message: string;
+  title?: string;
   onCancel: () => void;
 }
 
@@ -17,6 +18,7 @@ export function TailscaleCheckDialog({
   visible,
   url,
   message,
+  title,
   onCancel,
 }: TailscaleCheckDialogProps) {
   const color = useThemeColor();
@@ -44,7 +46,7 @@ export function TailscaleCheckDialog({
       visible={visible}
       onClose={onCancel}
       icon={<Shield size={18} color={color("accent-brand")} />}
-      title="Tailscale SSH check"
+      title={title || "Tailscale SSH check"}
       description={
         message ||
         "Complete the Tailscale SSH check in your browser to continue."
