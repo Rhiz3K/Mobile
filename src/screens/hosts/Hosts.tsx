@@ -38,6 +38,7 @@ import { SSHHost, ServerStatus, Snippet } from "@/types";
 import { publishHostSnapshot } from "@/widgets";
 import { accounts, api, activeClient } from "@/core/accounts";
 import { hostStatusesByLocalId, isSynced } from "@/core/sync";
+import { useLocalStatuses } from "@/core/status";
 import { SyncBanner } from "@/screens/hosts/SyncBanner";
 import { Screen } from "@/components/Screen";
 import {
@@ -183,9 +184,17 @@ export default function Hosts() {
     })();
   }, []);
 
+  // The phone checks hosts itself when no server reports status.
+  const statusClient = activeClient();
+  const phoneStatuses = useLocalStatuses(
+    hosts,
+    !statusClient || !statusClient.supports({ plugin: "host-status" }),
+  );
+
   const getHostStatus = useCallback(
-    (hostId: number): HostStatus => serverStatuses[hostId]?.status ?? "unknown",
-    [serverStatuses],
+    (hostId: number): HostStatus =>
+      serverStatuses[hostId]?.status ?? phoneStatuses[hostId] ?? "unknown",
+    [serverStatuses, phoneStatuses],
   );
 
   // Fetch CPU/RAM for online hosts. Never throws; failures are ignored so the
