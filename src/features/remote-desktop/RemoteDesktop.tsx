@@ -14,11 +14,9 @@ import {
   ActivityIndicator,
   Keyboard,
   PixelRatio,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from "react-native";
 import { WebView } from "react-native-webview";
@@ -29,28 +27,21 @@ import {
 import { VIEWPORT_SCRIPT } from "./viewport";
 import { loadGuacamoleAssets } from "./loadGuacamoleAssets";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import {
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  ChevronUp,
-  Keyboard as KeyboardIcon,
-  RotateCcw,
-  Settings2,
-  X,
-} from "lucide-react-native";
+import { RotateCcw } from "lucide-react-native";
 import type { SSHHost } from "@/types";
 import { useThemeColor } from "@/contexts/ThemeContext";
-import { Sheet, Tabs, Button, SheetBody, Input } from "@/ui";
+import { Button } from "@/ui";
 import { useSessionClient } from "@/core/accounts/session";
 import type { SessionTabStatus } from "@/core/features/types";
 import { sessionLifecycle } from "@/core/sessions/lifecycle";
 import { shouldAutoReconnect, tunnelWatchScript } from "./resume";
-
-// Height of the always-visible key strip at the bottom.
-// The parent session area already accounts for the tab bar + safe-area insets,
-// so we only need our own strip height here.
-const KEY_STRIP_HEIGHT = 44;
+import {
+  KEY_STRIP_HEIGHT,
+  RdpSignInSheet,
+  RemoteKeyStrip,
+  RemoteSettingsSheet,
+  type MouseMode,
+} from "./RemoteChrome";
 
 type ConnectionState =
   | "awaiting-credentials"
@@ -59,15 +50,6 @@ type ConnectionState =
   | "connected"
   | "disconnected"
   | "failed";
-
-type MouseMode = "touch" | "trackpad";
-
-interface Modifiers {
-  ctrl: boolean;
-  alt: boolean;
-  shift: boolean;
-  win: boolean;
-}
 
 export type RemoteDesktopProtocol = "rdp" | "vnc" | "telnet";
 
@@ -92,8 +74,6 @@ export function RemoteDesktop({
   const { bottom: safeBottom } = useSafeAreaInsets();
 
   const themeBg = color("background") ?? "rgb(12,13,11)";
-  const themeCard = color("card") ?? "rgb(24,25,23)";
-  const themeBorder = color("border") ?? "rgb(50,50,50)";
   const themeFg = color("foreground") ?? "rgb(250,250,250)";
   const themeMuted = color("muted-foreground") ?? "rgb(164,164,164)";
   const themeAccent = color("accent-brand") ?? "#f59145";
@@ -131,13 +111,6 @@ export function RemoteDesktop({
   const [webViewKey, setWebViewKey] = useState(0);
 
   const [mouseMode, setMouseMode] = useState<MouseMode>("touch");
-  const [modifiers, setModifiers] = useState<Modifiers>({
-    ctrl: false,
-    alt: false,
-    shift: false,
-    win: false,
-  });
-  const [showFunctionKeys, setShowFKeys] = useState(false);
   const [showSettingsSheet, setShowSettings] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1.0);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
@@ -165,22 +138,13 @@ export function RemoteDesktop({
 
   const resolvedProtocol = protocol ?? host.connectionType ?? "rdp";
   const login = rdpLogin(host, resolvedProtocol);
-  const [promptUsername, setPromptUsername] = useState("");
-  const [promptPassword, setPromptPassword] = useState("");
-  const [promptDomain, setPromptDomain] = useState(login.domain);
-
-  const cancelPrompt = () => {
-    setPromptPassword("");
-    setConnectionState("disconnected");
-  };
+  const cancelPrompt = () => setConnectionState("disconnected");
 
   const connect = useCallback(
     async (credentials?: RdpCredentials) => {
       setWebSocketUrl(null);
       setErrorMessage(null);
       if (login.prompt && !credentials) {
-        setPromptPassword("");
-        setPromptDomain(login.domain);
         setConnectionState("awaiting-credentials");
         return;
       }
@@ -291,7 +255,6 @@ export function RemoteDesktop({
           if (next === "prompt") {
             wasLive.current = false;
             setWebSocketUrl(null);
-            setPromptPassword("");
             setErrorMessage("That login was refused. Try again.");
             setConnectionState("awaiting-credentials");
             return;
@@ -661,7 +624,6 @@ ${VIEWPORT_SCRIPT}
   const reconnect = useCallback(() => {
     setWebSocketUrl(null);
     setZoomLevel(1.0);
-    setModifiers({ ctrl: false, alt: false, shift: false, win: false });
     setWebViewKey((k) => k + 1);
   }, []);
   useEffect(() => {
@@ -741,21 +703,6 @@ ${VIEWPORT_SCRIPT}
         `window.termixRemote && window.termixRemote.sendText(${JSON.stringify(t)})`,
       ),
     [inject],
-  );
-
-  const sendWithMods = useCallback(
-    (k: number) => {
-      inject(
-        `window.termixRemote && window.termixRemote.sendWithModifiers(${k}, ${JSON.stringify(modifiers)})`,
-      );
-      setModifiers({ ctrl: false, alt: false, shift: false, win: false });
-    },
-    [inject, modifiers],
-  );
-
-  const toggleModifier = useCallback(
-    (key: keyof Modifiers) => setModifiers((m) => ({ ...m, [key]: !m[key] })),
-    [],
   );
 
   const resetZoom = useCallback(() => {
@@ -841,73 +788,6 @@ ${VIEWPORT_SCRIPT}
           lineHeight: 18,
           textAlign: "center",
         },
-        // Key strip: sits at the very bottom of the parent session area
-        keyStrip: {
-          position: "absolute",
-          left: 0,
-          right: 0,
-          bottom: 0,
-          height: KEY_STRIP_HEIGHT,
-          backgroundColor: themeBg,
-          borderTopWidth: StyleSheet.hairlineWidth,
-          borderTopColor: themeBorder,
-          flexDirection: "row",
-          alignItems: "center",
-          paddingHorizontal: 4,
-        },
-        scrollContent: {
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 4,
-          paddingHorizontal: 4,
-        },
-        // Key button in the strip
-        key: {
-          height: 34,
-          paddingHorizontal: 9,
-          borderRadius: 0,
-          borderWidth: 1,
-          borderColor: themeBorder,
-          backgroundColor: themeCard,
-          alignItems: "center",
-          justifyContent: "center",
-          flexDirection: "row",
-          gap: 4,
-        },
-        keyText: {
-          color: themeFg,
-          fontSize: 12,
-          fontWeight: "600",
-        },
-        // Modifier pill (active = accent tinted)
-        modKey: {
-          height: 34,
-          paddingHorizontal: 9,
-          borderRadius: 0,
-          borderWidth: 1,
-          alignItems: "center",
-          justifyContent: "center",
-        },
-        modKeyText: {
-          fontSize: 12,
-          fontWeight: "700",
-        },
-        divider: {
-          width: 1,
-          height: 22,
-          backgroundColor: themeBorder,
-          marginHorizontal: 2,
-        },
-        iconKey: {
-          width: 36,
-          height: 34,
-          borderRadius: 0,
-          borderWidth: 1,
-          borderColor: themeBorder,
-          backgroundColor: themeCard,
-          alignItems: "center",
-          justifyContent: "center",
-        },
         hiddenInput: {
           position: "absolute",
           width: 1,
@@ -915,56 +795,8 @@ ${VIEWPORT_SCRIPT}
           opacity: 0,
           color: "transparent",
         },
-        // Settings sheet sections
-        sheetSection: {
-          paddingHorizontal: 16,
-          paddingVertical: 12,
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: themeBorder,
-          gap: 8,
-        },
-        sheetLabel: {
-          color: themeMuted,
-          fontSize: 10,
-          fontWeight: "700",
-          textTransform: "uppercase" as const,
-          letterSpacing: 1,
-        },
-        sheetDesc: {
-          color: themeMuted,
-          fontSize: 11,
-          lineHeight: 16,
-        },
-        zoomRow: {
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 8,
-          paddingHorizontal: 16,
-          paddingVertical: 12,
-        },
-        zoomLabel: {
-          color: themeMuted,
-          fontSize: 12,
-          flex: 1,
-        },
       }),
-    [themeBg, themeCard, themeBorder, themeFg, themeMuted],
-  );
-
-  const modKeyStyle = (active: boolean) => ({
-    ...styles.modKey,
-    borderColor: active ? themeAccent : themeBorder,
-    backgroundColor: active ? themeAccent : themeCard,
-  });
-
-  const modKeyTextStyle = (active: boolean) => ({
-    ...styles.modKeyText,
-    color: active ? "#fff" : themeMuted,
-  });
-
-  const FKEYS = useMemo(
-    () => Array.from({ length: 12 }, (_, i) => 0xffbe + i),
-    [],
+    [themeBg, themeFg, themeMuted],
   );
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -979,70 +811,18 @@ ${VIEWPORT_SCRIPT}
       ]}
       onLayout={handleContainerLayout}
     >
-      <Sheet
-        scroll
+      <RdpSignInSheet
         visible={isVisible && connectionState === "awaiting-credentials"}
-        onClose={cancelPrompt}
-        title="RDP sign-in"
         description={
           errorMessage
             ? `${errorMessage} They will not be saved.`
             : `Enter credentials for ${title}. They will not be saved.`
         }
-        footer={
-          <View className="flex-row justify-end gap-2">
-            <Button variant="muted" onPress={cancelPrompt}>
-              Cancel
-            </Button>
-            <Button
-              variant="muted"
-              disabled={!promptUsername.trim()}
-              onPress={() => {
-                const credentials = {
-                  username: promptUsername.trim(),
-                  password: promptPassword,
-                  domain: promptDomain,
-                };
-                setPromptPassword("");
-                Keyboard.dismiss();
-                void connect(credentials);
-              }}
-            >
-              Connect
-            </Button>
-          </View>
-        }
-      >
-        <SheetBody>
-          <View className="gap-3">
-            <Text style={{ color: themeFg }}>Username</Text>
-            <Input
-              accessibilityLabel="RDP username"
-              value={promptUsername}
-              onChangeText={setPromptUsername}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <Text style={{ color: themeFg }}>Domain (optional)</Text>
-            <Input
-              accessibilityLabel="RDP domain"
-              value={promptDomain}
-              onChangeText={setPromptDomain}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <Text style={{ color: themeFg }}>Password</Text>
-            <Input
-              accessibilityLabel="RDP password"
-              value={promptPassword}
-              onChangeText={setPromptPassword}
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
-        </SheetBody>
-      </Sheet>
+        initialUsername=""
+        initialDomain={login.domain}
+        onCancel={cancelPrompt}
+        onConnect={(credentials) => void connect(credentials)}
+      />
 
       {/* WebView */}
       {htmlContent ? (
@@ -1130,223 +910,29 @@ ${VIEWPORT_SCRIPT}
         style={styles.hiddenInput}
       />
 
-      {/* ── Key strip ── */}
       {canSendInput && (
-        <View style={[styles.keyStrip, { bottom: kbOverlap }]}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            keyboardShouldPersistTaps="always"
-            contentContainerStyle={styles.scrollContent}
-          >
-            {/* Modifier keys */}
-            {(["ctrl", "alt", "shift", "win"] as const).map((k) => (
-              <TouchableOpacity
-                key={k}
-                style={modKeyStyle(modifiers[k])}
-                onPress={() => toggleModifier(k)}
-              >
-                <Text style={modKeyTextStyle(modifiers[k])}>
-                  {k === "ctrl"
-                    ? "Ctrl"
-                    : k === "alt"
-                      ? "Alt"
-                      : k === "shift"
-                        ? "⇧"
-                        : "Win"}
-                </Text>
-              </TouchableOpacity>
-            ))}
-
-            <View style={styles.divider} />
-
-            {/* Keyboard toggle */}
-            {isKeyboardOpen ? (
-              <TouchableOpacity
-                style={[
-                  styles.key,
-                  { borderColor: themeAccent, backgroundColor: themeAccent },
-                ]}
-                onPress={() => Keyboard.dismiss()}
-              >
-                <X size={13} color="#fff" />
-                <Text style={[styles.keyText, { color: "#fff" }]}>Done</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={styles.iconKey}
-                onPress={() => inputRef.current?.focus()}
-              >
-                <KeyboardIcon size={15} color={themeMuted} />
-              </TouchableOpacity>
-            )}
-
-            <View style={styles.divider} />
-
-            {/* Common keys */}
-            {[
-              { label: "Esc", k: 0xff1b },
-              { label: "Tab", k: 0xff09 },
-            ].map(({ label, k }) => (
-              <TouchableOpacity
-                key={label}
-                style={styles.key}
-                onPress={() => sendWithMods(k)}
-              >
-                <Text style={styles.keyText}>{label}</Text>
-              </TouchableOpacity>
-            ))}
-
-            <View style={styles.divider} />
-
-            {/* Arrow keys */}
-            <TouchableOpacity
-              style={styles.iconKey}
-              onPress={() => sendWithMods(0xff51)}
-            >
-              <ChevronLeft size={14} color={themeFg} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.iconKey}
-              onPress={() => sendWithMods(0xff52)}
-            >
-              <ChevronUp size={14} color={themeFg} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.iconKey}
-              onPress={() => sendWithMods(0xff54)}
-            >
-              <ChevronDown size={14} color={themeFg} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.iconKey}
-              onPress={() => sendWithMods(0xff53)}
-            >
-              <ChevronRight size={14} color={themeFg} />
-            </TouchableOpacity>
-
-            <View style={styles.divider} />
-
-            {/* Nav keys */}
-            {[
-              { label: "Home", k: 0xff50 },
-              { label: "End", k: 0xff57 },
-              { label: "PgUp", k: 0xff55 },
-              { label: "PgDn", k: 0xff56 },
-              { label: "Bksp", k: 0xff08 },
-              { label: "Del", k: 0xffff },
-              { label: "Enter", k: 0xff0d },
-            ].map(({ label, k }) => (
-              <TouchableOpacity
-                key={label}
-                style={styles.key}
-                onPress={() => sendWithMods(k)}
-              >
-                <Text style={styles.keyText}>{label}</Text>
-              </TouchableOpacity>
-            ))}
-
-            <View style={styles.divider} />
-
-            {/* System combos */}
-            <TouchableOpacity
-              style={styles.key}
-              onPress={() => sendKeysyms([0xffe3, 0xffe9, 0xffff])}
-            >
-              <Text style={styles.keyText}>CAD</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.key}
-              onPress={() => sendKeysyms([0xffeb])}
-            >
-              <Text style={styles.keyText}>Win</Text>
-            </TouchableOpacity>
-
-            <View style={styles.divider} />
-
-            {/* F-key toggle */}
-            <TouchableOpacity
-              style={[
-                styles.key,
-                showFunctionKeys && {
-                  borderColor: themeAccent,
-                  backgroundColor: themeAccent,
-                },
-              ]}
-              onPress={() => setShowFKeys((v) => !v)}
-            >
-              <Text
-                style={[styles.keyText, showFunctionKeys && { color: "#fff" }]}
-              >
-                Fn
-              </Text>
-            </TouchableOpacity>
-
-            {/* F1-F12 (shown inline when toggled) */}
-            {showFunctionKeys &&
-              FKEYS.map((ks, i) => (
-                <TouchableOpacity
-                  key={ks}
-                  style={styles.key}
-                  onPress={() => sendWithMods(ks)}
-                >
-                  <Text style={styles.keyText}>F{i + 1}</Text>
-                </TouchableOpacity>
-              ))}
-
-            <View style={styles.divider} />
-
-            {/* Settings */}
-            <TouchableOpacity
-              style={styles.iconKey}
-              onPress={() => setShowSettings(true)}
-            >
-              <Settings2 size={15} color={themeMuted} />
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
+        <RemoteKeyStrip
+          bottom={kbOverlap}
+          keyboardOpen={isKeyboardOpen}
+          onKeyboard={() => inputRef.current?.focus()}
+          send={sendKeysyms}
+          onSettings={() => setShowSettings(true)}
+        />
       )}
 
-      {/* ── Settings sheet (mouse mode + zoom only - compact) ── */}
-      <Sheet
+      <RemoteSettingsSheet
         visible={showSettingsSheet}
         onClose={() => setShowSettings(false)}
-        title="Remote Settings"
-        scroll={false}
-      >
-        {/* Mouse mode */}
-        <View style={styles.sheetSection}>
-          <Text style={styles.sheetLabel}>Mouse Mode</Text>
-          <Tabs
-            options={[
-              { id: "touch" as MouseMode, label: "Touch" },
-              { id: "trackpad" as MouseMode, label: "Trackpad" },
-            ]}
-            value={mouseMode}
-            onChange={(m) => {
-              setMouseMode(m);
-              inject(
-                `window.termixRemote && window.termixRemote.setMouseMode('${m}')`,
-              );
-            }}
-          />
-          <Text style={styles.sheetDesc}>
-            {mouseMode === "touch"
-              ? "Tap directly where you want to click."
-              : "Drag to move pointer. Single tap = click. Two-finger tap = right-click."}
-          </Text>
-        </View>
-
-        {/* Zoom */}
-        <View style={styles.zoomRow}>
-          <Text style={styles.zoomLabel}>
-            Zoom: {zoomLevel.toFixed(1)}×. Pinch anywhere to zoom
-          </Text>
-          <Button variant="muted" size="sm" onPress={resetZoom}>
-            Reset
-          </Button>
-        </View>
-      </Sheet>
+        mouseMode={mouseMode}
+        onMouseMode={(m) => {
+          setMouseMode(m);
+          inject(
+            `window.termixRemote && window.termixRemote.setMouseMode('${m}')`,
+          );
+        }}
+        zoom={zoomLevel}
+        onResetZoom={resetZoom}
+      />
     </View>
   );
 }
