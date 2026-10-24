@@ -12,6 +12,7 @@ import { fromError, type ConnectFailure } from "../errors";
 import type {
   HostKeyData,
   ShellChannel,
+  ShellDrop,
   ShellExecResult,
   ShellOptions,
 } from "../types";
@@ -24,8 +25,6 @@ import {
 } from "./chain";
 import { classifyKeyboardInteractive, responsesWithAnswer } from "./kbd";
 import type { ResolvedLogin } from "./resolve";
-
-const MAX_RECONNECTS = 5;
 
 /** Splits off a UTF-8 sequence cut at the end of a chunk, so it decodes with the next one. */
 export class Utf8Stream {
@@ -53,16 +52,17 @@ export class Utf8Stream {
 
 const BROWSER_URL = /https:\/\/\S+/;
 
-/** A shell opened by this phone's own SSH engine. Mirrors RelayShell's events. */
+/**
+ * A shell opened by this phone's own SSH engine. Mirrors RelayShell's events.
+ * A drop is reported once through `onDropped`; the connection reconnects.
+ */
 export class LocalShell implements ShellChannel {
   private chain: Chain | null = null;
   private shell: SshShell | null = null;
   private abort: AbortController | null = null;
   private overrides: LoginOverrides | null = null;
   private destroyed = false;
-  private background = false;
   private dropped = false;
-  private reconnecting = false;
   private failed = false;
   private sawData = false;
   private totpAsked = false;
@@ -86,7 +86,7 @@ export class LocalShell implements ShellChannel {
   async connect(cols: number, rows: number): Promise<void> {
     this.cols = cols;
     this.rows = rows;
-    await this.open(0);
+    await this.open();
   }
 
   private log(level: string, message: string, stage = "auth") {
@@ -168,14 +168,11 @@ export class LocalShell implements ShellChannel {
     if (url) this.options.onBrowserCheckRequired?.(url[0], banner.trim());
   };
 
-  private async open(
-    retryCount: number,
-    fromBackground = false,
-  ): Promise<void> {
+  private async open(): Promise<void> {
     if (this.destroyed) return;
     this.failed = false;
     this.totpAsked = false;
-    this.options.onStateChange("connecting", { retryCount });
+    this.options.onStateChange("connecting", { retryCount: 0 });
     const abort = new AbortController();
     this.abort = abort;
     let chain: Chain;
@@ -194,7 +191,7 @@ export class LocalShell implements ShellChannel {
       );
     } catch (err) {
       if (this.destroyed || abort.signal.aborted) return;
-      this.handleLoginError(err, retryCount, fromBackground);
+      this.handleLoginError(err);
       return;
     }
     if (this.destroyed) {
@@ -212,20 +209,16 @@ export class LocalShell implements ShellChannel {
       return;
     }
     this.dropped = false;
+    // Every shell here is new, so startup lines always run.
     this.options.onStateChange("connected", {
       hostName: this.name,
-      fromBackground,
+      fromBackground: false,
       isReattach: false,
     });
-    if (retryCount === 0 && !fromBackground)
-      this.options.onPostConnectionSetup();
+    this.options.onPostConnectionSetup();
   }
 
-  private handleLoginError(
-    err: unknown,
-    retryCount: number,
-    fromBackground: boolean,
-  ) {
+  private handleLoginError(err: unknown) {
     const e =
       err instanceof SshError || err instanceof AppError
         ? err
@@ -258,16 +251,6 @@ export class LocalShell implements ShellChannel {
       case "cancelled":
         this.fail("Login cancelled.", failure);
         return;
-      case "connect":
-      case "timeout":
-      case "io":
-      case "disconnected":
-        // A drop while connected keeps trying a few times, like the relay.
-        if (retryCount > 0 && retryCount < MAX_RECONNECTS) {
-          this.scheduleReconnect(retryCount + 1, fromBackground);
-          return;
-        }
-        break;
     }
     this.fail(e.message, failure);
   }
@@ -289,9 +272,22 @@ export class LocalShell implements ShellChannel {
           this.markData();
         },
         onActive: () => this.markData(),
-        onExit: () => {
+        onExit: (exitCode, exitSignal) => {
           if (this.destroyed || this.shell !== shell) return;
           this.shell = null;
+          // No exit status means the channel was cut, not that the shell ended.
+          if (
+            exitCode === null &&
+            exitSignal === null &&
+            (this.dropped || chain.target.isClosed)
+          ) {
+            this.drop({ kind: "network", reason: "The connection was cut" });
+            return;
+          }
+          if (exitCode === null && exitSignal === null) {
+            this.drop({ kind: "ended", reason: "The shell channel closed" });
+            return;
+          }
           this.teardown();
           this.options.onDisconnected(this.name);
         },
@@ -302,37 +298,21 @@ export class LocalShell implements ShellChannel {
     this.unsubDrop = chain.target.onDisconnect((info) => {
       if (info.kind === "local" || this.destroyed || this.chain !== chain)
         return;
-      this.log("warning", `Connection lost: ${info.reason}`, "connection");
-      this.dropped = true;
-      this.shell?.release();
-      this.shell = null;
-      if (!this.background) this.reconnect(false);
+      this.drop({ kind: info.kind, reason: info.reason });
     });
+  }
+
+  private drop(info: ShellDrop) {
+    if (this.dropped && !this.chain) return;
+    this.dropped = true;
+    this.teardown();
+    this.options.onDropped?.(info);
   }
 
   private markData() {
     if (this.sawData) return;
     this.sawData = true;
     this.options.onStateChange("dataReceived", { hostName: this.name });
-  }
-
-  private scheduleReconnect(retryCount: number, fromBackground: boolean) {
-    const delay = Math.min(1000 * 2 ** (retryCount - 1), 5000);
-    setTimeout(() => {
-      if (!this.destroyed) this.open(retryCount, fromBackground);
-    }, delay);
-  }
-
-  /** After a drop: the same login again, without asking the user unless the server does. */
-  private async reconnect(fromBackground: boolean) {
-    if (this.reconnecting || this.destroyed) return;
-    this.reconnecting = true;
-    try {
-      this.teardown();
-      await this.open(1, fromBackground);
-    } finally {
-      this.reconnecting = false;
-    }
   }
 
   private teardown() {
@@ -396,14 +376,26 @@ export class LocalShell implements ShellChannel {
     this.abort?.abort();
     this.settlePrompts();
     this.teardown();
-    this.open(0);
+    this.open();
   }
 
   // Browser sign-ins only exist through a server.
   sendWarpgateContinue(): void {}
 
-  notifyBackgrounded(): void {
-    this.background = true;
+  // The engine keeps its keepalives going on its own threads.
+  notifyBackgrounded(): void {}
+
+  notifyForegrounded(): void {}
+
+  async probe(timeoutMs: number): Promise<boolean> {
+    const target: SshSession | undefined = this.chain?.target;
+    if (!target || target.isClosed || this.dropped) return false;
+    try {
+      await target.ping(Math.max(1, Math.ceil(timeoutMs / 1000)));
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async exec(command: string, timeoutSecs = 10): Promise<ShellExecResult> {
@@ -414,22 +406,6 @@ export class LocalShell implements ShellChannel {
       stdout: utf8Decode(result.stdout),
       exitCode: result.exitCode,
     };
-  }
-
-  notifyForegrounded(): void {
-    if (!this.background) return;
-    this.background = false;
-    if (this.destroyed || !this.chain) {
-      if (this.dropped) this.reconnect(true);
-      return;
-    }
-    const target: SshSession = this.chain.target;
-    if (this.dropped || target.isClosed) {
-      this.reconnect(true);
-      return;
-    }
-    // The OS may have cut the socket without telling us.
-    target.ping(5).catch(() => this.reconnect(true));
   }
 
   destroy(): void {

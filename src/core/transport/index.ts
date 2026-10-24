@@ -17,11 +17,14 @@ import type { Transport } from "./types";
 export * from "./types";
 export * from "./origin";
 export * from "./errors";
+export * from "./reconnect";
 export { HostConnection } from "./connection";
 export type {
+  ConnectedInfo,
   ConnectionPrompt,
   ConnectionSnapshot,
   ConnectionStatus,
+  NetworkInfo,
 } from "./connection";
 
 const relays = new WeakMap<AccountClient, Transport>();

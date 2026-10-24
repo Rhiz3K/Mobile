@@ -56,6 +56,15 @@ export interface HostKeyData {
   algorithm: string;
 }
 
+/**
+ * Why a live shell went away without the user ending it. `ended` is the
+ * remote side closing the channel with no exit status.
+ */
+export interface ShellDrop {
+  kind: "network" | "keepalive" | "server" | "ended";
+  reason: string;
+}
+
 /** What a shell reports back. Prompts mirror what the server asks for today. */
 export interface ShellEvents {
   onStateChange: (state: ShellState, data?: Record<string, unknown>) => void;
@@ -73,7 +82,13 @@ export interface ShellEvents {
   onBrowserCheckRequired?: (url: string, message: string) => void;
   onBrowserCheckCompleted?: () => void;
   onPostConnectionSetup: () => void;
+  /** The shell ended on purpose (exit, or the server closed the session). */
   onDisconnected: (hostName: string) => void;
+  /**
+   * A live shell dropped. Reported once; the shell does not reconnect itself,
+   * the connection that owns it does.
+   */
+  onDropped?: (drop: ShellDrop) => void;
   /** `failure` says which step failed and what to try. */
   onConnectionFailed: (message: string, failure?: ConnectFailure) => void;
   /** Fired when the backend session id is created/attached/cleared. */
@@ -115,6 +130,8 @@ export interface ShellOptions extends ShellEvents {
    * the relay ignores it.
    */
   pipeId?: string;
+  /** Reconnecting after a drop or an app restart, not a first connect. */
+  resume?: boolean;
 }
 
 /** A live shell on a host. */
@@ -137,6 +154,10 @@ export interface ShellChannel {
   attachTmux?(sessionName: string): void;
   notifyBackgrounded(): void;
   notifyForegrounded(): void;
+  /** Checks the connection still answers, within `timeoutMs`. */
+  probe?(timeoutMs: number): Promise<boolean>;
+  /** Low power mode: ping less often. */
+  setLowPower?(on: boolean): void;
   destroy(): void;
 }
 

@@ -168,8 +168,9 @@ describe("HostConnection", () => {
     expect(opts.onConnected).toHaveBeenCalledWith({
       fromBackground: false,
       isReattach: false,
+      resumed: false,
     });
-    expect(opts.onPostConnectionSetup).toHaveBeenCalled();
+    expect(opts.onPostConnectionSetup).toHaveBeenCalledWith({ resumed: false });
     expect(changes).toHaveBeenCalled();
     expect(conn.getSnapshot().log.map((e) => e.message)).toEqual([
       "Connecting to Box from this phone",
@@ -375,9 +376,10 @@ describe("HostConnection", () => {
     attempts = [relay.transport];
     await conn.retry();
     expect(opts.plan).toHaveBeenCalledTimes(2);
-    expect(conn.getSnapshot().log[0].message).toBe(
-      "Connecting to Box through the server",
-    );
+    // The log is kept across a retry, for bug reports.
+    const messages = conn.getSnapshot().log.map((e) => e.message);
+    expect(messages[0]).toBe("Connecting to Box from this phone");
+    expect(messages.at(-1)).toBe("Connecting to Box through the server");
     expect(relay.last().channel.connect).toHaveBeenCalledWith(80, 24);
     expect(conn.state).toMatchObject({ status: "connecting", origin: "relay" });
   });
@@ -395,11 +397,16 @@ describe("HostConnection", () => {
     expect(options.tabInstanceId).toBe("tab");
     expect(options.pipeId).toBe("pipe");
 
+    // Typed before the shell is up: kept, then sent once it is.
     conn.sendInput("ls\r");
+    expect(channel.sendInput).not.toHaveBeenCalled();
+    expect(conn.getSnapshot().pending).toBe(3);
+    options.onStateChange("connected");
+    expect(channel.sendInput).toHaveBeenCalledWith("ls\r");
+    expect(conn.getSnapshot().pending).toBe(0);
     conn.resize(120, 40);
     conn.notifyBackgrounded();
     conn.notifyForegrounded();
-    expect(channel.sendInput).toHaveBeenCalledWith("ls\r");
     expect(channel.sendResize).toHaveBeenCalledWith(120, 40);
     expect(channel.notifyBackgrounded).toHaveBeenCalled();
     expect(channel.notifyForegrounded).toHaveBeenCalled();
@@ -411,8 +418,6 @@ describe("HostConnection", () => {
 
     options.onSessionIdChange!("s2");
     expect(opts.onSessionIdChange).toHaveBeenCalledWith("s2");
-    options.onStateChange("connecting", { retryCount: 2 });
-    expect(conn.state).toMatchObject({ status: "connecting", retry: 2 });
   });
 
   test("a closed shell ends the connection; destroy drops it", async () => {
@@ -430,5 +435,382 @@ describe("HostConnection", () => {
     t.last().options.onStateChange("connected");
     expect(other.conn.state.status).toBe("connecting");
     await flush();
+  });
+});
+
+describe("reduceConnection reconnect states", () => {
+  const connected: ConnectionStatus = {
+    status: "connected",
+    origin: "local",
+    hasData: true,
+  };
+
+  test("reconnecting keeps the origin and a running try drops the countdown", () => {
+    const waiting = reduceConnection(connected, {
+      type: "reconnecting",
+      attempt: 2,
+      nextAt: 5000,
+      reason: "gone",
+    });
+    expect(waiting).toEqual({
+      status: "reconnecting",
+      origin: "local",
+      attempt: 2,
+      nextAt: 5000,
+      reason: "gone",
+    });
+    expect(
+      reduceConnection(waiting, {
+        type: "reconnecting",
+        attempt: 2,
+        nextAt: 5000,
+        reason: "gone",
+      }),
+    ).toBe(waiting);
+    // The new shell saying it is connecting keeps the reconnect status.
+    const trying = reduceConnection(waiting, { type: "connecting", retry: 0 });
+    expect(trying).toMatchObject({ status: "reconnecting", nextAt: null });
+    expect(reduceConnection(trying, { type: "connecting", retry: 0 })).toBe(
+      trying,
+    );
+  });
+
+  test("offline keeps the origin; nothing to go offline from without one", () => {
+    expect(
+      reduceConnection(connected, { type: "offline", reason: "gone" }),
+    ).toEqual({ status: "offline", origin: "local", reason: "gone" });
+    const idle: ConnectionStatus = { status: "idle" };
+    expect(reduceConnection(idle, { type: "offline", reason: "x" })).toBe(idle);
+    expect(
+      reduceConnection(idle, {
+        type: "reconnecting",
+        attempt: 1,
+        nextAt: null,
+        reason: "x",
+      }),
+    ).toBe(idle);
+  });
+});
+
+describe("HostConnection reconnect", () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  async function connected(
+    kind: Transport["kind"] = "local",
+    over: Partial<HostConnectionOptions> = {},
+  ) {
+    const t = fakeTransport(kind);
+    const { conn, opts } = setup([t.transport], over);
+    await conn.connect(80, 24);
+    t.last().options.onStateChange("connected");
+    return { t, conn, opts };
+  }
+
+  const drop = (t: ReturnType<typeof fakeTransport>, reason = "gone") =>
+    t.last().options.onDropped!({ kind: "network", reason });
+
+  test("a drop reconnects right away, then backs off, and only one try runs", async () => {
+    const { t, conn } = await connected();
+    drop(t);
+    expect(t.shells).toHaveLength(2);
+    expect(t.shells[0].channel.destroy).toHaveBeenCalled();
+    expect(t.last().options.resume).toBe(true);
+    expect(conn.state).toMatchObject({
+      status: "reconnecting",
+      attempt: 1,
+      nextAt: null,
+      reason: "gone",
+    });
+
+    t.last().options.onConnectionFailed("x", {
+      stage: "network",
+      message: "timed out",
+      hint: "h",
+    });
+    expect(conn.state).toMatchObject({ status: "reconnecting", attempt: 2 });
+    expect((conn.state as any).nextAt).not.toBeNull();
+    expect(t.shells).toHaveLength(2);
+
+    // Reconnect now starts the try; pressing it again does not start a second one.
+    conn.reconnectNow();
+    conn.reconnectNow();
+    expect(t.shells).toHaveLength(3);
+    jest.advanceTimersByTime(60000);
+    expect(t.shells).toHaveLength(3);
+  });
+
+  test("gives up after the last try with the reason", async () => {
+    const { t, conn } = await connected();
+    drop(t, "reset by peer");
+    for (let i = 0; i < 12; i++) {
+      t.last().options.onConnectionFailed("x", {
+        stage: "network",
+        message: "reset by peer",
+        hint: "h",
+      });
+      jest.advanceTimersByTime(120000);
+    }
+    expect(conn.state).toMatchObject({
+      status: "failed",
+      failure: { stage: "session", message: "reset by peer" },
+    });
+    // Ten tries after the drop, plus the first shell.
+    expect(t.shells).toHaveLength(11);
+  });
+
+  test("a refused login while reconnecting fails at once", async () => {
+    const { t, conn } = await connected();
+    drop(t);
+    t.last().options.onConnectionFailed("x", {
+      stage: "auth",
+      message: "no",
+      hint: "h",
+    });
+    expect(conn.state).toMatchObject({
+      status: "failed",
+      failure: { stage: "auth" },
+    });
+  });
+
+  test("a session another device took over is not retried", async () => {
+    const { t, conn } = await connected("relay");
+    t.last().options.onConnectionFailed("taken", {
+      stage: "session",
+      message: "taken",
+      hint: "h",
+      noRetry: true,
+    });
+    expect(conn.state.status).toBe("failed");
+    jest.advanceTimersByTime(60000);
+    expect(t.shells).toHaveLength(1);
+  });
+
+  test("offline waits without using tries and goes again when the network is back", async () => {
+    const { t, conn } = await connected();
+    conn.notifyNetworkChanged({
+      connected: false,
+      type: "none",
+      vpn: false,
+      changed: true,
+    });
+    drop(t);
+    expect(conn.state).toMatchObject({ status: "offline", reason: "gone" });
+    jest.advanceTimersByTime(600000);
+    expect(t.shells).toHaveLength(1);
+
+    conn.notifyNetworkChanged({
+      connected: true,
+      type: "mobile data",
+      vpn: false,
+      changed: true,
+    });
+    expect(t.shells).toHaveLength(2);
+    expect(conn.state).toMatchObject({ status: "reconnecting", attempt: 1 });
+    expect(conn.getSnapshot().log.map((e) => e.message)).toEqual(
+      expect.arrayContaining([
+        "Network lost",
+        "Offline, waiting for the network",
+        "Network: mobile data",
+      ]),
+    );
+  });
+
+  test("a network change or coming back probes a live shell and reconnects when it is dead", async () => {
+    const { t, conn } = await connected();
+    const probe = jest.fn(async () => true);
+    (t.last().channel as any).probe = probe;
+    conn.notifyNetworkChanged({
+      connected: true,
+      type: "Wi-Fi",
+      vpn: false,
+      changed: false,
+    });
+    expect(probe).not.toHaveBeenCalled();
+    conn.notifyNetworkChanged({
+      connected: true,
+      type: "mobile data",
+      vpn: false,
+      changed: true,
+    });
+    expect(probe).toHaveBeenCalledWith(3000);
+    await Promise.resolve();
+    expect(t.shells).toHaveLength(1);
+
+    probe.mockResolvedValueOnce(false);
+    conn.notifyForegrounded();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(t.shells).toHaveLength(2);
+    expect(conn.state.status).toBe("reconnecting");
+  });
+
+  test("coming back while waiting tries now", async () => {
+    const { t, conn } = await connected();
+    drop(t);
+    t.last().options.onConnectionFailed("x", {
+      stage: "network",
+      message: "x",
+      hint: "h",
+    });
+    expect(t.shells).toHaveLength(2);
+    conn.notifyBackgrounded();
+    conn.notifyForegrounded();
+    expect(t.shells).toHaveLength(3);
+  });
+
+  test("input typed while reconnecting goes to the same session on its own", async () => {
+    const { t, conn, opts } = await connected("relay");
+    drop(t);
+    conn.sendInput("ls");
+    conn.sendInput("\r");
+    expect(conn.getSnapshot()).toMatchObject({
+      pending: 3,
+      pendingHeld: false,
+    });
+    t.last().options.onStateChange("connected", { isReattach: true });
+    expect(t.last().channel.sendInput).toHaveBeenCalledWith("ls\r");
+    expect(conn.getSnapshot().pending).toBe(0);
+    expect(opts.onConnected).toHaveBeenLastCalledWith({
+      fromBackground: false,
+      isReattach: true,
+      resumed: true,
+    });
+  });
+
+  test("input for a new shell waits for send or discard and keeps its order", async () => {
+    const { t, conn, opts } = await connected();
+    drop(t);
+    conn.sendInput("rm x");
+    t.last().options.onStateChange("connected");
+    t.last().options.onPostConnectionSetup();
+    expect(opts.onPostConnectionSetup).toHaveBeenLastCalledWith({
+      resumed: true,
+    });
+    const channel = t.last().channel;
+    expect(channel.sendInput).not.toHaveBeenCalled();
+    expect(conn.getSnapshot()).toMatchObject({ pending: 4, pendingHeld: true });
+
+    conn.sendInput("!");
+    expect(channel.sendInput).not.toHaveBeenCalled();
+    // Startup lines skip the queue.
+    conn.sendNow("echo hi\r");
+    expect(channel.sendInput).toHaveBeenCalledWith("echo hi\r");
+
+    conn.discardInput();
+    expect(conn.getSnapshot()).toMatchObject({
+      pending: 0,
+      pendingHeld: false,
+    });
+    conn.sendInput("ok");
+    expect(channel.sendInput).toHaveBeenLastCalledWith("ok");
+
+    drop(t);
+    conn.sendInput("again");
+    t.last().options.onStateChange("connected");
+    conn.flushInput();
+    expect(t.last().channel.sendInput).toHaveBeenCalledWith("again");
+  });
+
+  test("the queue holds at most 64 KB, dropping the oldest part", async () => {
+    const { t, conn } = await connected();
+    drop(t);
+    conn.sendInput("a".repeat(64 * 1024));
+    conn.sendInput("bc");
+    expect(conn.getSnapshot().pending).toBe(64 * 1024);
+    expect(
+      conn.getSnapshot().log.some((e) => e.message.includes("over 64 KB")),
+    ).toBe(true);
+    conn.discardInput();
+    // Nothing is kept for a failed or closed connection.
+    t.last().options.onConnectionFailed("x", {
+      stage: "auth",
+      message: "no",
+      hint: "h",
+    });
+    conn.sendInput("x");
+    expect(conn.getSnapshot().pending).toBe(0);
+  });
+
+  test("a restored tab's first connect is a resume and retries", async () => {
+    const t = fakeTransport("relay");
+    const { conn, opts } = setup([t.transport], {
+      restored: true,
+      initialSessionId: "s1",
+    });
+    await conn.connect(80, 24);
+    expect(t.last().options.resume).toBe(true);
+    expect(t.last().options.initialSessionId).toBe("s1");
+    t.last().options.onConnectionFailed("Connection closed (1006)");
+    expect(conn.state).toMatchObject({ status: "reconnecting", attempt: 1 });
+    expect(t.shells).toHaveLength(2);
+    t.last().options.onStateChange("connected", { isReattach: true });
+    expect(opts.onConnected).toHaveBeenCalledWith({
+      fromBackground: false,
+      isReattach: true,
+      resumed: true,
+    });
+  });
+
+  test("low power waits longer and reaches the shell", async () => {
+    const { t, conn } = await connected();
+    const setLowPower = jest.fn();
+    (t.last().channel as any).setLowPower = setLowPower;
+    conn.setLowPower(true);
+    expect(setLowPower).toHaveBeenCalledWith(true);
+    drop(t);
+    expect(t.last().channel.setLowPower).toBeUndefined();
+    t.last().options.onConnectionFailed("x", {
+      stage: "network",
+      message: "x",
+      hint: "h",
+    });
+    const s = conn.state as any;
+    // Normal wait for try 2 is about a second; low power doubles it.
+    expect(s.nextAt - Date.now()).toBeGreaterThanOrEqual(1600);
+  });
+
+  test("a Tailscale host that can't be reached says to check Tailscale", async () => {
+    const t = fakeTransport("local");
+    const { conn } = setup([t.transport], {
+      host: { id: 1, name: "Box", ip: "100.78.68.100" } as any,
+    });
+    await conn.connect(80, 24);
+    t.last().options.onConnectionFailed("x", {
+      stage: "network",
+      message: "timed out",
+      hint: "h",
+    });
+    expect(conn.state).toMatchObject({
+      failure: { hint: expect.stringContaining("Tailscale") },
+    });
+
+    const vpn = fakeTransport("local");
+    const other = setup([vpn.transport], {
+      host: { id: 1, name: "Box", ip: "100.78.68.100" } as any,
+    });
+    other.conn.notifyNetworkChanged({
+      connected: true,
+      type: "VPN",
+      vpn: true,
+      changed: false,
+    });
+    await other.conn.connect(80, 24);
+    vpn.last().options.onConnectionFailed("x", {
+      stage: "network",
+      message: "timed out",
+      hint: "h",
+    });
+    expect(other.conn.state).toMatchObject({ failure: { hint: "h" } });
+  });
+
+  test("the log keeps the last 500 lines", async () => {
+    const { conn } = await connected();
+    for (let i = 0; i < 600; i++) {
+      conn.log({ level: "info", message: `line ${i}` });
+    }
+    const log = conn.getSnapshot().log;
+    expect(log).toHaveLength(500);
+    expect(log.at(-1)?.message).toBe("line 599");
   });
 });

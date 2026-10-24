@@ -7,6 +7,8 @@ import type {
   TerminalHostConfig,
 } from "../types";
 
+const TAKEN_OVER = "This session was opened on another device";
+
 /** Shell over the linked server's terminal socket. */
 export interface RelayShellConfig extends ShellOptions {
   /** Account the terminal session belongs to. */
@@ -20,20 +22,26 @@ export interface RelayShellConfig extends ShellOptions {
   ) => Promise<TerminalHostConfig>;
 }
 
+const PING_MS = 25000;
+const LOW_POWER_PING_MS = 60000;
+
+/**
+ * Shell over the linked server's terminal socket. A socket that drops after
+ * the shell was up is reported once through `onDropped`; the connection
+ * reconnects with a new RelayShell that attaches to the same server session.
+ */
 export class RelayShell implements ShellChannel {
   private config: RelayShellConfig;
   private ws: WebSocket | null = null;
-  private reconnectAttempts = 0;
-  private readonly maxReconnectAttempts = 5;
-  private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   private connectionTimeout: ReturnType<typeof setTimeout> | null = null;
   private pingInterval: ReturnType<typeof setInterval> | null = null;
+  private pingMs = PING_MS;
   private shouldNotReconnect = false;
   private hasNotifiedFailure = false;
   private isAppInBackground = false;
-  private backgroundTime: number | null = null;
-  private isReconnectFromBackground = false;
-  private currentConnectionFromBackground = false;
+  private everConnected = false;
+  private dropped = false;
+  private probes: ((ok: boolean) => void)[] = [];
   private destroyed = false;
   private cols = 80;
   private rows = 24;
@@ -94,6 +102,7 @@ export class RelayShell implements ShellChannel {
     this.destroyed = true;
     this.shouldNotReconnect = true;
     this.awaitingAuthCredentials = false;
+    this.settleProbes(false);
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       try {
         this.ws.send(JSON.stringify({ type: "disconnect" }));
@@ -254,46 +263,69 @@ export class RelayShell implements ShellChannel {
     }
   }
 
+  // The OS answers the server's socket pings, so our own pings can rest.
   notifyBackgrounded(): void {
     this.isAppInBackground = true;
-    this.backgroundTime = Date.now();
-    this.reconnectAttempts = 0;
     this.stopPingInterval();
-    this.clearReconnectTimeout();
-    if (this.connectionTimeout) {
-      clearTimeout(this.connectionTimeout);
-      this.connectionTimeout = null;
-    }
   }
 
   notifyForegrounded(): void {
     const wasInBackground = this.isAppInBackground;
     this.isAppInBackground = false;
-
-    if (!wasInBackground) return;
-    if (this.destroyed) return;
+    if (!wasInBackground || this.destroyed) return;
 
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.startPingInterval();
       return;
     }
-
-    this.isReconnectFromBackground = true;
-    this.reconnectAttempts = 0;
-
-    if (this.ws) {
-      try {
-        this.ws.onclose = null;
-        this.ws.onerror = null;
-        this.ws.onopen = null;
-        this.ws.onmessage = null;
-        this.ws.close();
-      } catch (_) {}
-      this.ws = null;
+    if (this.everConnected) {
+      this.drop("The socket closed while the app was away");
     }
-    this.stopPingInterval();
+  }
 
-    this.connectWebSocket();
+  /** Sends a ping and waits for the server to say anything back. */
+  probe(timeoutMs: number): Promise<boolean> {
+    const ws = this.ws;
+    if (!ws || ws.readyState !== WebSocket.OPEN || this.destroyed) {
+      return Promise.resolve(false);
+    }
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        this.probes = this.probes.filter((p) => p !== done);
+        resolve(false);
+      }, timeoutMs);
+      const done = (ok: boolean) => {
+        clearTimeout(timer);
+        resolve(ok);
+      };
+      this.probes.push(done);
+      try {
+        ws.send(JSON.stringify({ type: "ping" }));
+      } catch (_) {
+        this.settleProbes(false);
+      }
+    });
+  }
+
+  private settleProbes(ok: boolean) {
+    const waiting = this.probes;
+    this.probes = [];
+    waiting.forEach((p) => p(ok));
+  }
+
+  setLowPower(on: boolean): void {
+    const next = on ? LOW_POWER_PING_MS : PING_MS;
+    if (next === this.pingMs) return;
+    this.pingMs = next;
+    if (this.pingInterval) this.startPingInterval();
+  }
+
+  private drop(reason: string, kind: "network" | "server" = "network") {
+    if (this.dropped || this.destroyed) return;
+    this.dropped = true;
+    this.clearAllTimers();
+    this.settleProbes(false);
+    this.config.onDropped?.({ kind, reason });
   }
 
   private connectWebSocket(): void {
@@ -325,9 +357,7 @@ export class RelayShell implements ShellChannel {
       } catch (_) {}
     }
 
-    this.config.onStateChange("connecting", {
-      retryCount: this.reconnectAttempts,
-    });
+    this.config.onStateChange("connecting", { retryCount: 0 });
 
     const ws = this.config.client.openSocket(
       this.wsUrl,
@@ -341,14 +371,7 @@ export class RelayShell implements ShellChannel {
           ws.onclose = null;
           ws.close();
         } catch (_) {}
-        if (
-          !this.shouldNotReconnect &&
-          this.reconnectAttempts < this.maxReconnectAttempts
-        ) {
-          this.scheduleReconnect();
-        } else {
-          this.notifyFailureOnce("Connection timeout - server not responding");
-        }
+        this.notifyFailureOnce("Connection timeout - server not responding");
       }
     }, 10000);
 
@@ -357,13 +380,8 @@ export class RelayShell implements ShellChannel {
         clearTimeout(this.connectionTimeout);
         this.connectionTimeout = null;
       }
-      this.clearReconnectTimeout();
 
       this.hasNotifiedFailure = false;
-      this.reconnectAttempts = 0;
-
-      this.currentConnectionFromBackground = this.isReconnectFromBackground;
-      this.isReconnectFromBackground = false;
 
       if (this.serverSessionId) {
         this.pendingReattach = true;
@@ -397,6 +415,8 @@ export class RelayShell implements ShellChannel {
 
     ws.onmessage = (event: MessageEvent) => {
       if (this.destroyed) return;
+      // Anything from the server answers a probe.
+      if (this.probes.length) this.settleProbes(true);
       try {
         const msg = JSON.parse(event.data as string);
 
@@ -529,16 +549,15 @@ export class RelayShell implements ShellChannel {
           }
         } else if (msg.type === "connected") {
           this.lastServerError = null;
+          this.everConnected = true;
           const isReattach = this.pendingReattach;
           this.pendingReattach = false;
           this.config.onStateChange("connected", {
             hostName: this.config.hostConfig.name,
-            fromBackground: this.currentConnectionFromBackground,
+            fromBackground: false,
             isReattach,
           });
-          if (!this.currentConnectionFromBackground && !isReattach) {
-            this.config.onPostConnectionSetup();
-          }
+          if (!isReattach) this.config.onPostConnectionSetup();
         } else if (msg.type === "disconnected") {
           this.setServerSessionId(null);
           this.config.onDisconnected(this.config.hostConfig.name);
@@ -564,9 +583,9 @@ export class RelayShell implements ShellChannel {
             );
           }
         } else if (msg.type === "sessionTakenOver") {
-          this.setServerSessionId(null);
+          // Keep the session id: Retry takes the session back here.
           this.shouldNotReconnect = true;
-          this.config.onDisconnected(this.config.hostConfig.name);
+          this.notifyFailureOnce(TAKEN_OVER, true);
         } else if (msg.type === "tmux_sessions_available") {
           const list = Array.isArray(msg.sessions) ? msg.sessions : [];
           this.config.onTmuxSessions?.(
@@ -611,10 +630,6 @@ export class RelayShell implements ShellChannel {
         this.awaitingAuthCredentials = false;
       }
 
-      if (this.isAppInBackground) {
-        return;
-      }
-
       if (this.destroyed) return;
 
       if (this.shouldNotReconnect) {
@@ -622,12 +637,21 @@ export class RelayShell implements ShellChannel {
         return;
       }
 
-      if (event.code === 1000 || event.code === 1001) {
-        this.notifyFailureOnce(this.lastServerError ?? "Connection closed");
+      // Before the shell was up it's a failed connect, after it a drop.
+      if (!this.everConnected) {
+        this.notifyFailureOnce(
+          this.lastServerError ?? `Connection closed (${event.code})`,
+        );
         return;
       }
-
-      this.scheduleReconnect();
+      const goingAway = event.code === 1000 || event.code === 1001;
+      this.drop(
+        this.lastServerError ??
+          (goingAway
+            ? "The server closed the connection"
+            : `The socket closed (${event.code})`),
+        goingAway ? "server" : "network",
+      );
     };
 
     ws.onerror = () => {
@@ -638,39 +662,6 @@ export class RelayShell implements ShellChannel {
     };
   }
 
-  private scheduleReconnect(): void {
-    if (this.shouldNotReconnect || this.destroyed) return;
-
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      return;
-    }
-
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      this.notifyFailureOnce("Maximum reconnection attempts reached");
-      return;
-    }
-
-    this.reconnectAttempts += 1;
-
-    const delay = Math.min(
-      1000 * Math.pow(2, this.reconnectAttempts - 1),
-      5000,
-    );
-
-    this.config.onStateChange("connecting", {
-      retryCount: this.reconnectAttempts,
-    });
-
-    this.clearReconnectTimeout();
-
-    this.reconnectTimeout = setTimeout(() => {
-      this.reconnectTimeout = null;
-      if (this.destroyed) return;
-      if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
-      this.connectWebSocket();
-    }, delay);
-  }
-
   private startPingInterval(): void {
     this.stopPingInterval();
     this.pingInterval = setInterval(() => {
@@ -679,7 +670,7 @@ export class RelayShell implements ShellChannel {
           this.ws.send(JSON.stringify({ type: "ping" }));
         } catch (_) {}
       }
-    }, 25000);
+    }, this.pingMs);
   }
 
   private stopPingInterval(): void {
@@ -689,28 +680,28 @@ export class RelayShell implements ShellChannel {
     }
   }
 
-  private clearReconnectTimeout(): void {
-    if (this.reconnectTimeout) {
-      clearTimeout(this.reconnectTimeout);
-      this.reconnectTimeout = null;
-    }
-  }
-
   private clearAllTimers(): void {
     this.stopPingInterval();
-    this.clearReconnectTimeout();
     if (this.connectionTimeout) {
       clearTimeout(this.connectionTimeout);
       this.connectionTimeout = null;
     }
   }
 
-  private notifyFailureOnce(message: string): void {
+  private notifyFailureOnce(message: string, noRetry = false): void {
     if (this.hasNotifiedFailure) return;
     this.hasNotifiedFailure = true;
+    const failure = { ...fromRelayMessage(message), origin: "relay" as const };
     this.config.onConnectionFailed(
       `${this.config.hostConfig.name}: ${message}`,
-      { ...fromRelayMessage(message), origin: "relay" },
+      noRetry
+        ? {
+            ...failure,
+            stage: "session",
+            hint: "Tap Retry to bring it back here.",
+            noRetry,
+          }
+        : failure,
     );
   }
 

@@ -1,9 +1,18 @@
 import type { ConnectionLogEntry, ConnectionLogPayload } from "@/types";
-import { fromRelayMessage, unavailable, type ConnectFailure } from "./errors";
+import {
+  fromRelayMessage,
+  hintFor,
+  isTailnetAddress,
+  TAILSCALE_HINT,
+  unavailable,
+  type ConnectFailure,
+} from "./errors";
 import type { Blocked } from "./origin";
+import { isRetryable, MAX_RECONNECT_TRIES, reconnectDelay } from "./reconnect";
 import type {
   HostKeyData,
   RelayTmuxSession,
+  ShellDrop,
   ShellExecResult,
   ShellChannel,
   ShellOptions,
@@ -33,12 +42,29 @@ export type ConnectionStatus =
     }
   | { status: "prompt"; origin: TransportKind; prompt: ConnectionPrompt }
   | { status: "connected"; origin: TransportKind; hasData: boolean }
+  | {
+      status: "reconnecting";
+      origin: TransportKind;
+      /** Try number after the drop, from 1. */
+      attempt: number;
+      /** When the next try starts; null while a try is running. */
+      nextAt: number | null;
+      reason: string;
+    }
+  | { status: "offline"; origin: TransportKind; reason: string }
   | { status: "failed"; failure: ConnectFailure; fix?: Blocked["fix"] }
   | { status: "closed" };
 
 export type ConnectionEvent =
   | { type: "start"; origin: TransportKind; attempt: number }
   | { type: "connecting"; retry: number }
+  | {
+      type: "reconnecting";
+      attempt: number;
+      nextAt: number | null;
+      reason: string;
+    }
+  | { type: "offline"; reason: string }
   | { type: "prompt"; prompt: ConnectionPrompt }
   | { type: "answered" }
   | { type: "connected" }
@@ -68,9 +94,36 @@ export function reduceConnection(
     case "connecting": {
       const origin = originOf(s);
       if (!origin) return s;
+      // A reconnect try opening its shell stays a reconnect.
+      if (s.status === "reconnecting")
+        return s.nextAt === null ? s : { ...s, nextAt: null };
       const attempt = s.status === "connecting" ? s.attempt : 0;
       if (s.status === "connecting" && s.retry === e.retry) return s;
       return { status: "connecting", origin, attempt, retry: e.retry };
+    }
+    case "reconnecting": {
+      const origin = originOf(s);
+      if (!origin) return s;
+      if (
+        s.status === "reconnecting" &&
+        s.attempt === e.attempt &&
+        s.nextAt === e.nextAt &&
+        s.reason === e.reason
+      )
+        return s;
+      return {
+        status: "reconnecting",
+        origin,
+        attempt: e.attempt,
+        nextAt: e.nextAt,
+        reason: e.reason,
+      };
+    }
+    case "offline": {
+      const origin = originOf(s);
+      if (!origin) return s;
+      if (s.status === "offline" && s.reason === e.reason) return s;
+      return { status: "offline", origin, reason: e.reason };
     }
     case "prompt": {
       const origin = originOf(s);
@@ -102,6 +155,14 @@ export interface PlannedAttempts {
   blocked?: Blocked;
 }
 
+export interface ConnectedInfo {
+  fromBackground: boolean;
+  /** The server put the tab back on its old session. */
+  isReattach: boolean;
+  /** A reconnect after a drop or a restart, not the first connect. */
+  resumed: boolean;
+}
+
 export interface HostConnectionOptions {
   host: TerminalHostConfig;
   /** Which ways to try. Asked again on every connect and retry. */
@@ -112,12 +173,12 @@ export interface HostConnectionOptions {
   pipeId?: string;
   /** Connect timeout for a try that has a fallback after it. */
   fallbackTimeoutSecs?: number;
+  /** A tab brought back after the app restarted: its first connect is a resume. */
+  restored?: boolean;
   onData: (data: string) => void;
-  onConnected?: (info: {
-    fromBackground: boolean;
-    isReattach: boolean;
-  }) => void;
-  onPostConnectionSetup?: () => void;
+  onConnected?: (info: ConnectedInfo) => void;
+  /** The shell is new and ready for startup lines. `resumed` after a reconnect. */
+  onPostConnectionSetup?: (info: { resumed: boolean }) => void;
   onDisconnected?: (hostName: string) => void;
   onSessionIdChange?: (sessionId: string | null) => void;
   /** Fires when a try starts, with the way it goes. */
@@ -128,21 +189,43 @@ export interface HostConnectionOptions {
 export interface ConnectionSnapshot {
   state: ConnectionStatus;
   log: ConnectionLogEntry[];
+  /** Characters typed while not connected, waiting to be sent. */
+  pending: number;
+  /**
+   * The queue is held because the reconnect opened a new shell; the user
+   * picks send or discard.
+   */
+  pendingHeld: boolean;
+}
+
+/** What the app knows about the network, from the lifecycle listener. */
+export interface NetworkInfo {
+  connected: boolean;
+  type: string;
+  vpn: boolean;
+  /** The way out changed (Wi-Fi to cellular, a VPN up or down). */
+  changed: boolean;
 }
 
 const FALLBACK_STAGES = new Set(["network"]);
+const MAX_LOG = 500;
+const MAX_PENDING = 64 * 1024;
+const PROBE_MS = 3000;
 
 let logSeq = 0;
 
 /**
  * One connection to a host, for either transport. Owns the shell channel,
- * the prompts it raises, the connection log and the fallback from the phone
- * to the server. Screens render its state and call its answer methods.
+ * the prompts it raises, the connection log, the fallback from the phone to
+ * the server, and reconnecting after a drop. Screens render its state and
+ * call its answer methods.
  */
 export class HostConnection {
   private snapshot: ConnectionSnapshot = {
     state: { status: "idle" },
     log: [],
+    pending: 0,
+    pendingHeld: false,
   };
   private listeners = new Set<() => void>();
   private channel: ShellChannel | null = null;
@@ -154,9 +237,21 @@ export class HostConnection {
   private sessionId: string | null;
   private destroyed = false;
   private run = 0;
+  // Reconnecting
+  private resuming: boolean;
+  private lastResumed = false;
+  private reconnectAttempt = 0;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private dropReason = "";
+  private online = true;
+  private vpn: boolean | null = null;
+  private lowPower = false;
+  private pendingInput = "";
+  private pendingTrimmed = false;
 
   constructor(private readonly options: HostConnectionOptions) {
     this.sessionId = options.initialSessionId ?? null;
+    this.resuming = !!options.restored;
   }
 
   // Store
@@ -189,7 +284,9 @@ export class HostConnection {
       id: `log_${++logSeq}`,
       timestamp: Date.now(),
     };
-    this.set({ ...this.snapshot, log: [...this.snapshot.log, entry] });
+    const log = [...this.snapshot.log, entry];
+    if (log.length > MAX_LOG) log.splice(0, log.length - MAX_LOG);
+    this.set({ ...this.snapshot, log });
   }
 
   clearLog = () => {
@@ -214,7 +311,8 @@ export class HostConnection {
   /** Starts over with a fresh plan (after a failure, or an origin change). */
   async retry(): Promise<void> {
     this.dropChannel();
-    this.clearLog();
+    this.clearReconnect();
+    this.reconnectAttempt = 0;
     this.dispatch({ type: "reset" });
     await this.start();
   }
@@ -245,18 +343,21 @@ export class HostConnection {
     const transport = this.attempts[index];
     this.attempt = index;
     this.prompted = false;
-    this.dispatch({ type: "start", origin: transport.kind, attempt: index });
-    const name = this.options.host.name || this.options.host.ip;
-    this.log({
-      level: "info",
-      stage: "connection",
-      message:
-        transport.kind === "local"
-          ? `Connecting to ${name} from this phone`
-          : `Connecting to ${name} through the server`,
-    });
+    if (this.state.status !== "reconnecting") {
+      this.dispatch({ type: "start", origin: transport.kind, attempt: index });
+      const name = this.options.host.name || this.options.host.ip;
+      this.log({
+        level: "info",
+        stage: "connection",
+        message:
+          transport.kind === "local"
+            ? `Connecting to ${name} from this phone`
+            : `Connecting to ${name} through the server`,
+      });
+    }
     this.options.onOriginResolved?.(transport.kind);
-    const hasFallback = index < this.attempts.length - 1;
+    // A reconnect stays on the way that worked; no fallback mid session.
+    const hasFallback = !this.resuming && index < this.attempts.length - 1;
     try {
       this.channel = transport.openShell(this.shellOptions(hasFallback));
     } catch (err) {
@@ -267,6 +368,7 @@ export class HostConnection {
       );
       return;
     }
+    if (this.lowPower) this.channel.setLowPower?.(true);
     this.channel.connect(this.cols, this.rows).catch((err) => {
       this.onFailed(String(err));
     });
@@ -288,6 +390,7 @@ export class HostConnection {
       connectTimeoutSecs: hasFallback
         ? (this.options.fallbackTimeoutSecs ?? 8)
         : undefined,
+      resume: this.resuming,
       onSessionIdChange: guard((id) => {
         this.sessionId = id;
         this.options.onSessionIdChange?.(id);
@@ -307,16 +410,7 @@ export class HostConnection {
             break;
           }
           case "connected":
-            this.log({
-              level: "success",
-              stage: "connection",
-              message: "Connected",
-            });
-            this.dispatch({ type: "connected" });
-            this.options.onConnected?.({
-              fromBackground: !!data?.fromBackground,
-              isReattach: !!data?.isReattach,
-            });
+            this.onConnected(data);
             break;
           case "dataReceived":
             this.dispatch({ type: "data" });
@@ -345,7 +439,7 @@ export class HostConnection {
         }
       }),
       onPostConnectionSetup: guard(() =>
-        this.options.onPostConnectionSetup?.(),
+        this.options.onPostConnectionSetup?.({ resumed: this.lastResumed }),
       ),
       onTmuxSessions: guard((sessions) =>
         this.options.onTmuxSessions?.(sessions),
@@ -357,9 +451,11 @@ export class HostConnection {
           message: "Disconnected",
         });
         this.dropChannel();
+        this.clearReconnect();
         this.dispatch({ type: "closed" });
         this.options.onDisconnected?.(hostName);
       }),
+      onDropped: guard((drop) => this.onDropped(drop)),
       onConnectionFailed: guard((message, failure) =>
         this.onFailed(message, failure),
       ),
@@ -371,6 +467,33 @@ export class HostConnection {
         }),
       ),
     };
+  }
+
+  private onConnected(data?: Record<string, unknown>) {
+    const isReattach = !!data?.isReattach;
+    const resumed = this.resuming;
+    this.lastResumed = resumed;
+    this.resuming = false;
+    this.reconnectAttempt = 0;
+    this.clearReconnect();
+    this.log({
+      level: "success",
+      stage: "connection",
+      message: !resumed
+        ? "Connected"
+        : isReattach
+          ? "Reconnected to the same session"
+          : "Reconnected with a new shell",
+    });
+    this.dispatch({ type: "connected" });
+    // Typed input only goes on its own to the shell it was typed for.
+    if (!resumed || isReattach) this.flushInput();
+    else if (this.pendingInput) this.setPending(true);
+    this.options.onConnected?.({
+      fromBackground: !!data?.fromBackground,
+      isReattach,
+      resumed,
+    });
   }
 
   private ask(prompt: ConnectionPrompt) {
@@ -385,8 +508,19 @@ export class HostConnection {
       ...(failure ?? fromRelayMessage(message)),
       origin: failure?.origin ?? origin,
     };
+    if (this.resuming && !this.prompted && isRetryable(f)) {
+      this.log({ level: "warning", stage: "connection", message: f.message });
+      this.dropChannel();
+      this.scheduleReconnect(f.message);
+      return;
+    }
     const next = this.attempts[this.attempt + 1];
-    if (next && !this.prompted && FALLBACK_STAGES.has(f.stage)) {
+    if (
+      next &&
+      !this.resuming &&
+      !this.prompted &&
+      FALLBACK_STAGES.has(f.stage)
+    ) {
       this.log({ level: "warning", stage: "connection", message: f.message });
       this.log({
         level: "info",
@@ -404,13 +538,23 @@ export class HostConnection {
   }
 
   private failWith(failure: ConnectFailure, fix?: Blocked["fix"]) {
+    let f = failure;
+    if (
+      f.stage === "network" &&
+      this.vpn !== true &&
+      isTailnetAddress(this.options.host.ip || "")
+    ) {
+      f = { ...f, hint: TAILSCALE_HINT };
+    }
+    this.resuming = false;
+    this.clearReconnect();
     this.log({
       level: "error",
-      stage: failure.stage,
-      message: failure.message,
+      stage: f.stage,
+      message: f.message,
     });
     this.dropChannel();
-    this.dispatch({ type: "failed", failure, fix });
+    this.dispatch({ type: "failed", failure: f, fix });
   }
 
   private dropChannel() {
@@ -419,6 +563,211 @@ export class HostConnection {
     const channel = this.channel;
     this.channel = null;
     channel?.destroy();
+  }
+
+  // Reconnecting
+
+  private onDropped(drop: ShellDrop) {
+    this.log({
+      level: "warning",
+      stage: "connection",
+      message: `Connection lost: ${drop.reason}`,
+    });
+    this.dropChannel();
+    this.reconnectAttempt = 0;
+    this.scheduleReconnect(drop.reason);
+  }
+
+  private scheduleReconnect(reason: string) {
+    if (this.destroyed) return;
+    this.clearReconnect();
+    this.resuming = true;
+    this.dropReason = reason;
+    if (!this.online) {
+      if (this.state.status !== "offline") {
+        this.log({
+          level: "info",
+          stage: "connection",
+          message: "Offline, waiting for the network",
+        });
+      }
+      this.dispatch({ type: "offline", reason });
+      return;
+    }
+    this.reconnectAttempt++;
+    if (this.reconnectAttempt > MAX_RECONNECT_TRIES) {
+      this.failWith({
+        stage: "session",
+        message: reason,
+        hint: hintFor("session"),
+        origin: originOf(this.state) ?? undefined,
+      });
+      return;
+    }
+    const delay = reconnectDelay(this.reconnectAttempt, {
+      lowPower: this.lowPower,
+    });
+    if (delay === 0) {
+      this.resume();
+      return;
+    }
+    this.dispatch({
+      type: "reconnecting",
+      attempt: this.reconnectAttempt,
+      nextAt: Date.now() + delay,
+      reason,
+    });
+    this.log({
+      level: "info",
+      stage: "connection",
+      message: `Next try in ${Math.round(delay / 1000)}s`,
+    });
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      this.resume();
+    }, delay);
+  }
+
+  /** Starts the next reconnect try now. Only one runs at a time. */
+  private resume() {
+    if (this.destroyed || this.channel) return;
+    this.clearReconnect();
+    this.resuming = true;
+    if (this.reconnectAttempt < 1) this.reconnectAttempt = 1;
+    // A restored tab has no origin yet; it starts like a first connect.
+    if (!this.attempts.length) {
+      void this.start();
+      return;
+    }
+    this.dispatch({
+      type: "reconnecting",
+      attempt: this.reconnectAttempt,
+      nextAt: null,
+      reason: this.dropReason,
+    });
+    this.log({
+      level: "info",
+      stage: "connection",
+      message: `Reconnecting (try ${this.reconnectAttempt})`,
+    });
+    this.open(this.attempt);
+  }
+
+  private clearReconnect() {
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
+  }
+
+  /** Waiting for the next try, or offline. */
+  private get waiting(): boolean {
+    const s = this.state.status;
+    return s === "offline" || (s === "reconnecting" && !this.channel);
+  }
+
+  /** The Reconnect now button. After a failure it starts over. */
+  reconnectNow() {
+    const s = this.state.status;
+    if (s === "failed" || s === "closed") {
+      void this.retry();
+      return;
+    }
+    if (this.waiting) {
+      if (this.reconnectAttempt < 1) this.reconnectAttempt = 1;
+      this.resume();
+    }
+  }
+
+  private probe() {
+    const channel = this.channel;
+    if (!channel?.probe || this.state.status !== "connected") return;
+    const run = this.run;
+    channel.probe(PROBE_MS).then(
+      (ok) => {
+        if (ok || run !== this.run || this.destroyed) return;
+        this.onDropped({
+          kind: "network",
+          reason: "The host stopped answering",
+        });
+      },
+      () => {},
+    );
+  }
+
+  /** From the app wide network listener. */
+  notifyNetworkChanged(info: NetworkInfo) {
+    this.vpn = info.vpn;
+    if (!info.connected) {
+      if (!this.online) return;
+      this.online = false;
+      this.log({ level: "warning", stage: "network", message: "Network lost" });
+      if (this.waiting) {
+        this.clearReconnect();
+        this.dispatch({ type: "offline", reason: this.dropReason });
+      }
+      return;
+    }
+    const wasOffline = !this.online;
+    this.online = true;
+    if (wasOffline || info.changed) {
+      this.log({
+        level: "info",
+        stage: "network",
+        message: `Network: ${info.type}${info.vpn ? " with VPN" : ""}`,
+      });
+    }
+    if (this.waiting) {
+      // The network is back: the next try runs now, with every try left.
+      this.reconnectAttempt = 1;
+      this.resume();
+      return;
+    }
+    // The old socket may be tied to the network that just went away.
+    if (wasOffline || info.changed) this.probe();
+  }
+
+  setLowPower(on: boolean) {
+    if (this.lowPower === on) return;
+    this.lowPower = on;
+    this.log({
+      level: "info",
+      stage: "power",
+      message: on ? "Low power mode on" : "Low power mode off",
+    });
+    this.channel?.setLowPower?.(on);
+  }
+
+  // Typed input while not connected
+
+  private setPending(held: boolean) {
+    const pending = this.pendingInput.length;
+    if (!pending) this.pendingTrimmed = false;
+    const pendingHeld = held && pending > 0;
+    if (
+      pending === this.snapshot.pending &&
+      pendingHeld === this.snapshot.pendingHeld
+    )
+      return;
+    this.set({ ...this.snapshot, pending, pendingHeld });
+  }
+
+  /** Sends what was typed while reconnecting. */
+  flushInput() {
+    const data = this.pendingInput;
+    this.pendingInput = "";
+    this.setPending(false);
+    if (data && this.channel) this.channel.sendInput(data);
+  }
+
+  /** Drops what was typed while reconnecting. */
+  discardInput() {
+    if (!this.pendingInput) return;
+    this.log({
+      level: "info",
+      stage: "connection",
+      message: `Dropped ${this.pendingInput.length} typed characters`,
+    });
+    this.pendingInput = "";
+    this.setPending(false);
   }
 
   // Answers
@@ -493,7 +842,32 @@ export class HostConnection {
     this.channel?.attachTmux?.(sessionName);
   }
 
+  /** Sends typed input, or keeps it until the shell is back. */
   sendInput(data: string) {
+    const s = this.state.status;
+    if (s === "connected" && this.channel && !this.snapshot.pendingHeld) {
+      this.channel.sendInput(data);
+      return;
+    }
+    if (s === "failed" || s === "closed" || s === "idle") return;
+    let next = this.pendingInput + data;
+    if (next.length > MAX_PENDING) {
+      if (!this.pendingTrimmed) {
+        this.pendingTrimmed = true;
+        this.log({
+          level: "warning",
+          stage: "connection",
+          message: "Typed input is over 64 KB, the oldest part was dropped",
+        });
+      }
+      next = next.slice(next.length - MAX_PENDING);
+    }
+    this.pendingInput = next;
+    this.setPending(this.snapshot.pendingHeld);
+  }
+
+  /** Writes straight to the shell, skipping the queue. For startup lines. */
+  sendNow(data: string) {
     this.channel?.sendInput(data);
   }
 
@@ -504,16 +878,27 @@ export class HostConnection {
   }
 
   notifyBackgrounded() {
+    this.log({ level: "info", stage: "app", message: "App in the background" });
     this.channel?.notifyBackgrounded();
   }
 
   notifyForegrounded() {
+    this.log({ level: "info", stage: "app", message: "App in the foreground" });
     this.channel?.notifyForegrounded();
+    if (this.waiting && this.online) {
+      // Back in the app: try now, with every try left.
+      this.reconnectAttempt = 1;
+      this.resume();
+      return;
+    }
+    // The OS may have cut the socket without telling anyone.
+    this.probe();
   }
 
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
+    this.clearReconnect();
     this.dropChannel();
     this.listeners.clear();
   }

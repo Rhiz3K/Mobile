@@ -4,6 +4,7 @@ import {
   fromError,
   fromRelayMessage,
   hintFor,
+  isTailnetAddress,
   type FailureStage,
 } from "@/core/transport/errors";
 import { SshError, type SshErrorKind } from "@/modules/termix-ssh";
@@ -90,4 +91,17 @@ test("hints change with the way it was tried", () => {
   expect(hintFor("network", "local")).toMatch(/this phone/);
   expect(hintFor("network", "relay")).toMatch(/the server/);
   expect(failureTitle("auth")).toBe("The login was refused");
+});
+
+test("Tailscale addresses are spotted", () => {
+  for (const a of [
+    "100.64.0.1",
+    "100.78.68.100",
+    "100.127.255.254",
+    "box.tail1234.ts.net",
+    "fd7a:115c:a1e0::1",
+  ])
+    expect([a, isTailnetAddress(a)]).toEqual([a, true]);
+  for (const a of ["100.63.0.1", "100.128.0.1", "10.0.0.5", "example.net"])
+    expect([a, isTailnetAddress(a)]).toEqual([a, false]);
 });

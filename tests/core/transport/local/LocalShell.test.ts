@@ -328,42 +328,60 @@ test("a missing jump host stops the login", async () => {
   );
 });
 
-test("a dropped connection logs in again, after the app comes back", async () => {
-  const first = fakeSession();
-  const second = fakeSession();
-  mockConnect.mockResolvedValueOnce(first).mockResolvedValueOnce(second);
-  const { shell, events } = setup();
-  await shell.connect(80, 24);
-
-  shell.notifyBackgrounded();
-  first.drop();
-  await flush();
-  expect(mockConnect).toHaveBeenCalledTimes(1);
-
-  shell.notifyForegrounded();
-  await flush();
-  await flush();
-  expect(mockConnect).toHaveBeenCalledTimes(2);
-  expect(events.onStateChange).toHaveBeenCalledWith("connecting", {
-    retryCount: 1,
-  });
-  expect(events.onStateChange).toHaveBeenLastCalledWith("connected", {
-    hostName: "Box",
-    fromBackground: true,
-    isReattach: false,
-  });
-  expect(events.onPostConnectionSetup).toHaveBeenCalledTimes(1);
-});
-
-test("coming back pings a live connection", async () => {
+test("a drop is reported once and the shell does not log in again itself", async () => {
   const s = fakeSession();
   mockConnect.mockResolvedValue(s);
-  const { shell } = setup();
+  const onDropped = jest.fn();
+  const { shell, events } = setup(undefined, { onDropped });
   await shell.connect(80, 24);
-  shell.notifyBackgrounded();
-  shell.notifyForegrounded();
-  expect(s.ping).toHaveBeenCalledWith(5);
+  expect(events.onPostConnectionSetup).toHaveBeenCalledTimes(1);
+
+  s.drop();
+  s.drop();
+  s.shell.handlers.onExit(null, null);
+  await flush();
+  expect(onDropped).toHaveBeenCalledTimes(1);
+  expect(onDropped).toHaveBeenCalledWith({ kind: "network", reason: "gone" });
+  expect(s.shell.release).toHaveBeenCalled();
+  expect(s.disconnect).toHaveBeenCalled();
+  expect(events.onDisconnected).not.toHaveBeenCalled();
   expect(mockConnect).toHaveBeenCalledTimes(1);
+});
+
+test("a channel cut with no exit status is a drop; an exit status ends the shell", async () => {
+  const cut = fakeSession();
+  mockConnect.mockResolvedValue(cut);
+  const onDropped = jest.fn();
+  const a = setup(undefined, { onDropped });
+  await a.shell.connect(80, 24);
+  cut.shell.handlers.onExit(null, null);
+  expect(onDropped).toHaveBeenCalledWith({
+    kind: "ended",
+    reason: "The shell channel closed",
+  });
+  expect(a.events.onDisconnected).not.toHaveBeenCalled();
+
+  const done = fakeSession();
+  mockConnect.mockResolvedValue(done);
+  const b = setup(undefined, { onDropped: jest.fn() });
+  await b.shell.connect(80, 24);
+  done.shell.handlers.onExit(0, null);
+  expect(b.events.onDisconnected).toHaveBeenCalledWith("Box");
+});
+
+test("probe pings the connection and is false once it dropped", async () => {
+  const s = fakeSession();
+  mockConnect.mockResolvedValue(s);
+  const { shell } = setup(undefined, { onDropped: jest.fn() });
+  await shell.connect(80, 24);
+  await expect(shell.probe(3000)).resolves.toBe(true);
+  expect(s.ping).toHaveBeenCalledWith(3);
+
+  s.ping.mockRejectedValueOnce(new Error("timeout"));
+  await expect(shell.probe(3000)).resolves.toBe(false);
+
+  s.drop();
+  await expect(shell.probe(3000)).resolves.toBe(false);
 });
 
 test("closing the tab mid prompt cancels the login quietly", async () => {

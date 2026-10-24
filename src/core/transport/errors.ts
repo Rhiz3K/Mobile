@@ -20,6 +20,8 @@ export interface ConnectFailure {
   hint: string;
   /** Set by the connection once it knows which way it tried. */
   origin?: TransportKind;
+  /** Never retried on its own, like a session another device took over. */
+  noRetry?: boolean;
 }
 
 const TITLES: Record<FailureStage, string> = {
@@ -61,6 +63,20 @@ export function hintFor(stage: FailureStage, origin?: TransportKind): string {
       return "Pick another way to connect this host.";
   }
 }
+
+// 100.64.0.0/10, MagicDNS names and Tailscale's IPv6 range.
+const TAILNET_V4 = /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./;
+const TAILNET_NAME = /\.ts\.net\.?$/i;
+const TAILNET_V6 = /^\[?fd7a:115c:a1e0:/i;
+
+/** A host address that only works over Tailscale. */
+export function isTailnetAddress(address: string): boolean {
+  const a = address.trim();
+  return TAILNET_V4.test(a) || TAILNET_NAME.test(a) || TAILNET_V6.test(a);
+}
+
+export const TAILSCALE_HINT =
+  "This is a Tailscale address. Check that Tailscale is connected on this phone.";
 
 const SSH_STAGE: Record<SshErrorKind, FailureStage> = {
   connect: "network",

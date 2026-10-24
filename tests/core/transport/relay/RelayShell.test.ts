@@ -89,17 +89,154 @@ test("sends the auth subprotocol on the first connect", async () => {
   expect(jest.getTimerCount()).toBe(0);
 });
 
-test("keeps the auth subprotocol on automatic reconnect", async () => {
-  const { m } = manager();
+/** Opens the socket and lets the server say the shell is up. */
+function openAndConnect(socket: FakeSocket) {
+  socket.readyState = FakeSocket.OPEN;
+  (socket as any).onopen?.();
+  socket.onmessage?.({ data: JSON.stringify({ type: "connected" }) });
+}
+
+test("a socket that drops after connecting is reported once, no reconnect of its own", async () => {
+  const onDropped = jest.fn();
+  const { m, errors } = manager(fakeClient(), { onDropped });
   await m.connect(80, 24);
   const socket = FakeSocket.all[0];
-  socket.close();
+  openAndConnect(socket);
   socket.onclose?.({ code: 1006 });
-  jest.advanceTimersByTime(1000);
-  expect(FakeSocket.all.length).toBeGreaterThanOrEqual(2);
-  expectAuthenticated(FakeSocket.all[1]);
+  socket.onclose?.({ code: 1006 });
+  jest.advanceTimersByTime(30000);
+  expect(onDropped).toHaveBeenCalledTimes(1);
+  expect(onDropped).toHaveBeenCalledWith({
+    kind: "network",
+    reason: "The socket closed (1006)",
+  });
+  expect(FakeSocket.all).toHaveLength(1);
+  expect(errors).toEqual([]);
   m.destroy();
   expect(jest.getTimerCount()).toBe(0);
+});
+
+test("a server going away is a drop too; a close before the shell is a failed connect", async () => {
+  const onDropped = jest.fn();
+  const { m } = manager(fakeClient(), { onDropped });
+  await m.connect(80, 24);
+  openAndConnect(FakeSocket.all[0]);
+  FakeSocket.all[0].onclose?.({ code: 1001 });
+  expect(onDropped).toHaveBeenCalledWith({
+    kind: "server",
+    reason: "The server closed the connection",
+  });
+  m.destroy();
+
+  const failures: any[] = [];
+  const early = manager(fakeClient(), {
+    onDropped,
+    onConnectionFailed: (_m: string, f: unknown) => failures.push(f),
+  });
+  await early.m.connect(80, 24);
+  FakeSocket.all[1].onclose?.({ code: 1006 });
+  expect(failures).toEqual([
+    expect.objectContaining({ stage: "session", origin: "relay" }),
+  ]);
+  expect(onDropped).toHaveBeenCalledTimes(1);
+  early.m.destroy();
+});
+
+test("a resume attaches to the server session it had, with the auth subprotocol", async () => {
+  const states: any[] = [];
+  const setup = jest.fn();
+  const { m } = manager(fakeClient(), {
+    initialSessionId: "s1",
+    tabInstanceId: "tab",
+    resume: true,
+    onStateChange: (state: string, data: unknown) => states.push([state, data]),
+    onPostConnectionSetup: setup,
+  });
+  await m.connect(80, 24);
+  const socket = FakeSocket.all[0];
+  expectAuthenticated(socket);
+  openAndConnect(socket);
+  expect(socket.sent[0]).toEqual({
+    type: "attachSession",
+    data: { sessionId: "s1", cols: 80, rows: 24, tabInstanceId: "tab" },
+  });
+  expect(states.at(-1)).toEqual([
+    "connected",
+    { hostName: "host", fromBackground: false, isReattach: true },
+  ]);
+  expect(setup).not.toHaveBeenCalled();
+  m.destroy();
+});
+
+test("a session taken over by another device fails with no retry and keeps its id", async () => {
+  const failures: any[] = [];
+  const ids: unknown[] = [];
+  const onDropped = jest.fn();
+  const { m } = manager(fakeClient(), {
+    initialSessionId: "s1",
+    onDropped,
+    onSessionIdChange: (id: unknown) => ids.push(id),
+    onConnectionFailed: (_m: string, f: unknown) => failures.push(f),
+  });
+  await m.connect(80, 24);
+  const socket = FakeSocket.all[0];
+  openAndConnect(socket);
+  socket.onmessage?.({ data: JSON.stringify({ type: "sessionTakenOver" }) });
+  socket.onclose?.({ code: 1000 });
+  expect(failures).toEqual([
+    expect.objectContaining({
+      stage: "session",
+      noRetry: true,
+      message: "This session was opened on another device",
+    }),
+  ]);
+  expect(ids).toEqual([]);
+  expect(onDropped).not.toHaveBeenCalled();
+  m.destroy();
+});
+
+test("probe waits for the server to answer the ping", async () => {
+  const { m } = manager(fakeClient(), { onDropped: jest.fn() });
+  await m.connect(80, 24);
+  const socket = FakeSocket.all[0];
+  openAndConnect(socket);
+
+  const ok = m.probe(3000);
+  expect(socket.sent.at(-1)).toEqual({ type: "ping" });
+  socket.onmessage?.({ data: JSON.stringify({ type: "pong" }) });
+  await expect(ok).resolves.toBe(true);
+
+  const silent = m.probe(3000);
+  jest.advanceTimersByTime(3000);
+  await expect(silent).resolves.toBe(false);
+
+  socket.readyState = FakeSocket.CLOSED;
+  await expect(m.probe(3000)).resolves.toBe(false);
+  m.destroy();
+});
+
+test("coming back with a closed socket is a drop; low power pings less often", async () => {
+  const onDropped = jest.fn();
+  const { m } = manager(fakeClient(), { onDropped });
+  await m.connect(80, 24);
+  const socket = FakeSocket.all[0];
+  openAndConnect(socket);
+  const pings = () => socket.sent.filter((x) => x.type === "ping").length;
+
+  m.setLowPower(true);
+  jest.advanceTimersByTime(25000);
+  expect(pings()).toBe(0);
+  jest.advanceTimersByTime(35000);
+  expect(pings()).toBe(1);
+
+  m.notifyBackgrounded();
+  socket.readyState = FakeSocket.CLOSED;
+  m.notifyForegrounded();
+  expect(onDropped).toHaveBeenCalledWith({
+    kind: "network",
+    reason: "The socket closed while the app was away",
+  });
+  m.destroy();
 });
 
 test("2.9 servers get the plugin terminal socket", async () => {
