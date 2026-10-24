@@ -218,6 +218,7 @@ test("prompt lines and search results come back as plain callbacks", async () =>
   const onPromptLine = jest.fn();
   const onSearch = jest.fn();
   const onMenu = jest.fn();
+  const onShortcut = jest.fn();
   await render(
     <TerminalView
       fontSize={14}
@@ -228,6 +229,7 @@ test("prompt lines and search results come back as plain callbacks", async () =>
       onPromptLine={onPromptLine}
       onSearch={onSearch}
       onMenu={onMenu}
+      onShortcut={onShortcut}
     />,
   );
   expect(mockNative.props.watchPrompt).toBe(true);
@@ -237,4 +239,6 @@ test("prompt lines and search results come back as plain callbacks", async () =>
   expect(onSearch).toHaveBeenCalledWith({ total: 4, index: 3 });
   mockNative.props.onMenu(ev({}));
   expect(onMenu).toHaveBeenCalled();
+  mockNative.props.onShortcut(ev({ id: "newTab" }));
+  expect(onShortcut).toHaveBeenCalledWith("newTab");
 });

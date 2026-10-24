@@ -74,6 +74,7 @@ interface NativeProps {
   onPromptLine?: (e: Ev<{ line: string }>) => void;
   onSearch?: (e: Ev<{ total: number; index: number }>) => void;
   onMenu?: (e: Ev<object>) => void;
+  onShortcut?: (e: Ev<{ id: string }>) => void;
   style?: StyleProp<ViewStyle>;
   ref?: Ref<NativeHandle>;
 }
@@ -185,6 +186,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(
         watchPrompt={props.watchPrompt ?? false}
         onPromptLine={(e) => props.onPromptLine?.(e.nativeEvent.line)}
         onMenu={() => props.onMenu?.()}
+        onShortcut={(e) => props.onShortcut?.(e.nativeEvent.id)}
         onSearch={(e) =>
           props.onSearch?.({
             total: e.nativeEvent.total,

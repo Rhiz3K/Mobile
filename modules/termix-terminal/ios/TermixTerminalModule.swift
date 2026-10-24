@@ -10,7 +10,7 @@ public class TermixTerminalModule: Module {
       Events(
         "onInput", "onResize", "onBell", "onTitleChange", "onScrollState", "onLink", "onCopy",
         "onClipboardRequest", "onFontSize", "onModifiers", "onPromptLine",
-        "onSearch", "onMenu"
+        "onSearch", "onMenu", "onShortcut"
       )
 
       Prop("pipeId") { (view: TermixTerminalView, id: String?) in

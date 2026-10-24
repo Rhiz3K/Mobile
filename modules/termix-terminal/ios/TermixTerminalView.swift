@@ -43,11 +43,40 @@ final class TermixGhosttyView: UITerminalView {
     var commands = super.keyCommands ?? []
     // Cmd+. is Escape on iPad keyboards without an Esc key.
     commands.append(UIKeyCommand(input: ".", modifierFlags: .command, action: #selector(sendEscape)))
+    // App shortcuts; the ids match src/features/terminal/shortcuts.ts.
+    guard owner?.reportsShortcuts == true else { return commands }
+    var app: [(String, String, UIKeyModifierFlags, String)] = [
+      ("New Tab", "t", .command, "newTab"),
+      ("Close Tab", "w", .command, "closeTab"),
+      ("Next Tab", "]", [.command, .shift], "nextTab"),
+      ("Previous Tab", "[", [.command, .shift], "prevTab"),
+      ("Next Tab", "\t", .control, "nextTab"),
+      ("Previous Tab", "\t", [.control, .shift], "prevTab"),
+      ("Find", "f", .command, "find"),
+    ]
+    for n in 1...9 {
+      app.append(("Tab \(n)", "\(n)", .command, "tab\(n)"))
+    }
+    for (title, input, flags, id) in app {
+      let command = UIKeyCommand(
+        title: title,
+        action: #selector(appShortcut(_:)),
+        input: input,
+        modifierFlags: flags,
+        propertyList: id
+      )
+      if #available(iOS 15.0, *) { command.wantsPriorityOverSystemBehavior = true }
+      commands.append(command)
+    }
     return commands
   }
 
   @objc private func sendEscape() {
     _ = sendKey(.escape)
+  }
+
+  @objc private func appShortcut(_ sender: UIKeyCommand) {
+    if let id = sender.propertyList as? String { owner?.emitShortcut(id) }
   }
 }
 
@@ -167,6 +196,9 @@ class TermixTerminalView: ExpoView {
   let onPromptLine = EventDispatcher()
   let onSearch = EventDispatcher()
   let onMenu = EventDispatcher()
+  let onShortcut = EventDispatcher()
+  /** Set by the app when it handles shortcuts, so the keys reach the shell otherwise. */
+  var reportsShortcuts = true
   private var searchTotal = 0
   private var searchSelected = -1
 
@@ -460,6 +492,10 @@ class TermixTerminalView: ExpoView {
 
   func emitMenu() {
     onMenu([:])
+  }
+
+  func emitShortcut(_ id: String) {
+    onShortcut(["id": id])
   }
 
   // MARK: - Output

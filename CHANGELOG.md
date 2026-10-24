@@ -59,6 +59,7 @@
 - Share a link to a terminal that runs through the server, when the server has the Session Sharing plugin
 - Double tap a word in the terminal to select it, and scroll the history with two fingers, also while a program uses the mouse
 - More in the terminal's long press menu opens the tab's menu
+- Hardware keyboard shortcuts for a new tab, closing a tab, the next or previous tab, tabs 1 to 9, find and font size. The list is in Settings, Keyboard
 - Search the command history, and long press a command to run, copy or delete it
 - Past commands that start with what you type can show above the keys, if you turn it on
 - Command history of a linked server shows on the phone, and commands typed on the phone show in Termix

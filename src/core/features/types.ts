@@ -62,6 +62,8 @@ export interface SessionTabProps {
   onTitle?: (title: string | null) => void;
   /** Opens the tab's menu, like tapping the active tab. */
   onMenu?: () => void;
+  /** A hardware keyboard shortcut the tab leaves to the session screen. */
+  onShortcut?: (id: string) => void;
 }
 
 /**

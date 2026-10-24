@@ -74,6 +74,8 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
   var onPromptLine: ((line: String) -> Unit)? = null
   /** The app's own menu for the session, from More in the long press menu. */
   var onMenu: (() -> Unit)? = null
+  /** An app shortcut from a hardware keyboard, by id. The shell never sees it. */
+  var onShortcut: ((id: String) -> Unit)? = null
   var promptWatch = false
     set(value) {
       field = value
@@ -1768,6 +1770,12 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
       KeyEvent.ACTION_DOWN -> if (event.repeatCount > 0) 2 else 1
       KeyEvent.ACTION_UP -> 0
       else -> return false
+    }
+    onShortcut?.let { report ->
+      Shortcuts.idFor(event)?.let { id ->
+        report(id)
+        return true
+      }
     }
     if (action == 1 && event.isCtrlPressed && event.isShiftPressed) {
       when (event.keyCode) {

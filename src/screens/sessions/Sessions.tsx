@@ -29,6 +29,7 @@ import TabBar from "@/screens/sessions/navigation/TabBar";
 import { SessionMenu } from "@/screens/sessions/SessionMenu";
 import { TabSwipeEdge } from "@/screens/sessions/TabSwipeEdge";
 import { neighborTab } from "@/contexts/session-tabs";
+import { tabNumber } from "@/features/terminal/shortcuts";
 import type {
   SessionMenuContext,
   SessionMenuItemDef,
@@ -488,6 +489,22 @@ export default function Sessions() {
     }, 100);
   };
 
+  const handleShortcut = (id: string) => {
+    const n = tabNumber(id);
+    if (n !== null) {
+      const target = sessions[n - 1];
+      if (target) handleTabPress(target.id);
+      return;
+    }
+    if (id === "nextTab") stepTab(1);
+    else if (id === "prevTab") stepTab(-1);
+    else if (id === "newTab" && activeSessionId) {
+      duplicateSession(activeSessionId);
+    } else if (id === "closeTab" && activeSessionId) {
+      handleTabClose(activeSessionId);
+    }
+  };
+
   const stepTab = (step: 1 | -1) => {
     const next = neighborTab(sessions, activeSessionId, step);
     if (next) handleTabPress(next.id);
@@ -623,6 +640,7 @@ export default function Sessions() {
         onTransportResolved={(kind) => setSessionTransport(session.id, kind)}
         onTitle={(title) => setShellTitle(session.id, title)}
         onMenu={() => setMenuFor(session.id)}
+        onShortcut={handleShortcut}
         onBackgroundColorChange={(color) => {
           setTerminalBackgroundColors((prev) => ({
             ...prev,

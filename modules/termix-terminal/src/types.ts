@@ -109,6 +109,8 @@ export interface TerminalViewProps {
   onSearch?: (result: TerminalSearchResult) => void;
   /** More in the long press menu: the app's own menu for the session. */
   onMenu?: () => void;
+  /** An app shortcut from a hardware keyboard, like "newTab". The shell never sees it. */
+  onShortcut?: (id: string) => void;
   style?: StyleProp<ViewStyle>;
 }
 

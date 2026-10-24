@@ -20,6 +20,8 @@ so it works with any transport (the local SSH engine or the server relay).
   double tap selects a word, and More in the long press menu fires `onMenu`
 - Links: OSC 8 and plain addresses, opened by a tap or from the long press menu
 - OSC 52 copy; a program reading the clipboard asks first
+- App shortcuts from hardware keyboards (`onShortcut`, ids in `src/features/terminal/shortcuts.ts`);
+  those keys never reach the shell
 - Scrollback with fling, two finger scroll, scroll state events, pinch to zoom the font
 - Mouse reporting: taps are clicks and drags are wheel steps while the program tracks the mouse
 - Cursor style and blink, bell with sound, flash and haptics, title events

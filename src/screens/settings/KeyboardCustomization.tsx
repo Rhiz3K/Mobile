@@ -3,7 +3,8 @@ import { Pressable, ScrollView, View } from "react-native";
 import { useRouter } from "expo-router";
 import { ArrowLeft } from "lucide-react-native";
 import { Screen } from "@/components/Screen";
-import { ChoiceRow, FakeSwitch, SettingRow, Tabs, Text } from "@/ui";
+import { ChoiceRow, FakeSwitch, Label, SettingRow, Tabs, Text } from "@/ui";
+import { shortcutHelp } from "@/features/terminal/shortcuts";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { KeyLayoutEditor } from "@/features/terminal/keys/KeyLayoutEditor";
 import {
@@ -101,6 +102,20 @@ export default function KeyboardCustomization() {
             }
             last
           />
+          <View className="mt-6 gap-1 pb-6">
+            <Label>Hardware keyboard</Label>
+            {shortcutHelp().map((row, i, all) => (
+              <SettingRow
+                key={row.label}
+                label={row.label}
+                last={i === all.length - 1}
+              >
+                <Text className="text-meta text-muted-foreground">
+                  {row.keys}
+                </Text>
+              </SettingRow>
+            ))}
+          </View>
         </ScrollView>
       )}
     </Screen>

@@ -36,7 +36,12 @@ import { useTheme, useUiColors } from "@/contexts/ThemeContext";
 import { useClient } from "@/core/accounts";
 import { useSessionAccountId } from "@/core/accounts/session";
 import { useSessionRepositories } from "@/core/data/hooks";
-import { resolveTerminalSettings } from "./settings";
+import {
+  MAX_FONT_SIZE,
+  MIN_FONT_SIZE,
+  resolveTerminalSettings,
+} from "./settings";
+import { TERMINAL_SHORTCUTS, nextFontSize } from "./shortcuts";
 import {
   findStartupSnippet,
   startupLines,
@@ -99,6 +104,7 @@ interface TerminalProps {
   onTransportResolved?: (kind: TransportKind) => void;
   onTitle?: (title: string | null) => void;
   onMenu?: () => void;
+  onShortcut?: (id: string) => void;
 }
 
 export type TerminalHandle = TerminalInputHandle;
@@ -124,6 +130,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
       onTransportResolved,
       onTitle,
       onMenu,
+      onShortcut,
     },
     ref,
   ) => {
@@ -534,6 +541,26 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
       [openTmuxWindows],
     );
 
+    const handleShortcut = useCallback(
+      (id: string) => {
+        if (!TERMINAL_SHORTCUTS.has(id)) {
+          onShortcut?.(id);
+          return;
+        }
+        if (id === "find") {
+          setSearchOpen(true);
+          return;
+        }
+        const size = nextFontSize(settings.fontSize, id, {
+          min: MIN_FONT_SIZE,
+          max: MAX_FONT_SIZE,
+          reset: MOBILE_DEFAULT_TERMINAL_CONFIG.fontSize ?? 14,
+        });
+        if (size !== settings.fontSize) updateFontSize(size).catch(() => {});
+      },
+      [onShortcut, settings.fontSize, updateFontSize],
+    );
+
     const modifiersRef = useRef<ModifierState>({
       ctrl: "inactive",
       alt: "inactive",
@@ -655,6 +682,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
                   onSearch={setSearchResult}
                   onTitle={useShellTitle ? onTitle : undefined}
                   onMenu={onMenu}
+                  onShortcut={handleShortcut}
                 />
                 {searchOpen && isVisible ? (
                   <SearchBar
