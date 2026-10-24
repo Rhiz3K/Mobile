@@ -516,3 +516,69 @@ test("the working directory comes from the shell-cwd command on the same connect
   s.exec.mockResolvedValue({ stdout: enc("oops"), exitCode: 1 });
   await expect(shell.getCwd()).resolves.toBeNull();
 });
+
+describe("tailscale ssh", () => {
+  const tsProfile = () => ({ 7: profile({ authType: "tailscale" }) });
+  const tsOptions = {
+    hostConfig: {
+      id: 7,
+      name: "Box",
+      ip: "box.lan",
+      port: 22,
+      username: "root",
+      authType: "tailscale" as const,
+    },
+  };
+
+  test("a check banner opens the browser prompt and success closes it", async () => {
+    const s = fakeSession();
+    mockConnect.mockImplementation(async (_c: unknown, prompts: any) => {
+      prompts.onBanner?.(
+        "# Tailscale SSH requires an additional check.\nhttps://login.tailscale.com/a/abc123\n",
+      );
+      return s;
+    });
+    const { shell, events } = setup(tsProfile(), tsOptions);
+    events.onHostKeyVerificationRequired.mockImplementation(() =>
+      shell.sendHostKeyResponse("accept"),
+    );
+    await shell.connect(80, 24);
+    expect(events.onBrowserCheckRequired).toHaveBeenCalledWith(
+      "https://login.tailscale.com/a/abc123",
+      expect.stringContaining("additional check"),
+    );
+    expect(events.onBrowserCheckCompleted).toHaveBeenCalled();
+  });
+
+  test("a banner on a normal host never opens the browser prompt", async () => {
+    const s = fakeSession();
+    mockConnect.mockImplementation(async (_c: unknown, prompts: any) => {
+      prompts.onBanner?.("Welcome, see https://example.com/terms");
+      return s;
+    });
+    const { shell, events } = setup();
+    events.onHostKeyVerificationRequired.mockImplementation(() =>
+      shell.sendHostKeyResponse("accept"),
+    );
+    await shell.connect(80, 24);
+    expect(events.onBrowserCheckRequired).not.toHaveBeenCalled();
+  });
+
+  test("a refused none login is retried as user+password", async () => {
+    const s = fakeSession();
+    mockConnect
+      .mockRejectedValueOnce(new SshError("auth", "denied"))
+      .mockResolvedValueOnce(s);
+    const { shell, events } = setup(tsProfile(), tsOptions);
+    events.onHostKeyVerificationRequired.mockImplementation(() =>
+      shell.sendHostKeyResponse("accept"),
+    );
+    await shell.connect(80, 24);
+    expect(mockConnect).toHaveBeenCalledTimes(2);
+    expect(mockConnect.mock.calls[0][0]).toMatchObject({ username: "root" });
+    expect(mockConnect.mock.calls[1][0]).toMatchObject({
+      username: "root+password",
+      password: "termix",
+    });
+  });
+});

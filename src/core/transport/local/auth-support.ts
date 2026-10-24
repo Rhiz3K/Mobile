@@ -81,3 +81,22 @@ export function assertDeviceAuth(
     throw new AppError(secretRefMessage(), "AUTH_NEEDS_SERVER");
   }
 }
+
+/** Sign ins the server runs in a browser, by interaction id. */
+export const BROWSER_SIGN_IN_TITLES: Record<string, string> = {
+  opkssh: "OPKSSH",
+  vault: "Vault",
+  stepca: "Step CA",
+};
+
+/**
+ * File and Docker connects can't start a browser sign in, only the terminal
+ * can. Returns what to tell the user, or null for any other reply.
+ */
+export function signInFirstMessage(interaction: unknown): string | null {
+  if (typeof interaction !== "string") return null;
+  const title = BROWSER_SIGN_IN_TITLES[interaction];
+  return title
+    ? `Sign in with ${title} first. Open a terminal to this host once, then try again.`
+    : null;
+}

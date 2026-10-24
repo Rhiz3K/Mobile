@@ -1,5 +1,6 @@
 import type { AccountClient } from "@/core/api/AccountClient";
 import { fromRelayMessage } from "../errors";
+import { BROWSER_SIGN_IN_TITLES } from "../local/auth-support";
 import type {
   HostKeyData,
   ShellChannel,
@@ -22,11 +23,7 @@ export interface RelayShellConfig extends ShellOptions {
   ) => Promise<TerminalHostConfig>;
 }
 
-const SIGN_IN_TITLES: Record<string, string> = {
-  opkssh: "OPKSSH",
-  vault: "Vault",
-  stepca: "Step CA",
-};
+const SIGN_IN_TITLES = BROWSER_SIGN_IN_TITLES;
 const SIGN_IN_IDS = Object.keys(SIGN_IN_TITLES);
 
 const PING_MS = 25000;

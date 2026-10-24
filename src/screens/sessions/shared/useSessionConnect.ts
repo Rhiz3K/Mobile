@@ -5,6 +5,7 @@ import { getCurrentUserId } from "@/utils/user";
 import { useConnectionLog } from "./useConnectionLog";
 import { extractConnectionLogs } from "@/core/api/errors";
 import { fromRelayMessage, type ConnectFailure } from "@/core/transport";
+import { signInFirstMessage } from "@/core/transport/local/auth-support";
 
 export type SessionConnectState =
   "idle" | "connecting" | "connected" | "totp" | "warpgate" | "auth" | "error";
@@ -142,6 +143,13 @@ export function useSessionConnect(
           setState("warpgate");
           return;
         }
+        const signIn = signInFirstMessage(result?.requiresAuthInteraction);
+        if (signIn) {
+          setErrorMessage(signIn);
+          log.append({ level: "error", message: signIn });
+          setState("error");
+          return;
+        }
         if (
           result?.requiresAuth ||
           result?.authRequired ||
@@ -156,11 +164,16 @@ export function useSessionConnect(
         await markConnected();
       } catch (error: any) {
         log.ingest(extractConnectionLogs(error));
-        const msg = error?.message || "Failed to connect";
+        const signIn = signInFirstMessage(
+          error?.response?.data?.requiresAuthInteraction,
+        );
+        const msg = signIn || error?.message || "Failed to connect";
         setErrorMessage(msg);
         log.append({ level: "error", message: msg });
         // Surface auth dialog rather than a dead error when the host needs creds.
-        if (
+        if (signIn) {
+          setState("error");
+        } else if (
           error?.status === 401 ||
           error?.code === "AUTH_REQUIRED" ||
           error?.response?.data?.requiresAuthInteraction

@@ -5,6 +5,7 @@ import {
   isDeviceAuth,
   needsServerMessage,
   serverAuthPlugin,
+  signInFirstMessage,
 } from "@/core/transport/local/auth-support";
 
 test("the phone does password, key, login, none and tailscale", () => {
@@ -47,4 +48,14 @@ test("1Password references need the server", () => {
   expect(() => assertDeviceAuth("key", undefined, "op://V/I/key")).toThrow(
     AppError,
   );
+});
+
+test("file and docker connects tell the user to sign in from a terminal", () => {
+  expect(signInFirstMessage("opkssh")).toBe(
+    "Sign in with OPKSSH first. Open a terminal to this host once, then try again.",
+  );
+  expect(signInFirstMessage("stepca")).toMatch(/Step CA/);
+  expect(signInFirstMessage("warpgate")).toBeNull();
+  expect(signInFirstMessage(true)).toBeNull();
+  expect(signInFirstMessage(undefined)).toBeNull();
 });
