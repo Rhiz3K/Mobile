@@ -38,6 +38,9 @@ import type { SSHHost } from "@/types";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { Sheet, Tabs, Button, SheetBody, Input } from "@/ui";
 import { useSessionClient } from "@/core/accounts/session";
+import type { SessionTabStatus } from "@/core/features/types";
+import { sessionLifecycle } from "@/core/sessions/lifecycle";
+import { shouldAutoReconnect, tunnelWatchScript } from "./resume";
 
 // Height of the always-visible key strip at the bottom.
 // The parent session area already accounts for the tab bar + safe-area insets,
@@ -69,6 +72,7 @@ interface RemoteDesktopProps {
   title: string;
   protocol?: RemoteDesktopProtocol;
   onClose?: () => void;
+  onStatus?: (status: SessionTabStatus) => void;
 }
 
 export function RemoteDesktop({
@@ -76,6 +80,7 @@ export function RemoteDesktop({
   isVisible,
   title,
   protocol,
+  onStatus,
 }: RemoteDesktopProps) {
   const client = useSessionClient();
   const color = useThemeColor();
@@ -213,27 +218,69 @@ export function RemoteDesktop({
     connect();
   }, [connect, webViewKey]);
 
-  const handleMessage = useCallback((event: any) => {
-    try {
-      const payload = JSON.parse(event.nativeEvent.data);
-      if (payload.type === "state") {
-        if (payload.state === "connected") {
-          setConnectionState("connected");
-          setErrorMessage(null);
-        } else if (payload.state === "disconnected") {
-          setConnectionState("disconnected");
-        }
-      } else if (payload.type === "error") {
-        setConnectionState("failed");
-        setErrorMessage(payload.message || "Remote session failed");
-      } else if (payload.type === "zoomChange") {
-        setZoomLevel(payload.zoom);
-      }
-    } catch {
-      setConnectionState("failed");
-      setErrorMessage("Remote session returned an invalid message");
+  // Coming back to the app: a socket that died while away gets a new session
+  // instead of a frozen screen (issue #104).
+  const [autoReconnecting, setAutoReconnecting] = useState(false);
+  const autoAttempts = useRef(0);
+  const resumedAt = useRef(0);
+  const connectionStateRef = useRef(connectionState);
+  useEffect(() => {
+    connectionStateRef.current = connectionState;
+  }, [connectionState]);
+
+  const reconnectRef = useRef<() => void>(() => {});
+  // This socket got as far as connected, so losing it is a drop.
+  const wasLive = useRef(false);
+  const handleLost = useCallback((reason: "stale" | "lost") => {
+    if (!wasLive.current) return;
+    wasLive.current = false;
+    const ok = shouldAutoReconnect({
+      reason,
+      attempts: autoAttempts.current,
+      away: !sessionLifecycle.isActive,
+      sinceResumeMs: Date.now() - resumedAt.current,
+    });
+    if (!ok) {
+      setAutoReconnecting(false);
+      if (reason === "lost") setConnectionState("disconnected");
+      return;
     }
+    autoAttempts.current += 1;
+    setAutoReconnecting(true);
+    reconnectRef.current();
   }, []);
+
+  const handleMessage = useCallback(
+    (event: any) => {
+      try {
+        const payload = JSON.parse(event.nativeEvent.data);
+        if (payload.type === "state") {
+          if (payload.state === "connected") {
+            wasLive.current = true;
+            autoAttempts.current = 0;
+            setAutoReconnecting(false);
+            setConnectionState("connected");
+            setErrorMessage(null);
+          } else if (payload.state === "disconnected") {
+            setConnectionState((s) =>
+              s === "connecting" ? s : "disconnected",
+            );
+          }
+        } else if (payload.type === "lost" || payload.type === "stale") {
+          handleLost(payload.type);
+        } else if (payload.type === "error") {
+          setConnectionState("failed");
+          setErrorMessage(payload.message || "Remote session failed");
+        } else if (payload.type === "zoomChange") {
+          setZoomLevel(payload.zoom);
+        }
+      } catch {
+        setConnectionState("failed");
+        setErrorMessage("Remote session returned an invalid message");
+      }
+    },
+    [handleLost],
+  );
 
   // ── WebView HTML ──────────────────────────────────────────────────────────
 
@@ -297,6 +344,7 @@ export function RemoteDesktop({
 
       const tunnel = new Guacamole.WebSocketTunnel(wsUrl);
       const client = new Guacamole.Client(tunnel);
+${tunnelWatchScript()}
       const display = client.getDisplay();
       const displayElement = display.getElement();
       displayContainer.appendChild(displayElement);
@@ -587,6 +635,56 @@ export function RemoteDesktop({
     setModifiers({ ctrl: false, alt: false, shift: false, win: false });
     setWebViewKey((k) => k + 1);
   }, []);
+  useEffect(() => {
+    reconnectRef.current = reconnect;
+  }, [reconnect]);
+
+  useEffect(() => {
+    const check = () => {
+      if (connectionStateRef.current !== "connected") return;
+      webViewRef.current?.injectJavaScript(
+        "window.termixAlive && window.termixAlive(); true;",
+      );
+    };
+    return sessionLifecycle.register({
+      notifyForegrounded: () => {
+        resumedAt.current = Date.now();
+        check();
+      },
+      notifyNetworkChanged: (info) => {
+        if (info.connected && info.changed) {
+          resumedAt.current = Date.now();
+          check();
+        }
+      },
+    });
+  }, []);
+
+  const onStatusRef = useRef(onStatus);
+  useEffect(() => {
+    onStatusRef.current = onStatus;
+  }, [onStatus]);
+  useEffect(() => {
+    const report = onStatusRef.current;
+    if (!report) return;
+    if (autoReconnecting && connectionState !== "connected") {
+      report({ state: "reconnecting", reason: "The remote desktop dropped" });
+      return;
+    }
+    switch (connectionState) {
+      case "connected":
+        report({ state: "connected" });
+        break;
+      case "failed":
+        report({ state: "failed", reason: errorMessage ?? undefined });
+        break;
+      case "disconnected":
+        report({ state: "closed" });
+        break;
+      default:
+        report({ state: "connecting" });
+    }
+  }, [connectionState, autoReconnecting, errorMessage]);
 
   // ── JS bridge helpers ─────────────────────────────────────────────────────
 

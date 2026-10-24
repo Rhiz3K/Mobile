@@ -20,7 +20,12 @@ function asProtocol(value?: string): RemoteDesktopProtocol {
     : "rdp";
 }
 
-function RemoteDesktopTab({ session, isVisible, onClose }: SessionTabProps) {
+function RemoteDesktopTab({
+  session,
+  isVisible,
+  onClose,
+  onStatus,
+}: SessionTabProps) {
   return (
     <RemoteDesktop
       host={session.host}
@@ -28,6 +33,7 @@ function RemoteDesktopTab({ session, isVisible, onClose }: SessionTabProps) {
       title={session.title}
       protocol={asProtocol(session.remoteProtocol)}
       onClose={onClose}
+      onStatus={onStatus}
     />
   );
 }
