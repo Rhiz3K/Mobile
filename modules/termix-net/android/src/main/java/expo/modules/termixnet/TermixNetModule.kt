@@ -1,10 +1,16 @@
 package expo.modules.termixnet
 
+import android.util.Base64
 import android.webkit.CookieManager
 import com.facebook.react.modules.network.OkHttpClientProvider
 import expo.modules.kotlin.exception.CodedException
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import java.net.DatagramPacket
+import java.net.DatagramSocket
+import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.net.Socket
 
 class TermixNetModule : Module() {
   private val context
@@ -34,6 +40,28 @@ class TermixNetModule : Module() {
     }
 
     AsyncFunction("hasClientCert") { accountId: String -> ClientCerts.has(accountId) }
+
+    AsyncFunction("tcpProbe") { host: String, port: Int, timeoutMs: Int ->
+      try {
+        Socket().use { it.connect(InetSocketAddress(host, port), maxOf(timeoutMs, 100)) }
+        true
+      } catch (e: Exception) {
+        false
+      }
+    }
+
+    AsyncFunction("udpSend") { host: String, port: Int, base64: String ->
+      try {
+        val data = Base64.decode(base64, Base64.DEFAULT)
+        DatagramSocket().use { socket ->
+          socket.broadcast = true
+          socket.send(DatagramPacket(data, data.size, InetAddress.getByName(host), port))
+        }
+        null
+      } catch (e: Exception) {
+        throw CodedException("UDP_FAILED", e.message ?: "Could not send the packet", e)
+      }
+    }
 
     // The web view and React Native share this jar on Android.
     AsyncFunction("readWebCookies") { url: String ->

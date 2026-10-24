@@ -121,6 +121,7 @@ test("This device gets the features that run on the phone, and no server only on
     "remote-desktop.rdp",
     "remote-desktop.vnc",
     "remote-desktop.telnet",
+    "wake-on-lan",
     "snippets",
     "host-defaults",
     "host-transfer",

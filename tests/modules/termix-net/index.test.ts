@@ -1,8 +1,11 @@
 import {
   importClientCert,
+  isLanAvailable,
   isNetAvailable,
   NativeSocket,
   nativeStream,
+  tcpProbe,
+  udpSend,
 } from "@/modules/termix-net";
 import { clearFakeNet, fakeNet } from "../../helpers/net";
 
@@ -64,4 +67,23 @@ test("a native stream passes chunks and ends once", () => {
   expect(ends).toEqual(["lost"]);
   stop();
   expect(net.cancelStream).not.toHaveBeenCalled();
+});
+
+test("local network helpers need the native module", async () => {
+  clearFakeNet();
+  expect(isLanAvailable()).toBe(false);
+  await expect(tcpProbe("h", 22)).rejects.toThrow("can't check ports");
+  expect(() => udpSend("255.255.255.255", 9, "AA==")).toThrow("can't send UDP");
+});
+
+test("tcpProbe and udpSend call the module", async () => {
+  const net = fakeNet();
+  net.tcpProbe = jest.fn().mockResolvedValueOnce(true).mockRejectedValue("x");
+  net.udpSend = jest.fn().mockResolvedValue(undefined);
+  expect(isLanAvailable()).toBe(true);
+  expect(await tcpProbe("h", 22, 1000)).toBe(true);
+  expect(net.tcpProbe).toHaveBeenCalledWith("h", 22, 1000);
+  expect(await tcpProbe("h", 22)).toBe(false);
+  await udpSend("10.0.0.255", 9, "AA==");
+  expect(net.udpSend).toHaveBeenCalledWith("10.0.0.255", 9, "AA==");
 });

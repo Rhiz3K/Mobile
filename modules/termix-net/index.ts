@@ -68,6 +68,8 @@ export interface TermixNetNative {
   setCookies(url: string, cookies: NetCookie[]): Promise<void>;
   clearCookie(url: string, name: string): Promise<void>;
   clearWebCookies(url: string): Promise<void>;
+  tcpProbe?(host: string, port: number, timeoutMs: number): Promise<boolean>;
+  udpSend?(host: string, port: number, base64: string): Promise<void>;
   request?(request: Required<NetRequest>): Promise<NetResponse>;
   startStream?(id: string, request: Required<NetRequest>): void;
   cancelStream?(id: string): void;
@@ -162,6 +164,41 @@ export function nativeRequest(request: NetRequest): Promise<NetResponse> {
     body: request.body ?? null,
     timeoutMs: request.timeoutMs ?? 30000,
   });
+}
+
+// Local network
+
+/** True when this build can probe ports and send UDP on the local network. */
+export function isLanAvailable(): boolean {
+  return !!native?.tcpProbe && !!native?.udpSend;
+}
+
+/** True when a TCP connection to host:port opens within the time. */
+export async function tcpProbe(
+  host: string,
+  port: number,
+  timeoutMs = 5000,
+): Promise<boolean> {
+  if (!native?.tcpProbe) {
+    throw Object.assign(new Error("This build can't check ports."), {
+      code: "NET_UNAVAILABLE",
+    });
+  }
+  return native.tcpProbe(host, port, timeoutMs).catch(() => false);
+}
+
+/** Sends one UDP datagram with broadcast allowed; the payload is base64. */
+export function udpSend(
+  host: string,
+  port: number,
+  base64: string,
+): Promise<void> {
+  if (!native?.udpSend) {
+    throw Object.assign(new Error("This build can't send UDP packets."), {
+      code: "NET_UNAVAILABLE",
+    });
+  }
+  return native.udpSend(host, port, base64);
 }
 
 // Streams

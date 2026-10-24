@@ -82,6 +82,21 @@ public class TermixNetModule: Module {
       self.net.closeSocket(id: id, code: code, reason: reason)
     }
 
+    AsyncFunction("tcpProbe") { (host: String, port: Int, timeoutMs: Int, promise: Promise) in
+      LanProbe.tcp(host: host, port: port, timeoutMs: timeoutMs) { promise.resolve($0) }
+    }
+
+    AsyncFunction("udpSend") { (host: String, port: Int, base64: String) throws in
+      guard let data = Data(base64Encoded: base64) else {
+        throw Exception(name: "BAD_DATA", description: "The packet is not base64", code: "BAD_DATA")
+      }
+      do {
+        try LanProbe.udp(host: host, port: port, data: data)
+      } catch LanError.failed(let message) {
+        throw Exception(name: "UDP_FAILED", description: message, code: "UDP_FAILED")
+      }
+    }
+
     // Cookies a proxy set in the sign in web view, HttpOnly ones too.
     AsyncFunction("readWebCookies") { (url: String, promise: Promise) in
       guard let host = URL(string: url)?.host?.lowercased() else {
