@@ -509,6 +509,7 @@ export default function Hosts() {
         enableTunnel: host.enableTunnel,
         enableFileManager: host.enableFileManager,
         enableDocker: host.enableDocker,
+        enableServices: host.enableServices,
         defaultPath: host.defaultPath ?? "/",
         jumpHosts: host.jumpHosts ?? [],
         forceKeyboardInteractive: host.forceKeyboardInteractive,

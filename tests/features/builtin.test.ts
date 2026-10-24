@@ -32,6 +32,7 @@ test("every session type is owned by exactly one feature", () => {
       "docker",
       "filemanager",
       "remoteDesktop",
+      "services",
       "stats",
       "terminal",
       "tunnel",
@@ -67,6 +68,7 @@ test("host actions keep the old order", () => {
     "terminal.open",
     "file-manager.open",
     "docker.open",
+    "services.open",
     "tunnels.open",
     "host-metrics.open",
     "remote-desktop.rdp.open",
@@ -87,6 +89,7 @@ test("host editor switches and tabs keep the old order", () => {
     "enableFileManager",
     "enableTunnel",
     "enableDocker",
+    "enableServices",
   ]);
   const tabs = toggles
     .filter((t) => t.formTab)
@@ -110,6 +113,7 @@ test("This device gets the features that run on the phone, and no server only on
     "terminal",
     "file-manager",
     "docker",
+    "service-manager",
     "tunnels",
     "host-metrics",
     "snippets",

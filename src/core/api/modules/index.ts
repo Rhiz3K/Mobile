@@ -21,6 +21,7 @@ import { createDockerApi } from "./docker";
 import { createWakeOnLanApi } from "./wakeOnLan";
 import { createApiKeysApi } from "./apiKeys";
 import { createSessionSharingApi } from "./sessionSharing";
+import { createServicesApi } from "./services";
 
 export function createModules(c: AccountClient) {
   return {
@@ -46,6 +47,7 @@ export function createModules(c: AccountClient) {
     wakeOnLan: createWakeOnLanApi(c),
     apiKeys: createApiKeysApi(c),
     sessionSharing: createSessionSharingApi(c),
+    services: createServicesApi(c),
   };
 }
 

@@ -11,6 +11,7 @@ import {
   telnetFeature,
   vncFeature,
 } from "./remote-desktop/register";
+import { servicesFeature } from "./services/register";
 import { snippetsFeature } from "./snippets/register";
 import { sessionSharingFeature } from "./session-sharing/register";
 import { tailscaleFeature } from "./tailscale/register";
@@ -23,6 +24,7 @@ export const BUILT_IN_FEATURES = [
   terminalFeature,
   fileManagerFeature,
   dockerFeature,
+  servicesFeature,
   tunnelsFeature,
   hostMetricsFeature,
   remoteDesktopFeature,

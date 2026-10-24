@@ -122,6 +122,7 @@ export function rowToDraft(
     enableFileManager: get("file-manager", "enableFileManager") !== false,
     defaultPath: get("file-manager", "defaultPath") || "/",
     enableDocker: get("docker", "enableDocker") === true,
+    enableServices: get("service-manager", "enableServices") === true,
     enableTunnel: get("tunnels", "enableTunnel") === true,
     tunnelConnections: Array.isArray(get("tunnels", "tunnelConnections"))
       ? get("tunnels", "tunnelConnections")

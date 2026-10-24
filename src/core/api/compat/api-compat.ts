@@ -129,6 +129,7 @@ export function flattenPluginSettings<T extends Record<string, any>>(
 
   const docker = settings.docker;
   set("enableDocker", Boolean(docker?.enableDocker));
+  set("enableServices", Boolean(settings["service-manager"]?.enableServices));
 
   const tunnels = settings.tunnels;
   set("enableTunnel", Boolean(tunnels?.enableTunnel));
@@ -192,6 +193,7 @@ export function buildPluginHostSettings(
       defaultPath: data.enableFileManager ? data.defaultPath || "/" : "/",
     },
     docker: { enableDocker: Boolean(data.enableDocker) },
+    "service-manager": { enableServices: Boolean(data.enableServices) },
     // With saved routes the list goes to PUT /saved and the plugin mirrors it.
     tunnels: options.savedTunnels
       ? { enableTunnel: Boolean(data.enableTunnel) }

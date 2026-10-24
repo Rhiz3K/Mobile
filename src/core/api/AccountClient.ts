@@ -680,6 +680,14 @@ export class AccountClient implements HttpOwner {
     return `${toWebSocketBase(this.rootBase())}/docker/console/?${params.toString()}`;
   }
 
+  /**
+   * A plugin socket on 2.9+, like `pluginWebSocketUrl("service-manager", "follow")`.
+   * Open it with the `termix.jwt.<token>` subprotocol.
+   */
+  pluginWebSocketUrl(pluginId: string, path: string): string {
+    return `${toWebSocketBase(this.serverUrl)}/plugin-ws/${pluginId}/${path}`;
+  }
+
   remoteDesktopWebSocketUrl(
     token: string,
     width?: number,

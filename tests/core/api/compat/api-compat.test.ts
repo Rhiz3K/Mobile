@@ -105,6 +105,7 @@ test("pluginSettings fill the flat host fields", () => {
       "ssh-terminal": { enableTerminal: true, connectFrom: "server" },
       "file-manager": { enableFileManager: false, defaultPath: "/srv" },
       docker: { enableDocker: true },
+      "service-manager": { enableServices: true, useSudo: true },
       tunnels: {
         enableTunnel: true,
         tunnelConnections: '[{"sourcePort":1,"endpointPort":2}]',
@@ -119,6 +120,7 @@ test("pluginSettings fill the flat host fields", () => {
   expect(host.defaultPath).toBe("/srv");
   expect(host.showFilesPanel).toBe(true);
   expect(host.enableDocker).toBe(true);
+  expect(host.enableServices).toBe(true);
   expect(host.enableTunnel).toBe(true);
   expect(host.tunnelConnections).toHaveLength(1);
   expect(host.enableRdp).toBe(true);
@@ -131,6 +133,7 @@ test("pluginSettings fill the flat host fields", () => {
 test("a plugin missing from pluginSettings reads as off", () => {
   const host: any = flattenPluginSettings({ id: 1, pluginSettings: {} });
   expect(host.enableDocker).toBe(false);
+  expect(host.enableServices).toBe(false);
   expect(host.enableTerminal).toBe(false);
   expect(host.connectFrom).toBeUndefined();
   expect(JSON.parse(host.statsConfig).metricsEnabled).toBe(false);
@@ -195,6 +198,9 @@ describe("saved tunnels", () => {
 
   test("host settings skip the list when saved routes exist", () => {
     const data = { enableTunnel: true, tunnelConnections: [{ sourcePort: 1 }] };
+    expect(
+      buildPluginHostSettings({ enableServices: true })["service-manager"],
+    ).toEqual({ enableServices: true });
     expect(buildPluginHostSettings(data).tunnels).toEqual({
       enableTunnel: true,
       tunnelConnections: [{ sourcePort: 1 }],

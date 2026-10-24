@@ -76,6 +76,7 @@ export interface SSHHost {
   enableVnc?: boolean;
   enableTelnet?: boolean;
   enableDocker?: boolean;
+  enableServices?: boolean;
   sshPort?: number;
   notes?: string;
   guacamoleConfig?: string | Record<string, unknown> | null;
@@ -148,6 +149,7 @@ export interface SSHHostData {
   enableVnc?: boolean;
   enableTelnet?: boolean;
   enableDocker?: boolean;
+  enableServices?: boolean;
   notes?: string;
   macAddress?: string;
   rdpUser?: string;

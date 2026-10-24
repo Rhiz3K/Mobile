@@ -64,6 +64,7 @@ interface FormState {
   enableTunnel: boolean;
   enableFileManager: boolean;
   enableDocker: boolean;
+  enableServices: boolean;
   defaultPath: string;
   // RDP
   rdpUser: string;
@@ -105,6 +106,7 @@ const EMPTY: FormState = {
   enableTunnel: false,
   enableFileManager: true,
   enableDocker: false,
+  enableServices: false,
   defaultPath: "/",
   rdpUser: "Administrator",
   rdpPassword: "",
@@ -255,6 +257,7 @@ export default function HostForm({
         ? !!host.enableFileManager
         : (draft?.enableFileManager ?? EMPTY.enableFileManager),
       enableDocker: !!source.enableDocker,
+      enableServices: !!source.enableServices,
       defaultPath: source.defaultPath || "/",
       rdpUser: source.rdpUser ?? "Administrator",
       rdpDomain: source.rdpDomain ?? "",
@@ -315,7 +318,8 @@ export default function HostForm({
     | "enableTerminal"
     | "enableFileManager"
     | "enableTunnel"
-    | "enableDocker";
+    | "enableDocker"
+    | "enableServices";
   type Toggle = { key: ToggleKey; label: string; description?: string };
   const asToggle = (t: (typeof hostToggles)[number]): Toggle => ({
     key: t.key as ToggleKey,
@@ -427,6 +431,7 @@ export default function HostForm({
       enableTunnel: form.enableTunnel,
       enableFileManager: form.enableFileManager,
       enableDocker: form.enableDocker,
+      enableServices: form.enableServices,
       defaultPath: form.defaultPath,
       jumpHosts: host?.jumpHosts ?? [],
       // Fields this form does not edit; keep what the host already has.
