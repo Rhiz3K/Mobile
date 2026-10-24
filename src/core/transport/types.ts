@@ -7,6 +7,7 @@ import type {
   SshSession,
   SshSftp,
 } from "@/modules/termix-ssh";
+import type { AuthType } from "@/types";
 import type { ConnectFailure } from "./errors";
 
 /**
@@ -37,7 +38,7 @@ export interface TerminalHostConfig {
   ip: string;
   port: number;
   username: string;
-  authType: "password" | "key" | "credential" | "none" | "tailscale";
+  authType: AuthType;
   password?: string;
   key?: string;
   keyPassword?: string;

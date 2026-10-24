@@ -210,3 +210,14 @@ describe("saved tunnels", () => {
     ).toEqual({ enableTunnel: true });
   });
 });
+
+test("a picked Vault profile is saved, and left alone when not picked", () => {
+  const { buildPluginHostSettings } = require("@/core/api/compat/api-compat");
+  expect(buildPluginHostSettings({ vaultProfileId: 5 }).vault).toEqual({
+    profileId: 5,
+  });
+  expect(buildPluginHostSettings({ vaultProfileId: null }).vault).toEqual({
+    profileId: null,
+  });
+  expect(buildPluginHostSettings({}).vault).toBeUndefined();
+});

@@ -48,8 +48,11 @@ export function sharedFromHost(
   options: ShareOptions = {},
 ): SharedHost {
   // A saved login isn't ours to hand out, so the receiver picks their own.
-  const authType: SharedHost["authType"] =
-    host.authType === "credential" ? "password" : host.authType;
+  // Server sign ins don't travel either.
+  const shareable: string[] = ["none", "password", "key", "tailscale"];
+  const authType: SharedHost["authType"] = shareable.includes(host.authType)
+    ? (host.authType as SharedHost["authType"])
+    : "password";
   const shared: SharedHost = {
     v: 1,
     name: host.name,

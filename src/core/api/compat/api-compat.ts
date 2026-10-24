@@ -209,6 +209,10 @@ export function buildPluginHostSettings(
     },
     "wake-on-lan": { macAddress: data.macAddress?.trim() || "" },
   };
+  // Only set when the form picked one, so other saves keep the saved profile.
+  if (data.vaultProfileId !== undefined) {
+    out.vault = { profileId: data.vaultProfileId };
+  }
   if (Object.keys(terminal.snippets).length > 0) {
     out.snippets = terminal.snippets;
   }

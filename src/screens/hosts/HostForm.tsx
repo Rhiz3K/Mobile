@@ -36,10 +36,17 @@ import {
   saveOrigin,
   type ConnectionOrigin,
 } from "@/core/transport";
+import {
+  BrowserSignInFields,
+  isBrowserSignIn,
+  useBrowserSignInTabs,
+  type BrowserSignInType,
+} from "@/screens/hosts/BrowserSignIn";
 import { readLocalText } from "@/utils/localFile";
 import { importMessage, importPrivateKey } from "@/utils/keyImport";
 
-type AuthType = "password" | "key" | "credential" | "none" | "tailscale";
+type AuthType =
+  "password" | "key" | "credential" | "none" | "tailscale" | BrowserSignInType;
 // Feature tabs (tunnels, rdp, ...) come from registered host switches.
 type TabId = string;
 
@@ -55,6 +62,7 @@ interface FormState {
   // SSH
   username: string;
   authType: AuthType;
+  vaultProfileId: number | null;
   password: string;
   key: string;
   keyPassword: string;
@@ -87,6 +95,13 @@ interface FormState {
   notes: string;
 }
 
+function vaultProfileOf(source: {
+  pluginSettings?: Record<string, Record<string, unknown>>;
+}): number | null {
+  const id = Number(source.pluginSettings?.vault?.profileId);
+  return Number.isFinite(id) && id > 0 ? id : null;
+}
+
 const EMPTY: FormState = {
   name: "",
   ip: "",
@@ -97,6 +112,7 @@ const EMPTY: FormState = {
   enableTelnet: false,
   username: "",
   authType: "password",
+  vaultProfileId: null,
   password: "",
   key: "",
   keyPassword: "",
@@ -162,6 +178,7 @@ export default function HostForm({
     return map;
   }, [hostToggles]);
   const canWake = useCapability("host.wake");
+  const signInTabs = useBrowserSignInTabs(form.authType);
   const hasDefaultPath = useCapability("files.defaultPath");
   const tailscaleAvailable = useCapability("hosts.discovery");
   // The name a Tailscale draft or device pick filled in, so picking another
@@ -249,7 +266,8 @@ export default function HostForm({
       enableVnc: !!source.enableVnc,
       enableTelnet: !!source.enableTelnet,
       username: source.username ?? "",
-      authType: source.authType ?? "password",
+      authType: (source.authType ?? "password") as AuthType,
+      vaultProfileId: vaultProfileOf(source),
       credentialId: source.credentialId,
       enableTerminal: source.enableTerminal !== false,
       enableTunnel: !!source.enableTunnel,
@@ -422,6 +440,8 @@ export default function HostForm({
         .filter(Boolean),
       pin: form.pin,
       authType: form.authType,
+      vaultProfileId:
+        form.authType === "vault" ? form.vaultProfileId : undefined,
       password: form.authType === "password" ? form.password : undefined,
       key: form.authType === "key" ? (form.key as any) : undefined,
       keyPassword: form.authType === "key" ? form.keyPassword : undefined,
@@ -674,8 +694,17 @@ export default function HostForm({
                   ...(tailscaleAvailable || form.authType === "tailscale"
                     ? [{ id: "tailscale" as const, label: "Tailscale" }]
                     : []),
+                  ...signInTabs,
                 ]}
               />
+
+              {isBrowserSignIn(form.authType) ? (
+                <BrowserSignInFields
+                  authType={form.authType}
+                  vaultProfileId={form.vaultProfileId}
+                  onVaultProfile={(id) => set("vaultProfileId", id)}
+                />
+              ) : null}
 
               {form.authType === "tailscale" ? (
                 <>

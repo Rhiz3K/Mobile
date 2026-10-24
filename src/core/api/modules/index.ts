@@ -1,5 +1,6 @@
 import type { AccountClient } from "../AccountClient";
 import { createTailscaleApi } from "./tailscale";
+import { createVaultApi } from "./vault";
 import { createHostsApi } from "./hosts";
 import { createRemoteDesktopApi } from "./remoteDesktop";
 import { createTunnelsApi } from "./tunnels";
@@ -26,6 +27,7 @@ import { createServicesApi } from "./services";
 export function createModules(c: AccountClient) {
   return {
     tailscale: createTailscaleApi(c),
+    vault: createVaultApi(c),
     hosts: createHostsApi(c),
     remoteDesktop: createRemoteDesktopApi(c),
     tunnels: createTunnelsApi(c),

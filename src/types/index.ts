@@ -154,6 +154,8 @@ export interface SSHHostData {
   enableServices?: boolean;
   notes?: string;
   macAddress?: string;
+  /** Vault plugin profile for hosts that sign in with Vault. */
+  vaultProfileId?: number | null;
   rdpUser?: string;
   rdpPassword?: string;
   rdpDomain?: string;
@@ -570,7 +572,16 @@ export type ErrorType =
 // AUTHENTICATION TYPES
 // ============================================================================
 
-export type AuthType = "password" | "key" | "credential" | "none" | "tailscale";
+export type AuthType =
+  | "password"
+  | "key"
+  | "credential"
+  | "none"
+  | "tailscale"
+  // Sign ins the linked server runs in a browser.
+  | "opkssh"
+  | "stepca"
+  | "vault";
 
 export type KeyType = "rsa" | "ecdsa" | "ed25519";
 
