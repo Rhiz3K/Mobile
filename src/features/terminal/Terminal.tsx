@@ -38,6 +38,8 @@ import { useSessionAccountId } from "@/core/accounts/session";
 import { useSessionRepositories } from "@/core/data/hooks";
 import { resolveTerminalSettings } from "./settings";
 import { findStartupSnippet, startupLines } from "./startup";
+import { CommandLineTracker } from "./history/capture";
+import { SuggestionStrip } from "./history/SuggestionStrip";
 import {
   TerminalView,
   type ModifierState,
@@ -106,8 +108,6 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
     const sizeRef = useRef<{ cols: number; rows: number } | null>(null);
     const connectedOnce = useRef(false);
     const transportRef = useRef<TransportKind | null>(null);
-    // Buffers typed characters so a command can be saved to history on Enter.
-    const commandBufferRef = useRef("");
 
     const settings = useMemo(
       () =>
@@ -124,35 +124,43 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
       onBackgroundColorChange?.(settings.colors.background);
     }, [settings.colors.background, onBackgroundColorChange]);
 
-    const recordCommandInput = useCallback(
-      (data: string) => {
-        for (const ch of data) {
-          if (ch === "\r" || ch === "\n") {
-            const command = commandBufferRef.current.trim();
-            commandBufferRef.current = "";
-            if (command.length > 1 && hostConfig.id > 0) {
-              repos.commandHistory
-                .add({ id: hostConfig.id } as SSHHost, command)
-                .catch(() => {});
-            }
-          } else if (ch === "\x7f" || ch === "\b") {
-            commandBufferRef.current = commandBufferRef.current.slice(0, -1);
-          } else if (ch === "\x03" || ch === "\x15") {
-            commandBufferRef.current = "";
-          } else if (ch >= " " && ch !== "\x1b") {
-            commandBufferRef.current += ch;
-          }
-        }
-      },
-      [hostConfig.id, repos],
+    const historyOn = hostConfig.terminalConfig?.enableCommandHistory !== false;
+    const hostRef = useRef(host);
+    hostRef.current = host;
+    const historyOnRef = useRef(historyOn);
+    historyOnRef.current = historyOn;
+    // Set while the shell shows a password prompt.
+    const passwordPromptRef = useRef(false);
+    const [tracker] = useState(
+      () =>
+        new CommandLineTracker({
+          onSubmit: (line, save) => {
+            const h = hostRef.current;
+            if (!save || !historyOnRef.current || !(h.id > 0)) return;
+            repos.commandHistory.add(h, line).catch(() => {});
+          },
+          isPasswordInput: () => passwordPromptRef.current,
+        }),
     );
+    const suggestionsOn = !!config.commandSuggestions && historyOn;
+    const [history, setHistory] = useState<string[]>([]);
+    useEffect(() => {
+      if (!suggestionsOn || !(host.id > 0)) return;
+      const load = () =>
+        repos.commandHistory
+          .list(host)
+          .then(setHistory)
+          .catch(() => {});
+      load();
+      return repos.commandHistory.subscribe(load);
+    }, [suggestionsOn, host, repos]);
 
     const sendInput = useCallback(
       (data: string) => {
-        recordCommandInput(data);
+        tracker.track(data);
         connRef.current?.sendInput(data);
       },
-      [recordCommandInput],
+      [tracker],
     );
 
     // Startup lines wait for the shell's first output, so they land at a prompt.
@@ -409,6 +417,13 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
                   onFontSize={handleFontSize}
                   showScrollButton={isVisible && isConnected && !isDialogOpen}
                 />
+                {suggestionsOn && isVisible && isConnected ? (
+                  <SuggestionStrip
+                    tracker={tracker}
+                    history={history}
+                    onPick={(rest) => sendInput(rest)}
+                  />
+                ) : null}
               </View>
             )}
           </View>

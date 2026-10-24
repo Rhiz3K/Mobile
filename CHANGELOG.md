@@ -45,6 +45,9 @@
 - Long press a snippet to insert it without running or to copy it
 - Mark a snippet as a note so it is pasted without running
 - An option to confirm before a snippet runs
+- Search the command history, and long press a command to run, copy or delete it
+- Past commands that start with what you type can show above the keys, if you turn it on
+- Command history of a linked server shows on the phone, and commands typed on the phone show in Termix
 - The startup snippet fills in $HOST, $USER, $PORT and $NAME and runs once the shell shows its prompt
 
 ### Changed
@@ -62,6 +65,7 @@
 - The iOS app icon, including the dark and tinted versions, now uses the same logo as Termix on the web and desktop
 - Needs iOS 16.4 or newer
 - A terminal that fails to connect stays open with the error instead of closing
+- Commands that look like they hold a password, token or key are no longer saved to history, like in Termix
 
 ### Fixed
 

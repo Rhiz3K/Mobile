@@ -5,6 +5,7 @@ import { accountStorage } from "@/core/storage/kv";
 import { AppError } from "@/core/errors";
 import { localRepositories } from "./local";
 import { serverRepositories } from "./server";
+import { withServerHistory } from "./history-sync";
 import type { DataRepositories, Repository } from "./types";
 
 export * from "./types";
@@ -43,7 +44,9 @@ export const emptyRepositories: DataRepositories = {
     remove: refuse("snippets"),
   },
   commandHistory: {
+    subscribe: noop,
     list: async () => [],
+    merge: async () => {},
     add: async () => {},
     remove: async () => {},
     clear: async () => {},
@@ -61,6 +64,7 @@ export const emptyRepositories: DataRepositories = {
 
 const cache = new Map<string, DataRepositories>();
 const serverCache = new WeakMap<AccountClient, DataRepositories>();
+const latestClient = new Map<string, AccountClient>();
 
 /**
  * This device and every linked server that syncs use their own encrypted
@@ -83,9 +87,21 @@ export function repositoriesFor(
   }
   if (account.kind === "server" && !synced) return emptyRepositories;
   if (!store) return emptyRepositories;
+  if (client) latestClient.set(account.id, client);
   let repos = cache.get(account.id);
   if (!repos) {
     repos = localRepositories(account.id);
+    if (account.kind === "server") {
+      // The server keeps history too, so the web app sees what was typed here.
+      const id = account.id;
+      repos = {
+        ...repos,
+        commandHistory: withServerHistory(
+          repos.commandHistory,
+          () => latestClient.get(id) ?? null,
+        ),
+      };
+    }
     cache.set(account.id, repos);
   }
   return repos;

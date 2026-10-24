@@ -3,7 +3,7 @@ import { SquareTerminal, Terminal as TerminalIcon } from "lucide-react-native";
 import type { FeatureDef, SessionTabProps } from "@/core/features/types";
 import { isSshHost, toTerminalHostConfig } from "@/utils/hosts";
 import { Terminal, type TerminalHandle } from "./Terminal";
-import HistoryBar from "./keyboard/HistoryBar";
+import HistoryBar from "./history/HistoryBar";
 import { hostTerminalEditor } from "./HostTerminalTab";
 
 const TerminalTab = forwardRef<TerminalHandle, SessionTabProps>(

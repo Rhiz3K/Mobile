@@ -38,6 +38,7 @@ export function serverRepositories(
   const hostChanges = signal();
   const credentialChanges = signal();
   const snippetChanges = signal();
+  const historyChanges = signal();
   const recentOrigins = new Map<number, string>();
 
   return {
@@ -108,11 +109,18 @@ export function serverRepositories(
         snippetChanges.after(snippets.deleteSnippetFolder(name).then(() => {})),
     },
     commandHistory: {
+      subscribe: historyChanges.subscribe,
       list: (host) => terminal.getCommandHistory(host.id),
-      add: (host, command) => terminal.saveCommandToHistory(host.id, command),
+      // The server is the only copy here.
+      merge: async () => {},
+      add: (host, command) =>
+        historyChanges.after(terminal.saveCommandToHistory(host.id, command)),
       remove: (host, command) =>
-        terminal.deleteCommandFromHistory(host.id, command),
-      clear: (host) => terminal.clearCommandHistory(host.id),
+        historyChanges.after(
+          terminal.deleteCommandFromHistory(host.id, command),
+        ),
+      clear: (host) =>
+        historyChanges.after(terminal.clearCommandHistory(host.id)),
     },
     // The server keeps its own activity feed; nothing to record here.
     recentActivity: {

@@ -493,3 +493,19 @@ test("snippets keep the note flag", async () => {
   await repos.snippets.update(note.id, { isNote: false });
   expect((await repos.snippets.get(note.id))!.isNote).toBe(false);
 });
+
+test("merged history goes below what the phone has, in the given order", async () => {
+  const { repos } = setup();
+  const host = await repos.hosts.create(fullHost);
+  await repos.commandHistory.add(host, "ls");
+  const changes = jest.fn();
+  const off = repos.commandHistory.subscribe(changes);
+  await repos.commandHistory.merge(host, ["top", "ls", " df ", ""]);
+  off();
+  expect(await repos.commandHistory.list(host)).toEqual(["ls", "top", "df"]);
+  await new Promise((r) => setTimeout(r, 0));
+  expect(changes).toHaveBeenCalled();
+  // Nothing new, nothing written.
+  await repos.commandHistory.merge(host, ["top"]);
+  expect(await repos.commandHistory.list(host)).toEqual(["ls", "top", "df"]);
+});

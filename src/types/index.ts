@@ -463,6 +463,8 @@ export interface TerminalConfig {
   optionAsMeta: boolean;
   /** Phone only: ask before a snippet runs. */
   confirmSnippetRun?: boolean;
+  /** Phone only: show past commands that match the typed line. */
+  commandSuggestions?: boolean;
 
   // Host only, from the ssh-terminal plugin.
   useSSHTitle?: boolean;

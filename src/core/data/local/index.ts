@@ -368,6 +368,7 @@ export function localRepositories(
     },
 
     commandHistory: {
+      subscribe: watch(commandHistory),
       async list(host) {
         const d = await db();
         return d
@@ -409,6 +410,46 @@ export function localRepositories(
             )
             .run();
         });
+        touched(commandHistory);
+      },
+      async merge(host, commands) {
+        const d = await db();
+        const key = hostKey(d, host);
+        const have = new Set(
+          d
+            .select({ command: commandHistory.command })
+            .from(commandHistory)
+            .where(eq(commandHistory.hostSyncId, key))
+            .all()
+            .map((row) => row.command),
+        );
+        const oldest = d
+          .select({ usedAt: commandHistory.usedAt })
+          .from(commandHistory)
+          .where(eq(commandHistory.hostSyncId, key))
+          .orderBy(asc(commandHistory.usedAt))
+          .limit(1)
+          .get();
+        const missing = [...new Set(commands.map((c) => c.trim()))]
+          .filter((c) => c && !have.has(c))
+          .slice(0, Math.max(0, HISTORY_LIMIT - have.size));
+        if (missing.length === 0) return;
+        // Older than anything here, newest of the merged ones first.
+        const parsed = oldest ? Date.parse(oldest.usedAt) : NaN;
+        const base = Number.isFinite(parsed) ? parsed : Date.now();
+        d.transaction((tx) => {
+          missing.forEach((command, i) => {
+            tx.insert(commandHistory)
+              .values({
+                hostSyncId: key,
+                command,
+                usedAt: new Date(base - (i + 1) * 1000).toISOString(),
+              })
+              .onConflictDoNothing()
+              .run();
+          });
+        });
+        touched(commandHistory);
       },
       async remove(host, command) {
         const d = await db();
@@ -420,12 +461,14 @@ export function localRepositories(
             ),
           )
           .run();
+        touched(commandHistory);
       },
       async clear(host) {
         const d = await db();
         d.delete(commandHistory)
           .where(eq(commandHistory.hostSyncId, hostKey(d, host)))
           .run();
+        touched(commandHistory);
       },
     },
 

@@ -6,6 +6,7 @@ import {
   AlignLeft,
   ArrowLeft,
   Bell,
+  History,
   Link,
   Palette,
   Rows3,
@@ -411,6 +412,20 @@ export default function TerminalCustomization() {
               />
             </SettingRow>
           ) : null}
+        </Section>
+
+        <Section icon={History} title="History">
+          <SettingRow
+            label="Suggest commands"
+            description="Shows past commands that start with what you type"
+            last
+          >
+            <FakeSwitch
+              checked={current.commandSuggestions ?? false}
+              onChange={(v) => save({ commandSuggestions: v })}
+              accessibilityLabel="Suggest commands"
+            />
+          </SettingRow>
         </Section>
 
         <Button variant="destructive" onPress={() => setShowResetConfirm(true)}>

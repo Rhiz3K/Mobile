@@ -53,8 +53,10 @@ export interface HostFolderRepository extends Watchable {
 }
 
 /** Commands typed into a host's terminal, newest first. */
-export interface CommandHistoryRepository {
+export interface CommandHistoryRepository extends Watchable {
   list(host: SSHHost): Promise<string[]>;
+  /** Adds commands the list lacks below the ones it has, keeping their order. */
+  merge(host: SSHHost, commands: string[]): Promise<void>;
   add(host: SSHHost, command: string): Promise<void>;
   remove(host: SSHHost, command: string): Promise<void>;
   clear(host: SSHHost): Promise<void>;
