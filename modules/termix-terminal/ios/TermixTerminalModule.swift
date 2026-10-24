@@ -124,10 +124,6 @@ public class TermixTerminalModule: Module {
       AsyncFunction("getStats") { (view: TermixTerminalView) -> [String: Double] in
         view.stats()
       }.runOnQueue(.main)
-
-      OnViewDestroys { (view: TermixTerminalView) in
-        view.destroy()
-      }
     }
   }
 }

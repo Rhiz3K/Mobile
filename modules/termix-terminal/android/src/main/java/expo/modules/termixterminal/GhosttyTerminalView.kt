@@ -540,7 +540,8 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
         stats.bytes += chunk.size
         val reply = GhosttyVt.nativeWrite(handle, chunk)
         if (reply != null && reply.isNotEmpty()) synchronized(pendingReplies) { pendingReplies.add(reply) }
-        pendingEvents.getAndUpdate { it or GhosttyVt.nativeTakeEventFlags(handle) or EVENT_OUTPUT }
+        val flags = GhosttyVt.nativeTakeEventFlags(handle) or EVENT_OUTPUT
+        pendingEvents.getAndUpdate { it or flags }
         GhosttyVt.nativeModes(handle)?.let { modes ->
           mouseTracking = modes[0] != 0
           altScreen = modes[1] != 0

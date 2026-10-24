@@ -451,11 +451,10 @@ class TermixTerminalView: ExpoView {
     }
   }
 
-  func destroy() {
-    reader.pipe.detachSink(reader)
+  // Unanswered clipboard requests deny themselves when they go away.
+  deinit {
+    if let reader { reader.pipe.detachSink(reader) }
     if let pipeId { TermixPipes.release(pipeId) }
-    for request in clipboardRequests.values { request.respond(allow: false) }
-    clipboardRequests.removeAll()
   }
 }
 
