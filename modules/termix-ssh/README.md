@@ -53,8 +53,9 @@ feature (`telnet`, `vnc`, `rdp`, all on by default), so one can be left out to s
 
 VNC and RDP on the phone are a prototype: only the dev display lab opens them.
 
-Size of a release build (Windows x64 DLL, the same profile as the phones): 4.0 MB with no remote
-protocols, 4.2 MB with Telnet and VNC, 8.8 MB with RDP too.
+Size: the arm64 Android library went from 3.4 MB (0.3.0) to 8.1 MB (0.4.0). Telnet and VNC add about
+0.2 MB of that; RDP is the rest. A Windows build with the same profile shows the same split (4.0 MB
+without remote protocols, 4.2 MB with Telnet and VNC, 8.8 MB with RDP).
 
 Secrets stay in Rust once a login starts: the config kept for `reconnect()` is wiped when the session
 goes, and `ConnectConfig` never prints secrets in logs.
