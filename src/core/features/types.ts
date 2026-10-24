@@ -60,6 +60,8 @@ export interface SessionTabProps {
   onBackgroundColorChange?: (color: string) => void;
   /** A title the program set, when the host shows those. Null clears it. */
   onTitle?: (title: string | null) => void;
+  /** Opens the tab's menu, like tapping the active tab. */
+  onMenu?: () => void;
 }
 
 /**

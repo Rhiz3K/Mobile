@@ -16,10 +16,11 @@ so it works with any transport (the local SSH engine or the server relay).
 - Output parsed off the main thread, with back pressure: a full pipe pauses the SSH reader
 - Software keyboard with IME composition (CJK as preedit), dictation, no auto capitals,
   hardware keyboards, and sticky Ctrl and Alt driven by the app's key row
-- Selection with handles and a magnifier, copy, paste (bracketed, unsafe text asks first)
+- Selection with handles and a magnifier, copy, paste (bracketed, unsafe text asks first);
+  double tap selects a word, and More in the long press menu fires `onMenu`
 - Links: OSC 8 and plain addresses, opened by a tap or from the long press menu
 - OSC 52 copy; a program reading the clipboard asks first
-- Scrollback with fling, scroll state events, pinch to zoom the font
+- Scrollback with fling, two finger scroll, scroll state events, pinch to zoom the font
 - Mouse reporting: taps are clicks and drags are wheel steps while the program tracks the mouse
 - Cursor style and blink, bell with sound, flash and haptics, title events
 - Screen reader text and announcements of new output

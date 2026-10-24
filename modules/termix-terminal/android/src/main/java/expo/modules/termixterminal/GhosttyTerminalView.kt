@@ -72,6 +72,8 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
   var onOutput: (() -> Unit)? = null
   /** The line at the cursor once output settles, while [promptWatch] is on. */
   var onPromptLine: ((line: String) -> Unit)? = null
+  /** The app's own menu for the session, from More in the long press menu. */
+  var onMenu: (() -> Unit)? = null
   var promptWatch = false
     set(value) {
       field = value
@@ -287,6 +289,20 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
         return true
       }
 
+      // A double tap selects the word, like a long press without the drag.
+      override fun onDoubleTap(e: MotionEvent): Boolean {
+        if (handle == 0L || finished || mouseTracking) return false
+        lastPressCol = colAt(e.x)
+        lastPressRow = rowAt(e.y)
+        pressLink = linkAt(e.x, e.y)
+        selectionMode = synchronized(vtLock) {
+          handle != 0L && GhosttyVt.nativeSelectWord(handle, lastPressCol, lastPressRow)
+        }
+        scheduleFrame()
+        if (selectionMode) startTerminalActionMode()
+        return true
+      }
+
       override fun onLongPress(e: MotionEvent) {
         if (handle == 0L || finished || scaleDetector.isInProgress) return
         lastPressCol = colAt(e.x)
@@ -340,6 +356,9 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
     }
   )
 
+  private var twoFingerLastY = 0f
+  private var twoFingerAccum = 0f
+
   // Every 0.1 of accumulated scale steps the font size by 1dp.
   private var pinchScale = 1f
   private var pinchLastScale = 1f
@@ -349,10 +368,20 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
       override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
         pinchScale = 1f
         pinchLastScale = 1f
+        twoFingerLastY = detector.focusY
+        twoFingerAccum = 0f
         return true
       }
 
       override fun onScale(detector: ScaleGestureDetector): Boolean {
+        // Two fingers moving together scroll, also while one finger drives the mouse.
+        twoFingerAccum += twoFingerLastY - detector.focusY
+        twoFingerLastY = detector.focusY
+        val rows = (twoFingerAccum / cellHeight).toInt()
+        if (rows != 0) {
+          twoFingerAccum -= rows * cellHeight
+          scrollRows(detector.focusX, detector.focusY, rows)
+        }
         pinchScale *= detector.scaleFactor
         val steps = ((pinchScale - pinchLastScale) / PINCH_SCALE_STEP).toInt()
         if (steps != 0) {
@@ -1204,12 +1233,14 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
           menu.add(Menu.NONE, MENU_PASTE, 1, android.R.string.paste)
           menu.add(Menu.NONE, MENU_SELECT_ALL, 2, android.R.string.selectAll)
           menu.add(Menu.NONE, MENU_OPEN_LINK, 3, OPEN_LINK_LABEL)
+          menu.add(Menu.NONE, MENU_MORE, 4, MORE_LABEL)
           return true
         }
 
         override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean {
           menu.findItem(MENU_COPY)?.isVisible = selectionMode
           menu.findItem(MENU_OPEN_LINK)?.isVisible = pressLink != null
+          menu.findItem(MENU_MORE)?.isVisible = onMenu != null
           return true
         }
 
@@ -1222,6 +1253,10 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
               val link = pressLink
               clearSelection()
               if (link != null) onLink?.invoke(link)
+            }
+            MENU_MORE -> {
+              clearSelection()
+              onMenu?.invoke()
             }
             else -> return false
           }
@@ -1895,6 +1930,8 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
     const val MENU_SELECT_ALL = 3
     const val MENU_OPEN_LINK = 4
     const val OPEN_LINK_LABEL = "Open link"
+    const val MENU_MORE = 5
+    const val MORE_LABEL = "More"
 
     const val SCROLLBAR_FADE_START_MS = 800L
     const val SCROLLBAR_FADE_END_MS = 1400L

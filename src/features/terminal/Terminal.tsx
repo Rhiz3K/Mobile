@@ -98,6 +98,7 @@ interface TerminalProps {
   onSessionIdChange?: (sessionId: string | null) => void;
   onTransportResolved?: (kind: TransportKind) => void;
   onTitle?: (title: string | null) => void;
+  onMenu?: () => void;
 }
 
 export type TerminalHandle = TerminalInputHandle;
@@ -122,6 +123,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
       onSessionIdChange,
       onTransportResolved,
       onTitle,
+      onMenu,
     },
     ref,
   ) => {
@@ -652,6 +654,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
                   onPromptLine={(line) => watcherRef.current?.line(line)}
                   onSearch={setSearchResult}
                   onTitle={useShellTitle ? onTitle : undefined}
+                  onMenu={onMenu}
                 />
                 {searchOpen && isVisible ? (
                   <SearchBar

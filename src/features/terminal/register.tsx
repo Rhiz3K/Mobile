@@ -23,6 +23,7 @@ const TerminalTab = forwardRef<TerminalHandle, SessionTabProps>(
       onTransportResolved,
       onBackgroundColorChange,
       onTitle,
+      onMenu,
     },
     ref,
   ) => (
@@ -41,6 +42,7 @@ const TerminalTab = forwardRef<TerminalHandle, SessionTabProps>(
       onClose={onClose}
       onBackgroundColorChange={onBackgroundColorChange}
       onTitle={onTitle}
+      onMenu={onMenu}
     />
   ),
 );

@@ -57,6 +57,8 @@
 - Hold a tab to drag it to a new place, and swipe in from the left or right edge to go to the next tab
 - Tabs show the title the program sets when the host turns that on
 - Share a link to a terminal that runs through the server, when the server has the Session Sharing plugin
+- Double tap a word in the terminal to select it, and scroll the history with two fingers, also while a program uses the mouse
+- More in the terminal's long press menu opens the tab's menu
 - Search the command history, and long press a command to run, copy or delete it
 - Past commands that start with what you type can show above the keys, if you turn it on
 - Command history of a linked server shows on the phone, and commands typed on the phone show in Termix

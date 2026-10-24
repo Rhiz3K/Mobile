@@ -25,6 +25,10 @@ final class TermixGhosttyView: UITerminalView {
     if let owner, let url = owner.link(at: context.sourcePoint) {
       items.insert(UIAction(title: "Open link") { [weak owner] _ in owner?.emitLink(url) }, at: 0)
     }
+    // The app's own menu for the session: find, tmux, key rows, share.
+    if let owner {
+      items.append(UIAction(title: "More") { [weak owner] _ in owner?.emitMenu() })
+    }
     return items
   }
 
@@ -162,6 +166,7 @@ class TermixTerminalView: ExpoView {
   let onModifiers = EventDispatcher()
   let onPromptLine = EventDispatcher()
   let onSearch = EventDispatcher()
+  let onMenu = EventDispatcher()
   private var searchTotal = 0
   private var searchSelected = -1
 
@@ -451,6 +456,10 @@ class TermixTerminalView: ExpoView {
 
   func emitLink(_ url: String) {
     onLink(["url": url])
+  }
+
+  func emitMenu() {
+    onMenu([:])
   }
 
   // MARK: - Output

@@ -622,6 +622,7 @@ export default function Sessions() {
         }
         onTransportResolved={(kind) => setSessionTransport(session.id, kind)}
         onTitle={(title) => setShellTitle(session.id, title)}
+        onMenu={() => setMenuFor(session.id)}
         onBackgroundColorChange={(color) => {
           setTerminalBackgroundColors((prev) => ({
             ...prev,

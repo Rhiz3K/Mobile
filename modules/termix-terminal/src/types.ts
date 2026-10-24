@@ -107,6 +107,8 @@ export interface TerminalViewProps {
   onPromptLine?: (line: string) => void;
   /** Hits of the current search, and which one shows (-1 for none). */
   onSearch?: (result: TerminalSearchResult) => void;
+  /** More in the long press menu: the app's own menu for the session. */
+  onMenu?: () => void;
   style?: StyleProp<ViewStyle>;
 }
 

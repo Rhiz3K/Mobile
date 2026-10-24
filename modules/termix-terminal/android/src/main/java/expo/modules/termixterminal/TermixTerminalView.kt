@@ -23,6 +23,7 @@ class TermixTerminalView(context: Context, appContext: AppContext) :
   private val onModifiers by EventDispatcher<Map<String, Any>>()
   private val onPromptLine by EventDispatcher<Map<String, Any>>()
   private val onSearch by EventDispatcher<Map<String, Any>>()
+  private val onMenu by EventDispatcher<Map<String, Any>>()
 
   private val terminal = GhosttyTerminalView(context).also { view ->
     view.onInputBytes = { bytes ->
@@ -41,6 +42,7 @@ class TermixTerminalView(context: Context, appContext: AppContext) :
     view.onModifiers = { ctrl, alt -> onModifiers(mapOf("ctrl" to ctrl, "alt" to alt)) }
     view.onPromptLine = { line -> onPromptLine(mapOf("line" to line)) }
     view.onSearch = { total, index -> onSearch(mapOf("total" to total, "index" to index)) }
+    view.onMenu = { onMenu(emptyMap()) }
   }
 
   init {

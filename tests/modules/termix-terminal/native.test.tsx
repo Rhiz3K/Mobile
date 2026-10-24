@@ -217,6 +217,7 @@ test("search calls reach the native view with every option set", async () => {
 test("prompt lines and search results come back as plain callbacks", async () => {
   const onPromptLine = jest.fn();
   const onSearch = jest.fn();
+  const onMenu = jest.fn();
   await render(
     <TerminalView
       fontSize={14}
@@ -226,6 +227,7 @@ test("prompt lines and search results come back as plain callbacks", async () =>
       onResize={() => {}}
       onPromptLine={onPromptLine}
       onSearch={onSearch}
+      onMenu={onMenu}
     />,
   );
   expect(mockNative.props.watchPrompt).toBe(true);
@@ -233,4 +235,6 @@ test("prompt lines and search results come back as plain callbacks", async () =>
   mockNative.props.onSearch(ev({ total: 4, index: 3 }));
   expect(onPromptLine).toHaveBeenCalledWith("Password:");
   expect(onSearch).toHaveBeenCalledWith({ total: 4, index: 3 });
+  mockNative.props.onMenu(ev({}));
+  expect(onMenu).toHaveBeenCalled();
 });
