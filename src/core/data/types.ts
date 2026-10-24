@@ -6,6 +6,9 @@ import type {
   SnippetFolder,
 } from "@/types";
 
+import type { DefaultsIndex } from "@/core/hosts/defaults/resolve";
+import type { DefaultsTarget } from "@/core/hosts/defaults/store";
+
 export type Unsubscribe = () => void;
 
 /** Lists that can tell when they changed, so screens stay live. */
@@ -127,6 +130,20 @@ export interface HostPrefsRepository extends Watchable {
   set(host: SSHHost, key: string, value: string | null): Promise<void>;
 }
 
+/** Where a default is set: the user's own level, or one folder. */
+export type HostDefaultsTarget = DefaultsTarget;
+
+/** The user and folder levels of host defaults, plus the server's snapshot. */
+export interface HostDefaultsRepository extends Watchable {
+  index(): Promise<DefaultsIndex>;
+  set(
+    target: HostDefaultsTarget,
+    fullKey: string,
+    value: unknown,
+  ): Promise<void>;
+  unset(target: HostDefaultsTarget, fullKey: string): Promise<void>;
+}
+
 /** Where an account keeps its data. */
 export interface DataRepositories {
   /** "local" for the encrypted store on this phone, "server" for the server. */
@@ -140,6 +157,8 @@ export interface DataRepositories {
   recentActivity: RecentActivityRepository;
   origins: HostOriginRepository;
   hostPrefs: HostPrefsRepository;
+  /** Only in an account's local copy. A live server applies its own. */
+  hostDefaults?: HostDefaultsRepository;
   /** Only on This device, where the phone opens SSH itself. */
   connect?: HostConnectRepository;
 }

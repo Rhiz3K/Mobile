@@ -8,12 +8,25 @@ import {
   hostPrefs,
   credentials,
   folders,
+  hostDefaults,
   hosts,
   recentActivity,
   snippetFolders,
   snippets,
 } from "@/core/db/schema";
 import { localStores, type LocalStores } from "@/core/db/stores";
+import {
+  overridesAfterEdit,
+  planHostDefaults,
+  storedOverrides,
+} from "@/core/hosts/defaults/apply";
+import { leftOutKeys } from "@/core/hosts/defaults/draft";
+import {
+  loadDefaultsIndex,
+  materializeHosts,
+  setDefault,
+  unsetDefault,
+} from "@/core/hosts/defaults/store";
 import type { SSHHost } from "@/types";
 import type { DataRepositories } from "../types";
 import {
@@ -102,9 +115,22 @@ export function localRepositories(
       },
       async create(draft) {
         const d = await db();
+        const base = hostToRow(draft, null);
+        const plan = planHostDefaults({
+          columns: base,
+          index: loadDefaultsIndex(d),
+          leftOut: leftOutKeys(draft),
+          pluginSettings: parseJson(base.pluginSettings, {}),
+          fillPlugins: true,
+        });
         const row = d
           .insert(hosts)
-          .values({ ...hostToRow(draft, null), syncId: randomUUID() })
+          .values({
+            ...plan.columns,
+            pluginSettings: JSON.stringify(plan.pluginSettings),
+            defaultOverrides: JSON.stringify(plan.overrides),
+            syncId: randomUUID(),
+          } as typeof base & { syncId: string })
           .returning()
           .get();
         touched(hosts);
@@ -115,9 +141,26 @@ export function localRepositories(
         const current = d.select().from(hosts).where(eq(hosts.id, id)).get();
         if (!current) throw notFound("host");
         refuseShared(current, "host");
+        const next = hostToRow(draft, current);
+        const plan = planHostDefaults({
+          columns: next,
+          index: loadDefaultsIndex(d),
+          hostId: id,
+          overrides: overridesAfterEdit(
+            storedOverrides(current.defaultOverrides),
+            current as never,
+            next,
+          ),
+          pluginSettings: parseJson(next.pluginSettings, {}),
+        });
         const row = d
           .update(hosts)
-          .set({ ...hostToRow(draft, current), updatedAt: now() })
+          .set({
+            ...plan.columns,
+            pluginSettings: JSON.stringify(plan.pluginSettings),
+            defaultOverrides: JSON.stringify(plan.overrides),
+            updatedAt: now(),
+          } as typeof next)
           .where(eq(hosts.id, id))
           .returning()
           .get();
@@ -404,6 +447,32 @@ export function localRepositories(
             .run();
         }
         touched(hostPrefs);
+      },
+    },
+
+    hostDefaults: {
+      subscribe: watch(hostDefaults, hosts, folders),
+      async index() {
+        return loadDefaultsIndex(await db());
+      },
+      async set(target, fullKey, value) {
+        const d = await db();
+        d.transaction((tx) => {
+          // Classify first, so a host holding the old default keeps following it.
+          materializeHosts(tx as never);
+          setDefault(tx as never, target, fullKey, value);
+          materializeHosts(tx as never);
+        });
+        touched(hostDefaults, hosts);
+      },
+      async unset(target, fullKey) {
+        const d = await db();
+        d.transaction((tx) => {
+          materializeHosts(tx as never);
+          unsetDefault(tx as never, target, fullKey);
+          materializeHosts(tx as never);
+        });
+        touched(hostDefaults, hosts);
       },
     },
 

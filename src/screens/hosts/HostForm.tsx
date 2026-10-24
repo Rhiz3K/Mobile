@@ -25,6 +25,7 @@ import { TailscaleDevicePicker } from "@/features/tailscale/TailscaleDevices";
 import { tailnetAddress } from "@/features/tailscale/tailscale";
 import { useRepositories } from "@/core/data/hooks";
 import { useActiveAccount } from "@/core/accounts";
+import { formDefaults, type FormDefaults } from "@/core/hosts/defaults/form";
 import {
   ORIGINS,
   ORIGIN_HELP,
@@ -147,6 +148,8 @@ export default function HostForm({
     Record<string, HostFormValues>
   >({});
   const savedSudo = useRef("");
+  // What the new host form was filled with from the defaults.
+  const initialDefaults = useRef<FormDefaults>({});
   const isEdit = !!host;
   const hostToggles = useHostToggles();
   const editors = useMemo(() => {
@@ -207,10 +210,30 @@ export default function HostForm({
       values[id] = editor.read(host ?? null);
     }
     setEditorValues(values);
+    initialDefaults.current = {};
     if (!source) {
       setForm(EMPTY);
       setTunnels([]);
-      return;
+      if (!repos.hostDefaults) return;
+      let cancelled = false;
+      repos.hostDefaults
+        .index()
+        .then((index) => {
+          if (cancelled) return;
+          const found = formDefaults(index, "");
+          initialDefaults.current = found;
+          setForm((f) => ({
+            ...f,
+            username: found.username ?? f.username,
+            port: String(found.port ?? f.port),
+            authType: (found.authType ?? f.authType) as FormState["authType"],
+            credentialId: found.credentialId ?? f.credentialId,
+          }));
+        })
+        .catch(() => {});
+      return () => {
+        cancelled = true;
+      };
     }
     setTunnels(source.tunnelConnections ?? []);
     // Start from the known fields, then enrich with resolved secrets.
@@ -431,6 +454,20 @@ export default function HostForm({
       telnetPassword: form.telnetPassword,
       telnetPort: parseInt(form.telnetPort, 10) || 23,
     };
+    // Values still as the defaults filled them are left out, so the host
+    // follows the defaults of the folder it ends up in.
+    if (!isEdit) {
+      const filled = initialDefaults.current;
+      if (
+        filled.username !== undefined &&
+        payload.username === filled.username
+      ) {
+        payload.username = "";
+      }
+      if (filled.port !== undefined && payload.port === filled.port) {
+        payload.port = 0;
+      }
+    }
     // Only sent when changed, so a host whose secret the phone can't read keeps it.
     if (form.enableSsh && form.sudoPassword !== savedSudo.current) {
       payload.sudoPassword = form.sudoPassword;
