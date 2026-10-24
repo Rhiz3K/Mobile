@@ -149,6 +149,9 @@
 - Uploading a large file in the file manager no longer fails
 - Coming back to the app after a while no longer leaves a terminal that looks open but does not respond
 - Remote desktop no longer freezes after switching to another app, it reconnects on its own (#104)
+- RDP text no longer turns tiny after rotating the phone or tablet
+- Opening the keyboard no longer changes the RDP resolution, the desktop just fits the space left
+- RDP hosts set to ask for a login ask again after a wrong password instead of failing
 
 ## 1.6.0
 

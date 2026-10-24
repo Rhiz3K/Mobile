@@ -119,6 +119,9 @@ test("socket URLs follow the server generation", async () => {
   expect(c.remoteDesktopWebSocketUrl("t", 10, 20)).toBe(
     "wss://termix.example/guacamole/websocket/?token=t&width=10&height=20",
   );
+  expect(c.remoteDesktopWebSocketUrl("t", 10, 20, 192)).toBe(
+    "wss://termix.example/guacamole/websocket/?token=t&width=10&height=20&dpi=192",
+  );
   await c.refreshServerApi();
   expect(c.terminalWebSocketUrl("t")).toBe(
     "wss://termix.example/plugin-ws/ssh-terminal/terminal",

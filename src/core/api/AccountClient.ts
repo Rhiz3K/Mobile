@@ -692,10 +692,12 @@ export class AccountClient implements HttpOwner {
     token: string,
     width?: number,
     height?: number,
+    dpi?: number,
   ): string {
     const params = new URLSearchParams({ token });
     if (width) params.set("width", String(width));
     if (height) params.set("height", String(height));
+    if (dpi) params.set("dpi", String(dpi));
     const base = toWebSocketBase(this.rootBase());
     if (this.apiGeneration === "plugin") {
       return `${base}/plugin-ws/remote-desktop/display?${params.toString()}`;

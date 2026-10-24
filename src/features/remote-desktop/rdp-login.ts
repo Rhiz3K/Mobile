@@ -39,3 +39,31 @@ export function remoteDesktopConnectBody(
       : {}),
   };
 }
+
+// Guacamole's CLIENT_UNAUTHORIZED and CLIENT_FORBIDDEN.
+const AUTH_CODES = new Set([0x0301, 0x0303]);
+
+export interface RemoteError {
+  code?: number;
+  message?: string;
+}
+
+export function isAuthFailure(error: RemoteError): boolean {
+  if (error.code != null && AUTH_CODES.has(error.code)) return true;
+  return /authentication fail|logon fail|invalid credentials/i.test(
+    error.message ?? "",
+  );
+}
+
+/**
+ * What to do when the remote refused the login. The server only takes a
+ * typed login for hosts set to ask, so a saved login gets a message instead.
+ */
+export function afterAuthFailure(
+  protocol: string,
+  prompts: boolean,
+  error: RemoteError,
+): "prompt" | "saved-login" | null {
+  if (protocol !== "rdp" || !isAuthFailure(error)) return null;
+  return prompts ? "prompt" : "saved-login";
+}

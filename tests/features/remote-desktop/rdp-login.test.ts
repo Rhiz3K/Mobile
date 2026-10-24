@@ -1,4 +1,8 @@
-import { rdpLogin } from "@/features/remote-desktop/rdp-login";
+import {
+  afterAuthFailure,
+  isAuthFailure,
+  rdpLogin,
+} from "@/features/remote-desktop/rdp-login";
 
 test("2.8 and 2.9 credential-less RDP hosts prompt, with their saved domain", () => {
   for (const host of [
@@ -38,4 +42,22 @@ test("an explicitly empty modern domain overrides stale legacy fields", () => {
       "rdp",
     ).domain,
   ).toBe("");
+});
+
+describe("afterAuthFailure", () => {
+  it("spots refused logins by status code or message", () => {
+    expect(isAuthFailure({ code: 0x0301 })).toBe(true);
+    expect(isAuthFailure({ message: "Authentication failed" })).toBe(true);
+    expect(isAuthFailure({ code: 0x0201, message: "Upstream error" })).toBe(
+      false,
+    );
+  });
+
+  it("asks again on hosts set to ask and explains saved logins", () => {
+    const refused = { code: 0x0301 };
+    expect(afterAuthFailure("rdp", true, refused)).toBe("prompt");
+    expect(afterAuthFailure("rdp", false, refused)).toBe("saved-login");
+    expect(afterAuthFailure("vnc", true, refused)).toBeNull();
+    expect(afterAuthFailure("rdp", true, { message: "timeout" })).toBeNull();
+  });
 });

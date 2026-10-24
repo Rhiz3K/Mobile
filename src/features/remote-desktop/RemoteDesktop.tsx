@@ -1,4 +1,5 @@
 import {
+  afterAuthFailure,
   rdpLogin,
   type RdpCredentials,
 } from "@/features/remote-desktop/rdp-login";
@@ -21,7 +22,11 @@ import {
   View,
 } from "react-native";
 import { WebView } from "react-native-webview";
-import { resolveRemoteDesktopSize } from "./remoteDesktopSize";
+import {
+  resolveRemoteDesktopSize,
+  type RemoteDesktopSize,
+} from "./remoteDesktopSize";
+import { VIEWPORT_SCRIPT } from "./viewport";
 import { loadGuacamoleAssets } from "./loadGuacamoleAssets";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -111,7 +116,10 @@ export function RemoteDesktop({
   }, []);
 
   // Stores the resolved initial size once connect() runs
-  const initialSizeRef = useRef({ width: 1280, height: 720 });
+  const initialSizeRef = useRef<RemoteDesktopSize>({
+    width: 1280,
+    height: 720,
+  });
 
   const webViewRef = useRef<WebView>(null);
   const inputRef = useRef<TextInput>(null);
@@ -187,14 +195,21 @@ export function RemoteDesktop({
           );
         // Use measured layout size; fall back to ref if layout fired already
         const measured = availableSizeRef.current;
-        const { width: remW, height: remH } = resolveRemoteDesktopSize(
+        const size = resolveRemoteDesktopSize(
           host.guacamoleConfig,
           measured?.w ?? 1280,
           measured ? Math.max(1, measured.h - KEY_STRIP_HEIGHT) : 720,
-          (protocol ?? host.connectionType) === "rdp" ? PixelRatio.get() : 1,
+          resolvedProtocol === "rdp" ? PixelRatio.get() : 1,
         );
-        initialSizeRef.current = { width: remW, height: remH };
-        setWebSocketUrl(client.remoteDesktopWebSocketUrl(token, remW, remH));
+        initialSizeRef.current = size;
+        setWebSocketUrl(
+          client.remoteDesktopWebSocketUrl(
+            token,
+            size.width,
+            size.height,
+            size.dpi,
+          ),
+        );
       } catch (error) {
         setConnectionState("failed");
         setErrorMessage(
@@ -207,7 +222,7 @@ export function RemoteDesktop({
     [
       host.id,
       host.guacamoleConfig,
-      host.connectionType,
+      resolvedProtocol,
       protocol,
       login.prompt,
       login.domain,
@@ -269,8 +284,24 @@ export function RemoteDesktop({
         } else if (payload.type === "lost" || payload.type === "stale") {
           handleLost(payload.type);
         } else if (payload.type === "error") {
+          const next = afterAuthFailure(resolvedProtocol, login.prompt, {
+            code: payload.code,
+            message: payload.message,
+          });
+          if (next === "prompt") {
+            wasLive.current = false;
+            setWebSocketUrl(null);
+            setPromptPassword("");
+            setErrorMessage("That login was refused. Try again.");
+            setConnectionState("awaiting-credentials");
+            return;
+          }
           setConnectionState("failed");
-          setErrorMessage(payload.message || "Remote session failed");
+          setErrorMessage(
+            next === "saved-login"
+              ? "The remote refused the saved login. Check the RDP login on this host."
+              : payload.message || "Remote session failed",
+          );
         } else if (payload.type === "zoomChange") {
           setZoomLevel(payload.zoom);
         }
@@ -279,7 +310,7 @@ export function RemoteDesktop({
         setErrorMessage("Remote session returned an invalid message");
       }
     },
-    [handleLost],
+    [handleLost, resolvedProtocol, login.prompt],
   );
 
   // ── WebView HTML ──────────────────────────────────────────────────────────
@@ -352,26 +383,15 @@ ${tunnelWatchScript()}
       // The server owns the framebuffer size, especially for fixed-size VNC.
       let remoteW = ${JSON.stringify(initialSizeRef.current.width)};
       let remoteH = ${JSON.stringify(initialSizeRef.current.height)};
+      let remoteDpi = ${JSON.stringify(initialSizeRef.current.dpi ?? 0)};
       let zoom = 1; // Relative to fit-to-screen, not framebuffer pixels.
       let panX = 0;
       let panY = 0;
-
-      const vpW = () => window.innerWidth;
-      const vpH = () => window.innerHeight;
-      const fitScale = () => Math.min(vpW() / remoteW, vpH() / remoteH);
-      const toRemote = (vx, vy) => ({
-        x: panX + vx / (fitScale() * zoom),
-        y: panY + vy / (fitScale() * zoom),
-      });
+${VIEWPORT_SCRIPT}
       const applyTransform = () => {
         const scale = fitScale() * zoom;
         display.scale(scale);
         displayElement.style.transform = 'translate(' + (-panX * scale) + 'px,' + (-panY * scale) + 'px)';
-      };
-      const clampPan = () => {
-        const scale = fitScale() * zoom;
-        panX = Math.max(0, Math.min(remoteW - vpW() / scale, panX));
-        panY = Math.max(0, Math.min(remoteH - vpH() / scale, panY));
       };
       display.onresize = (width, height) => {
         if (width <= 0 || height <= 0) return;
@@ -572,8 +592,13 @@ ${tunnelWatchScript()}
           ks.forEach((k) => client.sendKeyEvent(1, k));
           ks.slice().reverse().forEach((k) => client.sendKeyEvent(0, k));
         },
-        resize: (w, h) => {
-          client.sendSize(Math.max(1, Math.round(w)), Math.max(1, Math.round(h)));
+        resize: (w, h, dpi) => {
+          if (dpi) remoteDpi = dpi;
+          const width = Math.max(1, Math.round(w));
+          const height = Math.max(1, Math.round(h));
+          // sendSize drops the dpi, so the session would fall back to 100% scale.
+          if (remoteDpi) tunnel.sendMessage('size', width, height, remoteDpi);
+          else client.sendSize(width, height);
         },
         sendText: (text) => {
           Array.from(text).forEach((ch) => {
@@ -615,7 +640,11 @@ ${tunnelWatchScript()}
         }
       };
       client.onerror = (err) => {
-        post({ type: 'error', message: err && err.message ? err.message : 'Remote session failed' });
+        post({
+          type: 'error',
+          code: err && typeof err.code === 'number' ? err.code : undefined,
+          message: err && err.message ? err.message : 'Remote session failed',
+        });
       };
 
       window.addEventListener('beforeunload', () => client.disconnect());
@@ -750,27 +779,25 @@ ${tunnelWatchScript()}
     keyboardHeight - SESSION_TAB_BAR_HEIGHT - safeBottom,
   );
 
-  // Tell remote to render at the true available size when connected or when
-  // the container size changes (orientation change) or keyboard opens/closes.
+  // Match the remote to the space we have when connected or rotated. The
+  // keyboard only shrinks the view, which refits, so the desktop keeps its size.
   useEffect(() => {
     if (!canSendInput || !availableSize) return;
-    const { width: remW, height: remH } = resolveRemoteDesktopSize(
+    const size = resolveRemoteDesktopSize(
       host.guacamoleConfig,
       availableSize.w,
-      Math.max(1, availableSize.h - KEY_STRIP_HEIGHT - kbOverlap),
-      (protocol ?? host.connectionType) === "rdp" ? PixelRatio.get() : 1,
+      Math.max(1, availableSize.h - KEY_STRIP_HEIGHT),
+      resolvedProtocol === "rdp" ? PixelRatio.get() : 1,
     );
     inject(
-      `window.termixRemote && window.termixRemote.resize(${remW}, ${remH})`,
+      `window.termixRemote && window.termixRemote.resize(${size.width}, ${size.height}, ${size.dpi ?? 0})`,
     );
   }, [
     canSendInput,
     availableSize,
-    kbOverlap,
     inject,
     host.guacamoleConfig,
-    host.connectionType,
-    protocol,
+    resolvedProtocol,
   ]);
 
   // ── Styles ────────────────────────────────────────────────────────────────
@@ -957,7 +984,11 @@ ${tunnelWatchScript()}
         visible={isVisible && connectionState === "awaiting-credentials"}
         onClose={cancelPrompt}
         title="RDP sign-in"
-        description={`Enter credentials for ${title}. They will not be saved.`}
+        description={
+          errorMessage
+            ? `${errorMessage} They will not be saved.`
+            : `Enter credentials for ${title}. They will not be saved.`
+        }
         footer={
           <View className="flex-row justify-end gap-2">
             <Button variant="muted" onPress={cancelPrompt}>
