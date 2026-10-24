@@ -64,6 +64,16 @@
 - Past commands that start with what you type can show above the keys, if you turn it on
 - Command history of a linked server shows on the phone, and commands typed on the phone show in Termix
 - The startup snippet fills in $HOST, $USER, $PORT and $NAME and runs once the shell shows its prompt
+- Open sessions keep running in the background on Android, with a notification that lists them and a Disconnect all button
+- Settings has a Background sessions section with the battery and notification settings Android needs, and says what iOS allows
+- Tabs come back after the app was closed. Server sessions pick up where they were, and a tab on This device says when the old shell is gone
+- Each tab shows when it is reconnecting, offline or failed, with a countdown and a Reconnect now button
+- What you type while a tab reconnects is kept and sent once it is back, and you can discard it
+- After a reconnect the terminal goes back into its tmux session, or GNU screen on hosts without tmux
+- Connection log in the tab menu, ready to copy into a bug report
+- Switching between Wi-Fi and mobile data, or a VPN going up or down, checks the connection and reconnects right away
+- A Tailscale host that can't be reached says to check that Tailscale is connected
+- Low power mode makes the app check connections less often
 
 ### Changed
 
@@ -80,6 +90,8 @@
 - The iOS app icon, including the dark and tinted versions, now uses the same logo as Termix on the web and desktop
 - Needs iOS 16.4 or newer
 - A terminal that fails to connect stays open with the error instead of closing
+- A dropped connection tries again up to ten times with a growing wait, and waits for the network while the phone is offline
+- A server session opened on another device stays as a tab with a button to bring it back here
 - The keyboard editor now edits rows and groups with drag to reorder, custom keys that type text, run a command or send Ctrl, and the tmux prefix. Your keys from 1.x move over
 - Ctrl, Alt and Shift from the key row also work in the full keys panel
 - Commands that look like they hold a password, token or key, and anything typed at a password prompt, are no longer saved to history, like in Termix
@@ -103,6 +115,8 @@
 - The Android app icon is no longer cut off and now uses the same logo and color as Termix on the web and desktop
 - The splash screen uses the same logo and color as the app icon
 - Uploading a large file in the file manager no longer fails
+- Coming back to the app after a while no longer leaves a terminal that looks open but does not respond
+- Remote desktop no longer freezes after switching to another app, it reconnects on its own (#104)
 
 ## 1.6.0
 
