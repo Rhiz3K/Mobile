@@ -142,7 +142,9 @@ export default function Sessions() {
 
   // Timers fire after the tab changed, so they read the active tab from here.
   const activeIdRef = useRef(activeSessionId);
-  activeIdRef.current = activeSessionId;
+  useEffect(() => {
+    activeIdRef.current = activeSessionId;
+  }, [activeSessionId]);
 
   /** Shows or hides the keyboard on the active terminal. */
   const keyboard = useCallback((action: "focus" | "blur" | "clear") => {
@@ -210,7 +212,7 @@ export default function Sessions() {
     }
     compositionActiveRef.current = false;
     lastSpecialKeyRef.current = null;
-  }, [activeSessionId, activeSession?.type, isCustomKeyboardVisible]);
+  }, [activeSessionId, activeIsTerminal, isCustomKeyboardVisible, keyboard]);
 
   useEffect(() => {
     const show = Keyboard.addListener("keyboardDidShow", () => {

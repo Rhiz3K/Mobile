@@ -1,4 +1,9 @@
-import React, { useState, useEffect, useReducer } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import {
   View,
   ScrollView,
@@ -8,6 +13,7 @@ import {
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { TerminalHandle } from "@/features/terminal/Terminal";
+import type { StickyModifierState } from "@/core/features/types";
 import KeyboardKey from "./KeyboardKey";
 import { useKeyboardCustomization } from "@/contexts/KeyboardCustomizationContext";
 import { KeyConfig } from "@/types/keyboard";
@@ -44,10 +50,27 @@ export default function KeyboardBar({
   const [altPressed, setAltPressed] = useState(false);
   const [shiftPressed, setShiftPressed] = useState(false);
   // A native terminal keeps sticky Ctrl and Alt itself; the bar shows its state.
-  const keyTarget = terminalRef.current?.keyTarget?.() ?? null;
-  const [, refresh] = useReducer((n: number) => n + 1, 0);
-  useEffect(() => keyTarget?.subscribeModifiers(refresh), [keyTarget]);
-  const nativeMods = keyTarget?.modifiers();
+  const target = useCallback(
+    () => terminalRef.current?.keyTarget?.() ?? null,
+    [terminalRef],
+  );
+  const subscribe = useCallback(
+    (onChange: () => void) =>
+      target()?.subscribeModifiers(onChange) ?? (() => {}),
+    [target],
+  );
+  const modsKey = useSyncExternalStore(subscribe, () => {
+    const t = target();
+    if (!t) return null;
+    const m = t.modifiers();
+    return `${m.ctrl}|${m.alt}`;
+  });
+  const nativeMods = modsKey
+    ? {
+        ctrl: modsKey.split("|")[0] as StickyModifierState,
+        alt: modsKey.split("|")[1] as StickyModifierState,
+      }
+    : null;
 
   const sendKey = (key: string) => {
     terminalRef.current?.sendInput(key);
@@ -59,6 +82,7 @@ export default function KeyboardBar({
       handlePaste();
       return;
     }
+    const keyTarget = target();
     if (keyTarget && sendNativeKey(keyTarget, keyConfig, shiftPressed)) return;
 
     switch (id) {
@@ -100,12 +124,14 @@ export default function KeyboardBar({
       const clipboardContent = await Clipboard.getStringAsync();
       if (!clipboardContent) return;
       // The native terminal brackets it and asks first when it could run commands.
+      const keyTarget = target();
       if (keyTarget) keyTarget.paste(clipboardContent);
       else sendKey(clipboardContent);
     } catch {}
   };
 
   const toggleModifier = (modifier: "ctrl" | "alt" | "shift") => {
+    const keyTarget = target();
     if (keyTarget && modifier !== "shift") {
       keyTarget.toggleModifier(modifier);
       return;
