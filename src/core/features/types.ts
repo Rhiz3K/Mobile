@@ -46,6 +46,23 @@ export interface SessionLike {
   remoteProtocol?: string;
   /** Overrides the host's saved origin for this tab. */
   origin?: ConnectionOrigin;
+  /** Brought back after the app was closed; its first connect is a resume. */
+  restored?: boolean;
+  /** What the tab saved to pick up where it was, like a tmux session name. */
+  resumeData?: Record<string, string> | null;
+}
+
+/** How a tab's connection is doing, shown in the tab bar and the notification. */
+export interface SessionTabStatus {
+  state:
+    | "idle"
+    | "connecting"
+    | "connected"
+    | "reconnecting"
+    | "offline"
+    | "failed"
+    | "closed";
+  reason?: string;
 }
 
 export interface SessionTabProps {
@@ -64,6 +81,10 @@ export interface SessionTabProps {
   onMenu?: () => void;
   /** A hardware keyboard shortcut the tab leaves to the session screen. */
   onShortcut?: (id: string) => void;
+  /** Reports the connection status for the tab bar and the notification. */
+  onStatus?: (status: SessionTabStatus) => void;
+  /** Saves data the tab needs to pick up again after the app was closed. */
+  onResumeData?: (data: Record<string, string> | null) => void;
 }
 
 /**

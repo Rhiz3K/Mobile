@@ -7,8 +7,10 @@ import {
 } from "react";
 import { useSessionAccountId } from "@/core/accounts/session";
 import { checkOpen } from "@/core/features";
+import { sessionLifecycle } from "@/core/sessions/lifecycle";
 import {
   HostConnection,
+  type ConnectedInfo,
   originInputs,
   planConnection,
   saveOrigin,
@@ -23,11 +25,8 @@ import { toast } from "@/utils/toast";
 
 export interface HostConnectionHandlers {
   onData: (data: string) => void;
-  onConnected?: (info: {
-    fromBackground: boolean;
-    isReattach: boolean;
-  }) => void;
-  onPostConnectionSetup?: () => void;
+  onConnected?: (info: ConnectedInfo) => void;
+  onPostConnectionSetup?: (info: { resumed: boolean }) => void;
   onDisconnected?: (hostName: string) => void;
   onSessionIdChange?: (sessionId: string | null) => void;
   onTransportResolved?: (kind: TransportKind) => void;
@@ -59,6 +58,8 @@ export function useHostConnection(
     initialSessionId?: string | null;
     /** Native pipe of the tab's terminal view. */
     pipeId?: string;
+    /** A tab brought back after the app was closed. */
+    restored?: boolean;
   },
 ) {
   const accountId = useSessionAccountId();
@@ -78,9 +79,11 @@ export function useHostConnection(
         tabInstanceId: opts.tabInstanceId,
         initialSessionId: opts.initialSessionId,
         pipeId: opts.pipeId,
+        restored: opts.restored,
         onData: (d) => handlers.current.onData(d),
         onConnected: (i) => handlers.current.onConnected?.(i),
-        onPostConnectionSetup: () => handlers.current.onPostConnectionSetup?.(),
+        onPostConnectionSetup: (i) =>
+          handlers.current.onPostConnectionSetup?.(i),
         onDisconnected: (n) => handlers.current.onDisconnected?.(n),
         onSessionIdChange: (id) => handlers.current.onSessionIdChange?.(id),
         onOriginResolved: (k) => handlers.current.onTransportResolved?.(k),
@@ -90,7 +93,13 @@ export function useHostConnection(
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [hostConfig.id, accountId],
   );
-  useEffect(() => () => conn.destroy(), [conn]);
+  useEffect(() => {
+    const unregister = sessionLifecycle.register(conn);
+    return () => {
+      unregister();
+      conn.destroy();
+    };
+  }, [conn]);
 
   const snapshot = useSyncExternalStore(
     conn.subscribe,
@@ -127,5 +136,13 @@ export function useHostConnection(
     [accountId, host.id, conn],
   );
 
-  return { conn, state, log: snapshot.log, switchTo, switchOrigin };
+  return {
+    conn,
+    state,
+    log: snapshot.log,
+    pending: snapshot.pending,
+    pendingHeld: snapshot.pendingHeld,
+    switchTo,
+    switchOrigin,
+  };
 }

@@ -22,6 +22,7 @@ import { LOCAL_ACCOUNT_ID } from "@/core/accounts/types";
 import { useKeyboard } from "@/contexts/KeyboardContext";
 import type { TerminalHandle } from "@/features/terminal/Terminal";
 import { features } from "@/core/features";
+import { sessionStatus } from "@/core/sessions/status";
 import { ConnectionsPanel } from "@/screens/sessions/ConnectionsPanel";
 import { Screen } from "@/components/Screen";
 import { Text } from "@/ui";
@@ -76,6 +77,7 @@ export default function Sessions() {
     setSessionTransport,
     renameSession,
     setShellTitle,
+    setResumeData,
     moveSession,
     duplicateSession,
     isCustomKeyboardVisible,
@@ -320,16 +322,8 @@ export default function Sessions() {
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextAppState) => {
+      // Connections hear about the app state from the session lifecycle.
       if (nextAppState === "active") {
-        sessions.forEach((session) => {
-          if (features.sessionHas(session.type, "terminal-input")) {
-            const terminalRef = tabRefs.current[session.id];
-            if (terminalRef?.current) {
-              terminalRef.current.notifyForegrounded();
-            }
-          }
-        });
-
         if (
           sessions.length > 0 &&
           activeIsTerminal &&
@@ -340,15 +334,6 @@ export default function Sessions() {
             keyboard("focus");
           }, 500);
         }
-      } else if (nextAppState === "background") {
-        sessions.forEach((session) => {
-          if (features.sessionHas(session.type, "terminal-input")) {
-            const terminalRef = tabRefs.current[session.id];
-            if (terminalRef?.current) {
-              terminalRef.current.notifyBackgrounded();
-            }
-          }
-        });
       }
     });
 
@@ -642,6 +627,8 @@ export default function Sessions() {
         }
         onTransportResolved={(kind) => setSessionTransport(session.id, kind)}
         onTitle={(title) => setShellTitle(session.id, title)}
+        onStatus={(status) => sessionStatus.set(session.id, status)}
+        onResumeData={(data) => setResumeData(session.id, data)}
         onMenu={() => setMenuFor(session.id)}
         onShortcut={handleShortcut}
         onBackgroundColorChange={(color) => {

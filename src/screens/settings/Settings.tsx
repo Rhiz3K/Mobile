@@ -55,6 +55,7 @@ import {
 } from "@/widgets";
 import { api, activeClient } from "@/core/accounts";
 import { clearSession } from "@/core/api/webSession";
+import { BackgroundSessionsSection } from "./BackgroundSessionsSection";
 
 export default function Settings() {
   const router = useRouter();
@@ -602,6 +603,11 @@ export default function Settings() {
             </Pressable>
           </View>
         </AccordionSection>
+
+        <BackgroundSessionsSection
+          open={open === "background"}
+          onToggle={() => toggle("background")}
+        />
 
         {/* Home-screen widgets */}
         {isWidgetSupported ? (

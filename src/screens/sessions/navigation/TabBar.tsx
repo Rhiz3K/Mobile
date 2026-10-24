@@ -27,6 +27,8 @@ import { getTabBarHeight, getButtonSize } from "@/utils/responsive";
 import { useUiColors } from "@/contexts/ThemeContext";
 import { features } from "@/core/features";
 import { displayTitle } from "@/contexts/session-tabs";
+import { useSessionStatuses } from "@/core/sessions/status";
+import { statusLabel, TabStatusMark } from "./TabStatusMark";
 import DraggableFlatList, {
   ScaleDecorator,
 } from "react-native-draggable-flatlist";
@@ -73,6 +75,7 @@ export default function TabBar({
   onTabMove,
 }: TabBarProps) {
   const ui = useUiColors();
+  const statuses = useSessionStatuses();
   const router = useRouter();
   const { isLandscape } = useOrientation();
   const insets = useSafeAreaInsets();
@@ -198,6 +201,8 @@ export default function TabBar({
                 const SessionIcon = getSessionIcon(session.type);
                 const iconColor = isActive ? ui.brand : ui.textMuted;
                 const title = displayTitle(session);
+                const status = statuses[session.id]?.state;
+                const statusText = statusLabel(status);
                 return (
                   <ScaleDecorator>
                     <TouchableOpacity
@@ -212,7 +217,9 @@ export default function TabBar({
                       focusable={false}
                       accessibilityRole="tab"
                       accessibilityState={{ selected: isActive }}
-                      accessibilityLabel={title}
+                      accessibilityLabel={
+                        statusText ? `${title}, ${statusText}` : title
+                      }
                       accessibilityHint={
                         isActive
                           ? "Tap for tab options, hold to move"
@@ -245,6 +252,7 @@ export default function TabBar({
                         >
                           {title}
                         </Text>
+                        <TabStatusMark state={status} />
                       </View>
                       <TouchableOpacity
                         onPress={(e) => {
