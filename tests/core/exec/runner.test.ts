@@ -1,6 +1,6 @@
 import { scriptShell } from "@termix-ssh/plugin-sdk/host-scripts";
 import { ExecPool } from "@/core/exec/pool";
-import { createRunner } from "@/core/exec/runner";
+import { createRunner, resetSudoState } from "@/core/exec/runner";
 import { setSudoPrompter, sudoMemory } from "@/core/exec/sudo";
 import {
   fakeHostSession,
@@ -28,6 +28,7 @@ const isRoot = (c: ExecCall) => c.command === scriptShell("root");
 const needsPassword = { stderr: "sudo: a password is required", code: 1 };
 
 afterEach(() => {
+  resetSudoState();
   sudoMemory.clear();
   setSudoPrompter(null);
 });
@@ -90,7 +91,7 @@ test("asks when nothing is saved, remembers it, and asks again when wrong", asyn
   const answers = ["wrong", "right"];
   const prompt = jest.fn(async () => answers.shift() ?? null);
   setSudoPrompter(prompt);
-  const { runner } = setup((c) => {
+  const { fake, runner } = setup((c) => {
     if (isRoot(c)) return needsPassword;
     const pw = c.stdin.split("\n")[1];
     return pw === "right"
@@ -106,8 +107,11 @@ test("asks when nothing is saved, remembers it, and asks again when wrong", asyn
     expect.objectContaining({ retry: true }),
   ]);
   expect(sudoMemory.get("acc:1")).toBe("right");
+  const before = fake.calls.length;
   await runner.run("y", { mode: "root" });
   expect(prompt).toHaveBeenCalledTimes(2);
+  // Known to need a password: straight to it, no passwordless try.
+  expect(fake.calls.length - before).toBe(1);
 });
 
 test("cancelling the prompt cancels the run, and no prompter means cancelled", async () => {

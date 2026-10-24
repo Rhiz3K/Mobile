@@ -12,3 +12,4 @@ export { AuthDialogs } from "./AuthDialogs";
 export { useHostConnection } from "./useHostConnection";
 export { ConnectionPrompts } from "./ConnectionPrompts";
 export { ConnectionError } from "./ConnectionError";
+export { ExecGate } from "./ExecGate";

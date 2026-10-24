@@ -195,7 +195,47 @@ export function createDockerApi(c: AccountClient) {
     }
   }
 
+  /** Compose stacks on the session's host. 403 when stacks are off on the server. */
+  async function getDockerStacks(sessionId: string): Promise<{
+    root: string;
+    stacks: DockerStackSummary[];
+  }> {
+    try {
+      const response = await dockerApi().get(`/docker/stacks/${sessionId}`);
+      return response.data;
+    } catch (error) {
+      c.fail(error, "list Docker stacks");
+    }
+  }
+
+  async function getDockerStack(
+    sessionId: string,
+    name: string,
+  ): Promise<DockerStackDetail> {
+    try {
+      const response = await dockerApi().get(
+        `/docker/stacks/${sessionId}/${encodeURIComponent(name)}`,
+      );
+      return response.data;
+    } catch (error) {
+      c.fail(error, "load the Docker stack");
+    }
+  }
+
+  /** Container counts for every Docker host the user can see, cached a minute. */
+  async function getDockerSummary(): Promise<DockerHostSummary[]> {
+    try {
+      const response = await dockerApi().get(`/docker/summary`);
+      return Array.isArray(response.data) ? response.data : [];
+    } catch (error) {
+      c.fail(error, "load Docker counts");
+    }
+  }
+
   return {
+    getDockerStacks,
+    getDockerStack,
+    getDockerSummary,
     dockerConnect,
     dockerConnectTOTP,
     dockerConnectBrowserSignIn,
@@ -212,3 +252,40 @@ export function createDockerApi(c: AccountClient) {
 }
 
 export type DockerApi = ReturnType<typeof createDockerApi>;
+
+export interface DockerStackSummary {
+  name: string;
+  managed: boolean;
+  state: "running" | "partial" | "stopped" | "paused" | "not-deployed";
+  running: number;
+  total: number;
+  composeFile: string | null;
+}
+
+export interface DockerStackDetail {
+  name: string;
+  managed: boolean;
+  composeFile: string | null;
+  compose: string | null;
+  services: {
+    service: string;
+    name: string;
+    id: string;
+    image: string;
+    state: string;
+    status: string;
+    health: string;
+    ports: string;
+  }[];
+  running: number;
+  total: number;
+}
+
+export interface DockerHostSummary {
+  hostId: number;
+  running: number;
+  stopped: number;
+  unhealthy: number;
+  total: number;
+  error?: string;
+}

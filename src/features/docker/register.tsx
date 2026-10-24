@@ -11,14 +11,16 @@ export const dockerFeature: FeatureDef = {
   id: "docker",
   title: "Docker",
   source: "native",
-  requires: { plugin: "docker" },
+  // Runs over the phone's SSH, or the server's Docker plugin when that is the way in.
+  availableOn: ["local", "server"],
   sessionTabs: [
     {
       type: "docker",
       icon: Container,
       titleSuffix: () => "Docker",
       shortLabel: () => "Docker",
-      needs: ["server"],
+      needsOneOf: [["exec"], ["server"]],
+      relayRequires: { plugin: "docker" },
       serverTabTypes: ["docker"],
       toServerTabType: () => "docker",
       component: DockerTab,

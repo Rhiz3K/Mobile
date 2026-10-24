@@ -9,15 +9,15 @@ import {
   RotateCcw,
   Trash2,
 } from "lucide-react-native";
-import { SSHHost, DockerContainer, DockerContainerAction } from "@/types";
+import { DockerContainer, DockerContainerAction } from "@/types";
 import { Text, Badge, Tabs } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { MONO_FONT } from "@/constants/fonts";
 import { toast } from "@/utils/toast";
-import { usePolling } from "@/screens/sessions/shared";
+import { usePoll } from "@/core/exec";
 import { DockerConsole } from "./DockerConsole";
 import type { DockerContainerStats } from "@/types";
-import { useSessionClient } from "@/core/accounts/session";
+import type { DockerBackend } from "./backend/types";
 
 type DetailTab = "logs" | "stats" | "console";
 
@@ -27,24 +27,25 @@ function isRunning(c: DockerContainer): boolean {
 function cleanName(name: string): string {
   return name.startsWith("/") ? name.slice(1) : name;
 }
+const errorText = (e: unknown, fallback: string) =>
+  e instanceof Error && e.message ? e.message : fallback;
 
 /**
  * Full-frame container detail: header with quick actions + a Logs / Stats /
  * Console tab strip. Logs poll; Stats poll (every 2s while running); Console is
- * an interactive exec shell over the docker-console WebSocket.
+ * an interactive shell in the container.
  */
 export function ContainerDetail({
-  host,
-  sessionId,
+  backend,
   container,
   onBack,
   onAction,
 }: {
-  host: SSHHost;
-  sessionId: string;
+  backend: DockerBackend;
   container: DockerContainer;
   onBack: () => void;
-  onAction: (c: DockerContainer, a: DockerContainerAction) => void;
+  /** Resolves true when the action ran. */
+  onAction: (c: DockerContainer, a: DockerContainerAction) => Promise<boolean>;
 }) {
   const color = useThemeColor();
   const [tab, setTab] = useState<DetailTab>("logs");
@@ -100,8 +101,7 @@ export function ContainerDetail({
           label="Remove"
           destructive
           onPress={() => {
-            onAction(container, "remove");
-            onBack();
+            void onAction(container, "remove").then((ok) => ok && onBack());
           }}
         />
       </View>
@@ -122,15 +122,15 @@ export function ContainerDetail({
       {/* Tab content */}
       <View className="flex-1">
         {tab === "logs" ? (
-          <LogsTab sessionId={sessionId} container={container} />
+          <LogsTab backend={backend} container={container} />
         ) : tab === "stats" ? (
-          <StatsTab
-            sessionId={sessionId}
-            container={container}
-            running={running}
-          />
+          <StatsTab backend={backend} container={container} running={running} />
         ) : (
-          <DockerConsole host={host} container={container} isVisible />
+          <DockerConsole
+            target={backend.console()}
+            container={container}
+            isVisible
+          />
         )}
       </View>
     </View>
@@ -172,33 +172,31 @@ function ActionChip({
 }
 
 function LogsTab({
-  sessionId,
+  backend,
   container,
 }: {
-  sessionId: string;
+  backend: DockerBackend;
   container: DockerContainer;
 }) {
-  const client = useSessionClient();
   const color = useThemeColor();
   const [logs, setLogs] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async () => {
-    try {
-      const text = await client.api.docker.getDockerContainerLogs(
-        sessionId,
-        container.id,
-        300,
-      );
-      setLogs(text || "(no output)");
-    } catch (e: any) {
-      setLogs(e?.message || "Failed to load logs");
-    } finally {
-      setLoading(false);
-    }
-  }, [sessionId, container.id]);
+  const load = useCallback(
+    async (signal: AbortSignal) => {
+      try {
+        const text = await backend.logs(container.id, 300, signal);
+        setLogs(text || "(no output)");
+      } catch (e) {
+        if (!signal.aborted) setLogs(errorText(e, "Failed to load logs"));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [backend, container.id],
+  );
 
-  usePolling(load, 4000, true);
+  usePoll(load, { intervalMs: 4000 });
 
   const copy = async () => {
     await Clipboard.setStringAsync(logs);
@@ -238,34 +236,32 @@ function LogsTab({
 }
 
 function StatsTab({
-  sessionId,
+  backend,
   container,
   running,
 }: {
-  sessionId: string;
+  backend: DockerBackend;
   container: DockerContainer;
   running: boolean;
 }) {
-  const client = useSessionClient();
   const color = useThemeColor();
   const [stats, setStats] = useState<DockerContainerStats | null>(null);
   const [error, setError] = useState<string>("");
 
-  const load = useCallback(async () => {
-    if (!running) return;
-    try {
-      const data = await client.api.docker.getDockerContainerStats(
-        sessionId,
-        container.id,
-      );
-      setStats(data);
-      setError("");
-    } catch (e: any) {
-      setError(e?.message || "Failed to load stats");
-    }
-  }, [sessionId, container.id, running]);
+  const load = useCallback(
+    async (signal: AbortSignal) => {
+      if (!running) return;
+      try {
+        setStats(await backend.stats(container.id, signal));
+        setError("");
+      } catch (e) {
+        if (!signal.aborted) setError(errorText(e, "Failed to load stats"));
+      }
+    },
+    [backend, container.id, running],
+  );
 
-  usePolling(load, 2000, running);
+  usePoll(load, { intervalMs: 2000, enabled: running });
 
   if (!running) {
     return (

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   View,
   ScrollView,
@@ -16,6 +16,7 @@ import {
   Pause,
   Trash2,
   MoreVertical,
+  ShieldCheck,
 } from "lucide-react-native";
 import {
   SSHHost,
@@ -23,19 +24,24 @@ import {
   DockerContainerAction,
   SessionAuthOverrides,
 } from "@/types";
-import { Text, Input, Badge, Tabs } from "@/ui";
+import { Text, Input, Badge, Tabs, Button, useConfirm } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { toast } from "@/utils/toast";
+import { useExecTarget, usePoll, type ExecRunner } from "@/core/exec";
 import {
   SessionFrame,
-  usePolling,
   useSessionConnect,
   AuthDialogs,
   ContextSheet,
+  ExecGate,
   type ContextAction,
 } from "@/screens/sessions/shared";
-import { ContainerDetail } from "./ContainerDetail";
 import { useSessionClient } from "@/core/accounts/session";
+import { ContainerDetail } from "./ContainerDetail";
+import { StacksView } from "./StacksView";
+import { createLocalDockerBackend } from "./backend/local";
+import { createRelayDockerBackend } from "./backend/relay";
+import type { DockerBackend, DockerCheck } from "./backend/types";
 
 interface DockerProps {
   host: SSHHost;
@@ -43,38 +49,68 @@ interface DockerProps {
 }
 
 type StatusFilter = "all" | "running" | "stopped";
+type Section = "containers" | "stacks";
 
-function isRunning(c: DockerContainer): boolean {
+export function isRunning(c: DockerContainer): boolean {
   return /^up|running/i.test(c.state || c.status || "");
 }
 
-function cleanName(name: string): string {
+export function cleanName(name: string): string {
   return name.startsWith("/") ? name.slice(1) : name;
 }
 
+const errorText = (e: unknown, fallback: string) =>
+  e instanceof Error && e.message ? e.message : fallback;
+
+/** Docker for a host: over the phone's SSH, or the server's Docker plugin. */
 export function Docker({ host, isVisible }: DockerProps) {
+  const { target, retry, switchOrigin } = useExecTarget(
+    host,
+    "docker",
+    isVisible,
+  );
+  if (!isVisible) return null;
+  return (
+    <ExecGate
+      target={target}
+      onRetry={() => void retry()}
+      onSwitch={switchOrigin}
+      local={(runner) => <LocalDocker host={host} runner={runner} />}
+      relay={(serverHost) => <RelayDocker host={serverHost} />}
+    />
+  );
+}
+
+function preferredRuntime(host: SSHHost): "docker" | "podman" {
+  return host.pluginSettings?.docker?.containerRuntime === "podman"
+    ? "podman"
+    : "docker";
+}
+
+function LocalDocker({ host, runner }: { host: SSHHost; runner: ExecRunner }) {
+  const [sudo, setSudo] = useState(false);
+  const backend = useMemo(
+    () =>
+      createLocalDockerBackend(runner, {
+        prefer: preferredRuntime(host),
+        sudo,
+      }),
+    [runner, host, sudo],
+  );
+  return (
+    <DockerView
+      host={host}
+      backend={backend}
+      onUseSudo={sudo ? undefined : () => setSudo(true)}
+    />
+  );
+}
+
+/** Opens the server's Docker session for `host`, then shows the same view. */
+function RelayDocker({ host }: { host: SSHHost }) {
   const client = useSessionClient();
-  const color = useThemeColor();
-  const [containers, setContainers] = useState<DockerContainer[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
-  const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [selected, setSelected] = useState<DockerContainer | null>(null);
-  const [menuFor, setMenuFor] = useState<DockerContainer | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [dockerAvailable, setDockerAvailable] = useState<boolean | null>(null);
-  const [initialLoadDone, setInitialLoadDone] = useState(false);
-
-  const loadContainers = useCallback(async (sessionId: string) => {
-    try {
-      const list = await client.api.docker.getDockerContainers(sessionId);
-      setContainers(list);
-    } catch (e: any) {
-      toast.error(e?.message || "Failed to load containers");
-    }
-  }, []);
-
-  const connectTransport = useMemo(
+  const [ready, setReady] = useState(false);
+  const transport = useMemo(
     () => ({
       prefix: "docker",
       connect: (
@@ -92,78 +128,154 @@ export function Docker({ host, isVisible }: DockerProps) {
       disconnect: (sessionId: string) =>
         client.api.docker.dockerDisconnect(sessionId),
     }),
-    [],
+    [client],
+  );
+  const conn = useSessionConnect(host, transport, async () => setReady(true), {
+    autoConnect: true,
+    keepAliveMs: 30000,
+  });
+  const sessionRef = useRef(conn.sessionId);
+  sessionRef.current = conn.sessionId;
+  const backend = useMemo(
+    () =>
+      createRelayDockerBackend(
+        client,
+        () => sessionRef.current.current ?? "",
+        host,
+      ),
+    [client, host],
   );
 
-  const onConnected = useCallback(
-    async (sessionId: string) => {
-      setInitialLoadDone(false);
-      // Confirm Docker is actually installed before listing.
+  const dialogs = (
+    <AuthDialogs
+      state={conn.state}
+      errorMessage={conn.errorMessage}
+      onSubmitTotp={conn.submitTotp}
+      onSubmitWarpgate={conn.submitWarpgate}
+      browserSignIn={conn.browserSignIn}
+      onSubmitAuth={conn.submitAuth}
+      onCancel={conn.cancelAuth}
+    />
+  );
+
+  if (conn.state !== "connected" || !ready) {
+    return (
+      <>
+        <SessionFrame
+          title={host.name}
+          subtitle="Docker"
+          status={conn.state === "error" ? "error" : "loading"}
+          loadingLabel="Connecting to Docker..."
+          errorMessage={conn.errorMessage}
+          failure={conn.state === "error" ? conn.failure : null}
+          onRetry={conn.state === "error" ? conn.retry : undefined}
+          logEntries={conn.logEntries}
+          isConnecting={conn.state === "connecting" || conn.state === "idle"}
+          isConnected={false}
+          hasConnectionError={conn.state === "error"}
+          onLogClear={conn.logClear}
+        />
+        {dialogs}
+      </>
+    );
+  }
+  return (
+    <>
+      <DockerView host={host} backend={backend} />
+      {dialogs}
+    </>
+  );
+}
+
+export function DockerView({
+  host,
+  backend,
+  onUseSudo,
+}: {
+  host: SSHHost;
+  backend: DockerBackend;
+  /** Offered when the login user can't reach the Docker daemon. */
+  onUseSudo?: () => void;
+}) {
+  const color = useThemeColor();
+  const confirm = useConfirm();
+  const [section, setSection] = useState<Section>("containers");
+  const [check, setCheck] = useState<DockerCheck | null>(null);
+  const [checkError, setCheckError] = useState("");
+  const [containers, setContainers] = useState<DockerContainer[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [selected, setSelected] = useState<DockerContainer | null>(null);
+  const [menuFor, setMenuFor] = useState<DockerContainer | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const load = useCallback(
+    async (signal?: AbortSignal) => {
       try {
-        const v = await client.api.docker.dockerValidate(sessionId);
-        setDockerAvailable(v.available);
-        if (!v.available) {
-          setInitialLoadDone(true);
-          return;
+        let current = check;
+        if (!current?.available) {
+          current = await backend.check();
+          setCheck(current);
+          setCheckError("");
+          if (!current.available) return;
         }
-      } catch {
-        setDockerAvailable(true); // assume available; list call will surface real errors
+        setContainers(await backend.containers(signal));
+      } catch (e) {
+        if (signal?.aborted) return;
+        if (!check) setCheckError(errorText(e, "Docker did not answer"));
+        else toast.error(errorText(e, "Failed to load containers"));
+      } finally {
+        if (!signal?.aborted) setLoaded(true);
       }
-      await loadContainers(sessionId);
-      setInitialLoadDone(true);
     },
-    [loadContainers],
+    [backend, check],
   );
 
-  const conn = useSessionConnect(
-    isVisible ? host : null,
-    connectTransport,
-    onConnected,
-    { autoConnect: true, keepAliveMs: 30000 },
-  );
+  usePoll(load, {
+    intervalMs: 5000,
+    enabled: section === "containers" && !selected,
+  });
 
-  // Only meaningful once the session is up; shared by the header button and
-  // pull to refresh so both show the same spinner.
-  const canRefresh = conn.state === "connected" && !refreshing;
-
-  const runRefresh = useCallback(async () => {
-    const sessionId = conn.sessionId.current;
-    if (!sessionId) return;
+  const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await loadContainers(sessionId);
+      await load();
     } finally {
       setRefreshing(false);
     }
-  }, [conn.sessionId, loadContainers]);
-
-  // Poll the container list while connected and visible.
-  usePolling(
-    () => {
-      if (conn.state === "connected" && conn.sessionId.current) {
-        loadContainers(conn.sessionId.current);
-      }
-    },
-    5000,
-    isVisible && conn.state === "connected",
-  );
+  }, [load]);
 
   const runAction = useCallback(
     async (c: DockerContainer, action: DockerContainerAction) => {
-      const sessionId = conn.sessionId.current;
-      if (!sessionId) return;
+      const name = cleanName(c.name);
+      if (action === "remove" || action === "stop") {
+        const ok = await confirm({
+          title: action === "remove" ? `Remove ${name}?` : `Stop ${name}?`,
+          description:
+            action === "remove"
+              ? "The container is stopped and deleted. Its volumes stay."
+              : "Anything running in it stops.",
+          confirmLabel: action === "remove" ? "Remove" : "Stop",
+          destructive: true,
+        });
+        if (!ok) return false;
+      }
       setBusyId(c.id);
       try {
-        await client.api.docker.dockerContainerAction(sessionId, c.id, action);
-        toast.success(`${action} | ${cleanName(c.name)}`);
-        await loadContainers(sessionId);
-      } catch (e: any) {
-        toast.error(e?.message || `Failed to ${action}`);
+        await backend.action(c.id, action);
+        toast.success(`${action} | ${name}`);
+        await load();
+        return true;
+      } catch (e) {
+        toast.error(errorText(e, `Failed to ${action}`));
+        return false;
       } finally {
         setBusyId(null);
       }
     },
-    [conn.sessionId, loadContainers],
+    [backend, load, confirm],
   );
 
   const filtered = useMemo(() => {
@@ -180,14 +292,10 @@ export function Docker({ host, isVisible }: DockerProps) {
     });
   }, [containers, query, statusFilter]);
 
-  if (!isVisible) return null;
-
-  // Detail view takes over the whole frame.
   if (selected) {
     return (
       <ContainerDetail
-        host={host}
-        sessionId={conn.sessionId.current}
+        backend={backend}
         container={selected}
         onBack={() => setSelected(null)}
         onAction={runAction}
@@ -195,53 +303,51 @@ export function Docker({ host, isVisible }: DockerProps) {
     );
   }
 
-  // Map connect-state → SessionFrame status.
-  const frameStatus =
-    conn.state === "connecting" ||
-    conn.state === "idle" ||
-    (conn.state === "connected" && !initialLoadDone)
-      ? "loading"
-      : conn.state === "error"
-        ? "error"
-        : dockerAvailable === false
+  const unavailable = check && !check.available;
+  const frameStatus = !loaded
+    ? "loading"
+    : checkError
+      ? "error"
+      : unavailable
+        ? "empty"
+        : section === "containers" && filtered.length === 0
           ? "empty"
-          : filtered.length === 0
-            ? "empty"
-            : "ready";
+          : "ready";
 
   return (
     <>
       <SessionFrame
         title={host.name}
-        subtitle="Docker"
+        subtitle={backend.via === "local" ? "Docker | this phone" : "Docker"}
         status={frameStatus}
-        loadingLabel="Connecting to Docker…"
-        errorMessage={conn.errorMessage}
-        failure={conn.state === "error" ? conn.failure : null}
+        loadingLabel="Looking for Docker..."
+        errorMessage={checkError}
+        onRetry={checkError ? () => void refresh() : undefined}
         emptyMessage={
-          dockerAvailable === false
-            ? "Docker is not installed or not running on this host."
+          unavailable
+            ? (check?.error ?? "Docker is not available on this host.")
             : containers.length === 0
               ? "No containers found"
               : "No containers match your filters"
         }
         emptyIcon={
-          <ContainerIcon size={32} color={color("muted-foreground")} />
+          unavailable && check?.code === "PERMISSION_DENIED" && onUseSudo ? (
+            <View className="items-center gap-3">
+              <ShieldCheck size={32} color={color("muted-foreground")} />
+              <Button size="sm" onPress={onUseSudo}>
+                Use sudo
+              </Button>
+            </View>
+          ) : (
+            <ContainerIcon size={32} color={color("muted-foreground")} />
+          )
         }
-        onRetry={conn.state === "error" ? conn.retry : undefined}
-        logEntries={conn.logEntries}
-        isConnecting={conn.state === "connecting" || conn.state === "idle"}
-        isConnected={conn.state === "connected"}
-        hasConnectionError={conn.state === "error"}
-        onLogClear={conn.logClear}
         headerActions={
           <Pressable
-            onPress={runRefresh}
-            disabled={!canRefresh}
+            onPress={refresh}
+            disabled={refreshing}
             hitSlop={8}
-            className={`p-1.5 ${
-              canRefresh ? "active:bg-muted/40" : "opacity-40"
-            }`}
+            className={`p-1.5 ${refreshing ? "opacity-40" : "active:bg-muted/40"}`}
           >
             {refreshing ? (
               <ActivityIndicator size="small" color={color("accent-brand")} />
@@ -251,75 +357,81 @@ export function Docker({ host, isVisible }: DockerProps) {
           </Pressable>
         }
         toolbar={
-          conn.state === "connected" && dockerAvailable !== false ? (
+          loaded && !unavailable && !checkError ? (
             <View className="gap-2.5 px-3 py-2.5">
-              <Input
-                value={query}
-                onChangeText={setQuery}
-                placeholder="Search containers…"
-                autoCapitalize="none"
-                autoCorrect={false}
-                leading={<Search size={15} color={color("muted-foreground")} />}
-              />
-              <Tabs<StatusFilter>
-                value={statusFilter}
-                onChange={setStatusFilter}
+              <Tabs<Section>
+                value={section}
+                onChange={setSection}
                 options={[
-                  { id: "all", label: "All" },
-                  { id: "running", label: "Running" },
-                  { id: "stopped", label: "Stopped" },
+                  { id: "containers", label: "Containers" },
+                  { id: "stacks", label: "Stacks" },
                 ]}
               />
+              {section === "containers" ? (
+                <>
+                  <Input
+                    value={query}
+                    onChangeText={setQuery}
+                    placeholder="Search containers..."
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    leading={
+                      <Search size={15} color={color("muted-foreground")} />
+                    }
+                  />
+                  <Tabs<StatusFilter>
+                    value={statusFilter}
+                    onChange={setStatusFilter}
+                    options={[
+                      { id: "all", label: "All" },
+                      { id: "running", label: "Running" },
+                      { id: "stopped", label: "Stopped" },
+                    ]}
+                  />
+                </>
+              ) : null}
             </View>
           ) : undefined
         }
       >
-        <ScrollView
-          className="flex-1"
-          contentContainerStyle={{
-            flexGrow: 1,
-            padding: 12,
-            gap: 8,
-            paddingBottom: 120,
-          }}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              tintColor={color("accent-brand")}
-              onRefresh={runRefresh}
-            />
-          }
-        >
-          {filtered.map((c) => (
-            <ContainerRow
-              key={c.id}
-              container={c}
-              busy={busyId === c.id}
-              onPress={() => setSelected(c)}
-              onMenu={() => setMenuFor(c)}
-            />
-          ))}
-        </ScrollView>
+        {section === "stacks" ? (
+          <StacksView backend={backend} />
+        ) : (
+          <ScrollView
+            className="flex-1"
+            contentContainerStyle={{
+              flexGrow: 1,
+              padding: 12,
+              gap: 8,
+              paddingBottom: 120,
+            }}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                tintColor={color("accent-brand")}
+                onRefresh={refresh}
+              />
+            }
+          >
+            {filtered.map((c) => (
+              <ContainerRow
+                key={c.id}
+                container={c}
+                busy={busyId === c.id}
+                onPress={() => setSelected(c)}
+                onMenu={() => setMenuFor(c)}
+              />
+            ))}
+          </ScrollView>
+        )}
       </SessionFrame>
 
-      {/* Container action menu */}
       <ContextSheet
         visible={menuFor !== null}
         onClose={() => setMenuFor(null)}
         title={menuFor ? cleanName(menuFor.name) : undefined}
         subtitle={menuFor?.image}
-        actions={buildActions(menuFor, color, runAction)}
-      />
-
-      {/* Shared auth dialogs (TOTP / Warpgate / interactive) */}
-      <AuthDialogs
-        state={conn.state}
-        errorMessage={conn.errorMessage}
-        onSubmitTotp={conn.submitTotp}
-        onSubmitWarpgate={conn.submitWarpgate}
-        browserSignIn={conn.browserSignIn}
-        onSubmitAuth={conn.submitAuth}
-        onCancel={conn.cancelAuth}
+        actions={buildActions(menuFor, color, (c, a) => void runAction(c, a))}
       />
     </>
   );
@@ -420,9 +532,13 @@ function ContainerRow({
             {container.image}
           </Text>
         </View>
-        <Badge variant={running ? "success" : "muted"}>
-          {running ? "running" : container.state || "stopped"}
-        </Badge>
+        {busy ? (
+          <ActivityIndicator size="small" color={color("accent-brand")} />
+        ) : (
+          <Badge variant={running ? "success" : "muted"}>
+            {running ? "running" : container.state || "stopped"}
+          </Badge>
+        )}
         <Pressable
           onPress={onMenu}
           hitSlop={8}

@@ -18,28 +18,32 @@ import {
   TerminalView,
   type TerminalViewApi,
 } from "@/features/terminal/TerminalView";
-import type { SSHHost, DockerContainer } from "@/types";
-import { useSessionClient } from "@/core/accounts/session";
+import type { DockerContainer } from "@/types";
+import { useClient } from "@/core/accounts";
+import { useSessionAccountId } from "@/core/accounts/session";
+import type { DockerConsoleTarget } from "./backend/types";
+import {
+  openLocalConsole,
+  openRelayConsole,
+  type ConsoleLink,
+} from "./consoleLink";
 
 /**
- * Interactive `docker exec` console on the native terminal view (xterm in a
- * WebView under the fallback flag), bridged to the backend docker console
- * WebSocket. Connect, then input, resize and output go both ways.
+ * Interactive shell in a container on the native terminal view (xterm in a
+ * WebView under the fallback flag). It runs over the phone's own SSH, or
+ * through the server's docker console socket.
  *
- * Kept deliberately small: this is a shell into a container, not the full
- * terminal experience (no command history / snippets), so it skips the heavier
- * Terminal machinery.
+ * Kept small: a shell into a container, not the full terminal experience.
  */
 export function DockerConsole({
-  host,
+  target,
   container,
   isVisible,
 }: {
-  host: SSHHost;
+  target: DockerConsoleTarget;
   container: DockerContainer;
   isVisible: boolean;
 }) {
-  const client = useSessionClient();
   const color = useThemeColor();
   const webViewRef = useRef<WebView>(null);
   const terminalRef = useRef<TerminalViewApi>(null);
@@ -57,7 +61,8 @@ export function DockerConsole({
       ),
     [config, resolvedTheme, fontScale],
   );
-  const wsRef = useRef<WebSocket | null>(null);
+  const client = useClient(useSessionAccountId());
+  const linkRef = useRef<ConsoleLink | null>(null);
   const [status, setStatus] = useState<
     "connecting" | "connected" | "error" | "closed"
   >("connecting");
@@ -65,83 +70,15 @@ export function DockerConsole({
   const [webViewKey, setWebViewKey] = useState(0);
   const [consoleHtml, setConsoleHtml] = useState<string | null>(null);
 
-  const send = useCallback((msg: object) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify(msg));
+  const write = useCallback((text: string) => {
+    if (XTERM_FALLBACK) {
+      webViewRef.current?.injectJavaScript(
+        `window.__write(${JSON.stringify(text)}); true;`,
+      );
+    } else {
+      terminalRef.current?.write(text);
     }
   }, []);
-
-  const connect = useCallback(async () => {
-    setStatus("connecting");
-    setErrorMessage("");
-    const token = await client.token();
-    if (!token) {
-      setStatus("error");
-      setErrorMessage("Not authenticated");
-      return;
-    }
-    try {
-      wsRef.current?.close();
-    } catch {}
-
-    const ws = client.openSocket(client.dockerConsoleWebSocketUrl(token), [
-      `termix.jwt.${token}`,
-    ]) as WebSocket;
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      send({
-        type: "connect",
-        data: {
-          // The server checks the ip we think we picked against the one it
-          // resolves from the id, and refuses the shell if they differ. Sending
-          // only the id reads as a mismatch, so pass the address too. syncId
-          // takes priority there when the host came from a sync server.
-          hostConfig: {
-            id: host.id,
-            ip: host.ip,
-            syncId: host.syncId ?? undefined,
-            enableDocker: true,
-          },
-          containerId: container.id,
-          cols: sizeRef.current.cols,
-          rows: sizeRef.current.rows,
-        },
-      });
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const msg = JSON.parse(event.data as string);
-        if (msg.type === "output") {
-          if (XTERM_FALLBACK) {
-            webViewRef.current?.injectJavaScript(
-              `window.__write(${JSON.stringify(msg.data)}); true;`,
-            );
-          } else {
-            terminalRef.current?.write(msg.data);
-          }
-        } else if (msg.type === "connected") {
-          setStatus("connected");
-          send({ type: "resize", data: sizeRef.current });
-        } else if (msg.type === "error") {
-          setStatus("error");
-          setErrorMessage(msg.message || "Console error");
-        } else if (msg.type === "disconnected") {
-          setStatus("closed");
-        }
-      } catch {}
-    };
-
-    ws.onerror = () => {
-      setStatus("error");
-      setErrorMessage("Connection failed");
-    };
-
-    ws.onclose = () => {
-      setStatus((s) => (s === "error" ? s : "closed"));
-    };
-  }, [host.id, host.ip, host.syncId, container.id, send]);
 
   useEffect(() => {
     if (!XTERM_FALLBACK) return;
@@ -162,28 +99,55 @@ export function DockerConsole({
   }, []);
 
   useEffect(() => {
-    connect();
+    setStatus("connecting");
+    setErrorMessage("");
+    const events = {
+      onOutput: write,
+      onConnected: () => setStatus("connected"),
+      onError: (message: string) => {
+        setStatus("error");
+        setErrorMessage(message);
+      },
+      onClosed: () => setStatus((s) => (s === "error" ? s : "closed")),
+    };
+    const link =
+      target.kind === "local"
+        ? openLocalConsole(target, container.id, sizeRef.current, events)
+        : client
+          ? openRelayConsole(
+              client,
+              target.host,
+              container.id,
+              () => sizeRef.current,
+              events,
+            )
+          : null;
+    if (!link) {
+      events.onError("This session has no server");
+      return;
+    }
+    linkRef.current = link;
     return () => {
-      try {
-        send({ type: "disconnect" });
-        wsRef.current?.close();
-      } catch {}
+      link.close();
+      if (linkRef.current === link) linkRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [webViewKey]);
+  }, [webViewKey, container.id]);
+
+  const onResize = useCallback((cols: number, rows: number) => {
+    sizeRef.current = { cols, rows };
+    linkRef.current?.resize(cols, rows);
+  }, []);
 
   const onWebViewMessage = useCallback(
     (event: { nativeEvent: { data: string } }) => {
       try {
         const msg = JSON.parse(event.nativeEvent.data);
-        if (msg.type === "input") {
-          send({ type: "input", data: msg.data });
-        } else if (msg.type === "resize") {
-          send({ type: "resize", data: { cols: msg.cols, rows: msg.rows } });
-        }
+        if (msg.type === "input") linkRef.current?.input(msg.data);
+        else if (msg.type === "resize") onResize(msg.cols, msg.rows);
       } catch {}
     },
-    [send],
+    [onResize],
   );
 
   const reconnect = () => setWebViewKey((k) => k + 1);
@@ -210,11 +174,8 @@ export function DockerConsole({
           key={webViewKey}
           ref={terminalRef}
           settings={settings}
-          onInput={(data) => send({ type: "input", data })}
-          onResize={(cols, rows) => {
-            sizeRef.current = { cols, rows };
-            send({ type: "resize", data: { cols, rows } });
-          }}
+          onInput={(data) => linkRef.current?.input(data)}
+          onResize={onResize}
         />
       )}
       {status !== "connected" ? (
@@ -223,7 +184,7 @@ export function DockerConsole({
             <>
               <ActivityIndicator size="large" color={color("accent-brand")} />
               <Text className="text-sm text-muted-foreground">
-                Attaching to {container.name}…
+                Attaching to {container.name}...
               </Text>
             </>
           ) : (

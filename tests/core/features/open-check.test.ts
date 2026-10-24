@@ -26,10 +26,16 @@ test("a This device host opens a terminal from the phone", async () => {
 });
 
 test("server features on a This device host say what they need", async () => {
-  const check = await checkOpen("local", { id: 1 }, true, "docker");
+  const check = await checkOpen("local", { id: 1 }, true, "remoteDesktop");
   expect(check.attempts).toEqual([]);
-  expect(check.blocked?.reason).toMatch(/Docker needs a Termix server/);
+  expect(check.blocked?.reason).toMatch(/needs a Termix server/);
   expect(check.blocked?.fix).toBeUndefined();
+});
+
+test("docker on a This device host runs over the phone's SSH", async () => {
+  const check = await checkOpen("local", { id: 1 }, true, "docker");
+  expect(check.blocked).toBeUndefined();
+  expect(check.attempts.map((t) => t.kind)).toEqual(["local"]);
 });
 
 test("files on a This device host open over the phone's SFTP", async () => {

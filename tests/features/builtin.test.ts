@@ -100,7 +100,7 @@ test("Tailscale discovery is off on older servers", () => {
   expect(registry().hasCapability("hosts.discovery", legacyServer)).toBe(false);
 });
 
-test("This device gets the terminal, files and snippets, and no server features", () => {
+test("This device gets the features that run on the phone, and no server only ones", () => {
   const ctx = {
     account: { id: "local", kind: "local" } as const,
     client: null,
@@ -109,6 +109,7 @@ test("This device gets the terminal, files and snippets, and no server features"
   expect(r.available(ctx).map((f) => f.id)).toEqual([
     "terminal",
     "file-manager",
+    "docker",
     "tunnels",
     "snippets",
     "host-defaults",
@@ -117,7 +118,8 @@ test("This device gets the terminal, files and snippets, and no server features"
   expect(r.keyboardTabs(ctx).map((t) => t.id)).toEqual(["snippets", "history"]);
   expect(r.canOpen("terminal", {}, ctx)).toBe(true);
   expect(r.canOpen("filemanager", {}, ctx)).toBe(true);
-  expect(r.canOpen("docker", {}, ctx)).toBe(false);
+  expect(r.canOpen("docker", {}, ctx)).toBe(true);
+  expect(r.canOpen("remoteDesktop", {}, ctx)).toBe(false);
 });
 
 test("files work over SFTP or the server, and sit beside terminals", () => {

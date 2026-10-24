@@ -30,6 +30,13 @@ export interface RunnerOptions {
   pool?: ExecPool;
 }
 
+const needsPassword = new Set<string>();
+
+/** Test seam. */
+export function resetSudoState() {
+  needsPassword.clear();
+}
+
 const SUDO_HELP =
   "This needs root. Log in as root, set up passwordless sudo, or save a sudo password for the host.";
 
@@ -66,10 +73,15 @@ export function createRunner(options: RunnerOptions): ExecRunner {
     );
 
   async function asRoot(script: string, o: RunOptions): Promise<RunResult> {
-    const first = await once(scriptShell("root"), script, o);
-    if (!SUDO_REFUSED_RE.test(first.stderr)) return first;
-    if (NOT_SUDOER_RE.test(first.stderr))
-      throw new ExecError("sudo", SUDO_HELP);
+    // Hosts known to want a password skip the passwordless try.
+    if (!needsPassword.has(options.key)) {
+      const first = await once(scriptShell("root"), script, o);
+      if (!SUDO_REFUSED_RE.test(first.stderr)) return first;
+      if (NOT_SUDOER_RE.test(first.stderr)) {
+        throw new ExecError("sudo", SUDO_HELP);
+      }
+      needsPassword.add(options.key);
+    }
 
     let password: string | null | undefined =
       sudoMemory.get(options.key) ??
