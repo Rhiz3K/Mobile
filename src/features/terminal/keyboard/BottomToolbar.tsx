@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { TerminalHandle } from "@/features/terminal/Terminal";
-import CustomKeyboard from "./CustomKeyboard";
+import KeyPanel from "../keys/KeyPanel";
 import { useKeyboardTabs } from "@/core/features";
 import { useUiColors } from "@/contexts/ThemeContext";
 import type { SSHHost } from "@/types";
@@ -18,6 +18,7 @@ interface BottomToolbarProps {
   initialTab?: ToolbarMode;
   hostId?: number;
   host?: SSHHost;
+  onCommand?: (id: string) => void;
 }
 
 export default function BottomToolbar({
@@ -28,6 +29,7 @@ export default function BottomToolbar({
   initialTab = "keyboard",
   hostId,
   host,
+  onCommand,
 }: BottomToolbarProps) {
   const ui = useUiColors();
   const [mode, setMode] = useState<ToolbarMode>(initialTab);
@@ -123,11 +125,10 @@ export default function BottomToolbar({
         }}
       >
         {activeMode === "keyboard" && (
-          <CustomKeyboard
+          <KeyPanel
             terminalRef={terminalRef}
-            isVisible={true}
-            keyboardHeight={safeKeyboardHeight}
-            isKeyboardIntentionallyHidden={isKeyboardIntentionallyHidden}
+            host={host}
+            onCommand={onCommand}
           />
         )}
 

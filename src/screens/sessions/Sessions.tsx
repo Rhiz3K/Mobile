@@ -18,6 +18,7 @@ import {
 } from "@/contexts/TerminalSessionsContext";
 import { X } from "lucide-react-native";
 import { SessionAccountProvider } from "@/core/accounts/session";
+import { LOCAL_ACCOUNT_ID } from "@/core/accounts/types";
 import { useKeyboard } from "@/contexts/KeyboardContext";
 import type { TerminalHandle } from "@/features/terminal/Terminal";
 import { features } from "@/core/features";
@@ -26,7 +27,7 @@ import { Screen } from "@/components/Screen";
 import { Text } from "@/ui";
 import TabBar from "@/screens/sessions/navigation/TabBar";
 import BottomToolbar from "@/features/terminal/keyboard/BottomToolbar";
-import KeyboardBar from "@/features/terminal/keyboard/KeyboardBar";
+import KeyRowBar from "@/features/terminal/keys/KeyRowBar";
 import { useOrientation } from "@/utils/orientation";
 import { getMaxKeyboardHeight, getTabBarHeight } from "@/utils/responsive";
 import {
@@ -51,11 +52,8 @@ import { XTERM_FALLBACK } from "@/features/terminal/fallback";
 // The native terminal reads the keyboard itself; the hidden input is for the xterm fallback.
 const HIDDEN_INPUT = XTERM_FALLBACK;
 
-type ActiveModifiers = {
-  ctrl: boolean;
-  alt: boolean;
-  shift: boolean;
-};
+// The key row keeps its own sticky modifiers now; typed text gets none.
+const NO_MODIFIERS = { ctrl: false, alt: false, shift: false };
 
 export default function Sessions() {
   const ui = useUiColors();
@@ -84,17 +82,11 @@ export default function Sessions() {
   const hiddenInputRef = useRef<TerminalImeInputHandle | null>(null);
   // Tab handles by session id. Tabs with "terminal-input" hand out a TerminalHandle.
   const tabRefs = useRef<Record<string, React.RefObject<any>>>({});
-  const [activeModifiers, setActiveModifiers] = useState({
-    ctrl: false,
-    alt: false,
-    shift: false,
-  });
   const [screenDimensions, setScreenDimensions] = useState(
     Dimensions.get("window"),
   );
-  const [customKeyboardInitialTab, setCustomKeyboardInitialTab] = useState<
-    "keyboard" | "snippets" | "history"
-  >("keyboard");
+  const [customKeyboardInitialTab, setCustomKeyboardInitialTab] =
+    useState<string>("keyboard");
   const compositionActiveRef = useRef(false);
   const lastSpecialKeyRef = useRef<TerminalSpecialKeyRecord | null>(null);
   const [terminalBackgroundColors, setTerminalBackgroundColors] = useState<
@@ -165,12 +157,12 @@ export default function Sessions() {
         return;
       }
 
-      const translatedText = translateCommittedText(text, activeModifiers);
+      const translatedText = translateCommittedText(text, NO_MODIFIERS);
       if (translatedText) {
         activeRef.current.sendInput(translatedText);
       }
     },
-    [activeModifiers, getActiveTerminalRef],
+    [getActiveTerminalRef],
   );
 
   const dispatchSpecialKey = useCallback(
@@ -546,35 +538,49 @@ export default function Sessions() {
     }
   };
 
-  const handleOpenSnippets = useCallback(() => {
-    setCustomKeyboardInitialTab("snippets");
-    if (!isCustomKeyboardVisible) {
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      toggleCustomKeyboard();
-      setKeyboardIntentionallyHidden(false);
-      requestAnimationFrame(() => {
-        keyboard("blur");
-      });
-      setTimeout(() => {
-        const activeRef = activeSessionId
-          ? tabRefs.current[activeSessionId]
-          : null;
-        if (activeRef?.current) {
-          activeRef.current.fit();
-          setTimeout(() => activeRef.current?.scrollToBottom(), 50);
-        }
-      }, 300);
-    }
-  }, [
-    isCustomKeyboardVisible,
-    toggleCustomKeyboard,
-    setKeyboardIntentionallyHidden,
-    activeSessionId,
-  ]);
+  const openPanel = useCallback(
+    (tab: string) => {
+      setCustomKeyboardInitialTab(tab);
+      if (!isCustomKeyboardVisible) {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        toggleCustomKeyboard();
+        setKeyboardIntentionallyHidden(false);
+        requestAnimationFrame(() => {
+          keyboard("blur");
+        });
+        setTimeout(() => {
+          const activeRef = activeSessionId
+            ? tabRefs.current[activeSessionId]
+            : null;
+          if (activeRef?.current) {
+            activeRef.current.fit();
+            setTimeout(() => activeRef.current?.scrollToBottom(), 50);
+          }
+        }, 300);
+      }
+    },
+    [
+      isCustomKeyboardVisible,
+      toggleCustomKeyboard,
+      setKeyboardIntentionallyHidden,
+      activeSessionId,
+    ],
+  );
 
-  const handleModifierChange = useCallback((modifiers: ActiveModifiers) => {
-    setActiveModifiers(modifiers);
-  }, []);
+  // Key row commands: "panel.<tab>" opens a keys panel tab, the rest go to the tab.
+  const handleKeyCommand = useCallback(
+    (id: string) => {
+      if (id.startsWith("panel.")) {
+        openPanel(id.slice("panel.".length));
+        return;
+      }
+      const handle = activeIdRef.current
+        ? tabRefs.current[activeIdRef.current]?.current
+        : null;
+      handle?.command?.(id);
+    },
+    [openPanel],
+  );
 
   const activeTerminalBgColor =
     activeIsTerminal && activeSessionId
@@ -706,20 +712,24 @@ export default function Sessions() {
             justifyContent: "center",
           }}
         >
-          <KeyboardBar
-            terminalRef={
-              activeSessionId
-                ? tabRefs.current[activeSessionId]
-                : React.createRef<TerminalHandle>()
-            }
-            isVisible={true}
-            onModifierChange={handleModifierChange}
-            isKeyboardIntentionallyHidden={
-              keyboardIntentionallyHiddenRef.current
-            }
-            bottomInset={KEYBOARD_BAR_BOTTOM_INSET}
-            onOpenSnippets={handleOpenSnippets}
-          />
+          <SessionAccountProvider
+            accountId={activeSession?.accountId ?? LOCAL_ACCOUNT_ID}
+          >
+            <KeyRowBar
+              terminalRef={
+                activeSessionId
+                  ? tabRefs.current[activeSessionId]
+                  : React.createRef<TerminalHandle>()
+              }
+              host={activeSession?.host}
+              isVisible={true}
+              isKeyboardIntentionallyHidden={
+                keyboardIntentionallyHiddenRef.current
+              }
+              bottomInset={KEYBOARD_BAR_BOTTOM_INSET}
+              onCommand={handleKeyCommand}
+            />
+          </SessionAccountProvider>
         </View>
       )}
 
@@ -802,6 +812,7 @@ export default function Sessions() {
               initialTab={customKeyboardInitialTab}
               hostId={activeSession?.host?.id}
               host={activeSession?.host}
+              onCommand={handleKeyCommand}
             />
           </SessionAccountProvider>
         </View>

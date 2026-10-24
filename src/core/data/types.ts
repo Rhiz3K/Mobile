@@ -120,6 +120,13 @@ export interface HostOriginRepository {
   set(hostId: number, origin: string): Promise<void>;
 }
 
+/** The phone's own choices for one host, like its key rows. Never synced. */
+export interface HostPrefsRepository extends Watchable {
+  get(host: SSHHost, key: string): Promise<string | null>;
+  /** Null removes it. */
+  set(host: SSHHost, key: string, value: string | null): Promise<void>;
+}
+
 /** Where an account keeps its data. */
 export interface DataRepositories {
   /** "local" for the encrypted store on this phone, "server" for the server. */
@@ -132,6 +139,7 @@ export interface DataRepositories {
   commandHistory: CommandHistoryRepository;
   recentActivity: RecentActivityRepository;
   origins: HostOriginRepository;
+  hostPrefs: HostPrefsRepository;
   /** Only on This device, where the phone opens SSH itself. */
   connect?: HostConnectRepository;
 }

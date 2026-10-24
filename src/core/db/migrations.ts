@@ -17,4 +17,9 @@ export const migrations: Migration[] = [
     name: "0001_sync",
     sql: "ALTER TABLE `ssh_data` ADD `server_id` integer;--> statement-breakpoint\nALTER TABLE `sync_records` ADD `extra` text;",
   },
+  {
+    version: 3,
+    name: "0002_host_prefs",
+    sql: "CREATE TABLE `host_prefs` (\n\t`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,\n\t`host_sync_id` text NOT NULL,\n\t`key` text NOT NULL,\n\t`value` text NOT NULL,\n\t`updated_at` text NOT NULL\n);\n--> statement-breakpoint\nCREATE UNIQUE INDEX `idx_host_prefs_host_key` ON `host_prefs` (`host_sync_id`,`key`);",
+  },
 ];

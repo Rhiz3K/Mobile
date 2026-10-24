@@ -219,6 +219,8 @@ export interface TerminalInputHandle {
   isSelecting: () => boolean;
   /** Set when the tab draws a native terminal that owns the keyboard. */
   keyTarget?: () => TerminalKeyTarget | null;
+  /** Runs a key row command the tab knows, like "search". False when it doesn't. */
+  command?: (id: string) => boolean;
 }
 
 export interface KeyboardTabProps {

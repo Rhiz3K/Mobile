@@ -1,6 +1,6 @@
 import type { AccountClient } from "@/core/api/AccountClient";
 import type { JsonKV } from "@/core/storage/kv";
-import type { Credential, Snippet, SnippetFolder } from "@/types";
+import type { Credential, Snippet, SnippetFolder, SSHHost } from "@/types";
 import type { DataRepositories } from "./types";
 
 const asList = <T>(data: unknown, key: string): T[] => {
@@ -39,6 +39,9 @@ export function serverRepositories(
   const credentialChanges = signal();
   const snippetChanges = signal();
   const historyChanges = signal();
+  const prefChanges = signal();
+  const prefKey = (host: SSHHost, key: string) =>
+    `hostPref.${host.syncId || host.id}.${key}`;
   const recentOrigins = new Map<number, string>();
 
   return {
@@ -107,6 +110,16 @@ export function serverRepositories(
         ),
       remove: (name) =>
         snippetChanges.after(snippets.deleteSnippetFolder(name).then(() => {})),
+    },
+    hostPrefs: {
+      subscribe: prefChanges.subscribe,
+      get: async (host, key) => (await phone?.get(prefKey(host, key))) ?? null,
+      set: (host, key, value) =>
+        prefChanges.after(
+          value === null
+            ? (phone?.remove(prefKey(host, key)) ?? Promise.resolve())
+            : (phone?.set(prefKey(host, key), value) ?? Promise.resolve()),
+        ),
     },
     commandHistory: {
       subscribe: historyChanges.subscribe,

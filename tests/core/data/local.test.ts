@@ -509,3 +509,18 @@ test("merged history goes below what the phone has, in the given order", async (
   await repos.commandHistory.merge(host, ["top"]);
   expect(await repos.commandHistory.list(host)).toEqual(["ls", "top", "df"]);
 });
+
+test("host prefs are kept per host and can be removed", async () => {
+  const { repos } = setup();
+  const a = await repos.hosts.create(fullHost);
+  const b = await repos.hosts.create({ ...fullHost, name: "b" });
+  await repos.hostPrefs.set(a, "keyLayout", "{}");
+  await repos.hostPrefs.set(a, "keyLayout", "two");
+  expect(await repos.hostPrefs.get(a, "keyLayout")).toBe("two");
+  expect(await repos.hostPrefs.get(b, "keyLayout")).toBeNull();
+  // A bare id finds the same host.
+  const bare = { id: a.id } as SSHHost;
+  expect(await repos.hostPrefs.get(bare, "keyLayout")).toBe("two");
+  await repos.hostPrefs.set(a, "keyLayout", null);
+  expect(await repos.hostPrefs.get(a, "keyLayout")).toBeNull();
+});

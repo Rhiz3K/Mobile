@@ -320,6 +320,21 @@ export const recentActivity = sqliteTable(
   (table) => [index("idx_recent_activity_at").on(table.at)],
 );
 
+/** Device only. Phone choices for one host, like its key rows. */
+export const hostPrefs = sqliteTable(
+  "host_prefs",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    hostSyncId: text("host_sync_id").notNull(),
+    key: text("key").notNull(),
+    value: text("value").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("idx_host_prefs_host_key").on(table.hostSyncId, table.key),
+  ],
+);
+
 /** Every table, in an order where a row's targets come first. */
 export const allTables = {
   credentials,
@@ -336,6 +351,7 @@ export const allTables = {
   syncState,
   commandHistory,
   recentActivity,
+  hostPrefs,
 };
 
 export type HostRow = typeof hosts.$inferSelect;

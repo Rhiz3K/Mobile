@@ -5,6 +5,7 @@ import { changes } from "@/core/db/changes";
 import type { LocalDb } from "@/core/db/driver";
 import {
   commandHistory,
+  hostPrefs,
   credentials,
   folders,
   hosts,
@@ -364,6 +365,45 @@ export function localRepositories(
             .run();
         });
         touched(snippetFolders, snippets);
+      },
+    },
+
+    hostPrefs: {
+      subscribe: watch(hostPrefs),
+      async get(host, key) {
+        const d = await db();
+        return (
+          d
+            .select({ value: hostPrefs.value })
+            .from(hostPrefs)
+            .where(
+              and(
+                eq(hostPrefs.hostSyncId, hostKey(d, host)),
+                eq(hostPrefs.key, key),
+              ),
+            )
+            .get()?.value ?? null
+        );
+      },
+      async set(host, key, value) {
+        const d = await db();
+        const hostSyncId = hostKey(d, host);
+        if (value === null) {
+          d.delete(hostPrefs)
+            .where(
+              and(eq(hostPrefs.hostSyncId, hostSyncId), eq(hostPrefs.key, key)),
+            )
+            .run();
+        } else {
+          d.insert(hostPrefs)
+            .values({ hostSyncId, key, value, updatedAt: now() })
+            .onConflictDoUpdate({
+              target: [hostPrefs.hostSyncId, hostPrefs.key],
+              set: { value, updatedAt: now() },
+            })
+            .run();
+        }
+        touched(hostPrefs);
       },
     },
 

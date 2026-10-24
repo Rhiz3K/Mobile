@@ -3,7 +3,7 @@ import { AppProvider, useAppContext } from "@/contexts/AppContext";
 import { TerminalSessionsProvider } from "@/contexts/TerminalSessionsContext";
 import { TerminalCustomizationProvider } from "@/contexts/TerminalCustomizationContext";
 import { KeyboardProvider } from "@/contexts/KeyboardContext";
-import { KeyboardCustomizationProvider } from "@/contexts/KeyboardCustomizationContext";
+import { KeyPrefsProvider } from "@/features/terminal/keys/KeyPrefsContext";
 import {
   ThemeProvider,
   useTheme,
@@ -123,12 +123,12 @@ export default function RootLayout() {
                 <TerminalSessionsProvider>
                   <TerminalCustomizationProvider>
                     <KeyboardProvider>
-                      <KeyboardCustomizationProvider>
+                      <KeyPrefsProvider>
                         <ConfirmProvider>
                           <RootLayoutContent />
                         </ConfirmProvider>
                         <Toaster />
-                      </KeyboardCustomizationProvider>
+                      </KeyPrefsProvider>
                     </KeyboardProvider>
                   </TerminalCustomizationProvider>
                 </TerminalSessionsProvider>

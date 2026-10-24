@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { TouchableOpacity, Text, View } from "react-native";
 import * as Haptics from "expo-haptics";
-import { KeySize } from "@/types/keyboard";
+import type { KeySize } from "./KeyPrefsContext";
 import {
   DEFAULT_KEY_REPEAT_INTERVAL,
   DEFAULT_KEY_REPEAT_INITIAL_DELAY,
@@ -9,7 +9,7 @@ import {
 } from "@/constants/keyboard-repeat-config";
 import { useUiColors } from "@/contexts/ThemeContext";
 
-interface KeyboardKeyProps {
+interface KeyButtonProps {
   label: string;
   onPress: () => void;
   style?: any;
@@ -26,7 +26,7 @@ interface KeyboardKeyProps {
   keyRepeatInitialDelay?: number;
 }
 
-export default function KeyboardKey({
+export default function KeyButton({
   label,
   onPress,
   style = {},
@@ -40,7 +40,7 @@ export default function KeyboardKey({
   keyRepeatEnabled = false,
   keyRepeatInterval = DEFAULT_KEY_REPEAT_INTERVAL,
   keyRepeatInitialDelay = DEFAULT_KEY_REPEAT_INITIAL_DELAY,
-}: KeyboardKeyProps) {
+}: KeyButtonProps) {
   const ui = useUiColors();
   const [isPressed, setIsPressed] = useState(false);
   const onPressRef = useRef(onPress);

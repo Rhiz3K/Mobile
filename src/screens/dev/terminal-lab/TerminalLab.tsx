@@ -16,7 +16,7 @@ import * as Clipboard from "expo-clipboard";
 import { Text } from "@/ui";
 import { useUiColors } from "@/contexts/ThemeContext";
 import type { TerminalInputHandle } from "@/core/features/types";
-import KeyboardBar from "@/features/terminal/keyboard/KeyboardBar";
+import KeyRowBar from "@/features/terminal/keys/KeyRowBar";
 import { FrameMonitor } from "@/modules/termix-frame-monitor";
 import {
   TerminalView,
@@ -291,7 +291,7 @@ export default function TerminalLab() {
         {readout ? <ReadoutView r={readout} status={status} /> : null}
       </View>
 
-      <KeyboardBar terminalRef={inputHandle} isVisible bottomInset={0} />
+      <KeyRowBar terminalRef={inputHandle} isVisible bottomInset={0} />
     </View>
   );
 }

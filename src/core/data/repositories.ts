@@ -60,6 +60,11 @@ export const emptyRepositories: DataRepositories = {
     get: async () => undefined,
     set: refuse("hosts"),
   },
+  hostPrefs: {
+    subscribe: noop,
+    get: async () => null,
+    set: async () => {},
+  },
 };
 
 const cache = new Map<string, DataRepositories>();

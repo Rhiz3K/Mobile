@@ -45,6 +45,9 @@
 - Long press a snippet to insert it without running or to copy it
 - Mark a snippet as a note so it is pasted without running
 - An option to confirm before a snippet runs
+- Key rows above the keyboard in groups: Main, Nav, Symbols, Ctrl and tmux, with the tmux prefix, splits, windows, panes and copy mode. Tap the row button for the next row, hold it to pick one
+- Hold a key with a dot in its corner for more keys, like _ = + on the minus key
+- Shift in the key row stays on for the next key like Ctrl and Alt, and a quick double tap keeps it on
 - Search the command history, and long press a command to run, copy or delete it
 - Past commands that start with what you type can show above the keys, if you turn it on
 - Command history of a linked server shows on the phone, and commands typed on the phone show in Termix
@@ -65,7 +68,13 @@
 - The iOS app icon, including the dark and tinted versions, now uses the same logo as Termix on the web and desktop
 - Needs iOS 16.4 or newer
 - A terminal that fails to connect stays open with the error instead of closing
+- The keyboard editor now edits rows and groups with drag to reorder, custom keys that type text, run a command or send Ctrl, and the tmux prefix. Your keys from 1.x move over
+- Ctrl, Alt and Shift from the key row also work in the full keys panel
 - Commands that look like they hold a password, token or key are no longer saved to history, like in Termix
+
+### Removed
+
+- Keyboard presets and the compact and hint options. The new rows cover them
 
 ### Fixed
 
