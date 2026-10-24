@@ -22,6 +22,7 @@ import type {
 import { checkOpen, features } from "@/core/features";
 import { asServerHost, isSynced, serverHostId } from "@/core/sync";
 import { isSshHost } from "@/utils/hosts";
+import { displayTitle, moveTab } from "./session-tabs";
 
 /** Session tab type. The registry knows which feature owns each one. */
 export type SessionType = string;
@@ -47,6 +48,12 @@ export interface TerminalSession {
   origin?: ConnectionOrigin;
   /** Whether the server lists this tab for other devices (relay only). */
   listed?: boolean;
+  /** Which way the tab's connection went. */
+  transport?: TransportKind;
+  /** A name the user gave the tab. Wins over every other title. */
+  customTitle?: string | null;
+  /** The title the program set, shown when the host asks for it. */
+  shellTitle?: string | null;
 }
 
 function getSessionTypeLabel(type: SessionType, remoteProtocol?: string) {
@@ -98,9 +105,18 @@ interface TerminalSessionsContextType {
       restoredSessionId?: string | null;
       remoteProtocol?: string;
       origin?: ConnectionOrigin;
+      /** Opens it for this account instead of the active one. */
+      accountId?: string;
     },
   ) => string;
   removeSession: (sessionId: string) => void;
+  /** A name for the tab; empty goes back to the host's name. */
+  renameSession: (sessionId: string, title: string) => void;
+  setShellTitle: (sessionId: string, title: string | null) => void;
+  /** Moves a tab to a new place in the tab bar. */
+  moveSession: (sessionId: string, toIndex: number) => void;
+  /** Another tab of the same kind on the same host. */
+  duplicateSession: (sessionId: string) => string | null;
   setActiveSession: (sessionId: string) => void;
   clearAllSessions: () => void;
   /** Persist the backend session id created/attached for a tab (cross-device). */
@@ -172,10 +188,11 @@ export const TerminalSessionsProvider: React.FC<
         restoredSessionId?: string | null;
         remoteProtocol?: string;
         origin?: ConnectionOrigin;
+        accountId?: string;
       },
     ): string => {
       const instanceId = opts?.instanceId ?? uuid();
-      const accountId = accounts.active().id;
+      const accountId = opts?.accountId ?? accounts.active().id;
       const client = clientFor(accountId);
       const sessionId = `${host.id}-${type}-${Date.now()}`;
 
@@ -310,6 +327,66 @@ export const TerminalSessionsProvider: React.FC<
     });
   }, []);
 
+  const renameSession = useCallback((sessionId: string, title: string) => {
+    setSessions((prev) => {
+      const target = prev.find((s) => s.id === sessionId);
+      if (!target) return prev;
+      const customTitle = title.trim() || null;
+      const next = { ...target, customTitle };
+      if (target.listed) {
+        clientFor(target.accountId)?.api.openTabs.patchOpenTab(
+          target.instanceId,
+          { label: displayTitle(next) },
+        );
+      }
+      return prev.map((s) => (s.id === sessionId ? next : s));
+    });
+  }, []);
+
+  const setShellTitle = useCallback(
+    (sessionId: string, title: string | null) => {
+      setSessions((prev) =>
+        prev.some((s) => s.id === sessionId && s.shellTitle !== title)
+          ? prev.map((s) =>
+              s.id === sessionId ? { ...s, shellTitle: title } : s,
+            )
+          : prev,
+      );
+    },
+    [],
+  );
+
+  const moveSession = useCallback((sessionId: string, toIndex: number) => {
+    setSessions((prev) => {
+      const next = moveTab(prev, sessionId, toIndex);
+      if (next === prev) return prev;
+      // Other devices list tabs in the same order.
+      next.forEach((s, i) => {
+        if (s.listed && prev.indexOf(s) !== i) {
+          clientFor(s.accountId)?.api.openTabs.patchOpenTab(s.instanceId, {
+            tabOrder: i,
+          });
+        }
+      });
+      return next;
+    });
+  }, []);
+
+  const sessionsRef = useRef(sessions);
+  sessionsRef.current = sessions;
+  const duplicateSession = useCallback(
+    (sessionId: string) => {
+      const source = sessionsRef.current.find((s) => s.id === sessionId);
+      if (!source) return null;
+      return addSession(source.host, source.type, {
+        remoteProtocol: source.remoteProtocol,
+        origin: source.origin,
+        accountId: source.accountId,
+      });
+    },
+    [addSession],
+  );
+
   const setActiveSession = useCallback(
     (sessionId: string) => {
       setSessions((prev) => {
@@ -360,7 +437,13 @@ export const TerminalSessionsProvider: React.FC<
         if (!target) return prev;
         const client = clientFor(target.accountId);
         const listed = kind === "relay" && !!client;
-        if (listed === !!target.listed) return prev;
+        if (listed === !!target.listed) {
+          return target.transport === kind
+            ? prev
+            : prev.map((s) =>
+                s.id === sessionId ? { ...s, transport: kind } : s,
+              );
+        }
         if (client && listed) {
           const record = {
             id: target.instanceId,
@@ -378,7 +461,9 @@ export const TerminalSessionsProvider: React.FC<
         } else {
           client?.api.openTabs.deleteOpenTab(target.instanceId);
         }
-        return prev.map((s) => (s.id === sessionId ? { ...s, listed } : s));
+        return prev.map((s) =>
+          s.id === sessionId ? { ...s, listed, transport: kind } : s,
+        );
       });
     },
     [],
@@ -477,6 +562,10 @@ export const TerminalSessionsProvider: React.FC<
         refreshBackgroundTabs,
         addSession,
         removeSession,
+        renameSession,
+        setShellTitle,
+        moveSession,
+        duplicateSession,
         setActiveSession,
         clearAllSessions,
         setBackendSessionId,

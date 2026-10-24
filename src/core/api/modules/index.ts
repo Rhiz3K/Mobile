@@ -20,6 +20,7 @@ import { createOpenTabsApi } from "./openTabs";
 import { createDockerApi } from "./docker";
 import { createWakeOnLanApi } from "./wakeOnLan";
 import { createApiKeysApi } from "./apiKeys";
+import { createSessionSharingApi } from "./sessionSharing";
 
 export function createModules(c: AccountClient) {
   return {
@@ -44,6 +45,7 @@ export function createModules(c: AccountClient) {
     docker: createDockerApi(c),
     wakeOnLan: createWakeOnLanApi(c),
     apiKeys: createApiKeysApi(c),
+    sessionSharing: createSessionSharingApi(c),
   };
 }
 

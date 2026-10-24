@@ -69,6 +69,7 @@ interface Props {
   watchPrompt?: boolean;
   onPromptLine?: (line: string) => void;
   onSearch?: (result: TerminalSearchResult) => void;
+  onTitle?: (title: string) => void;
 }
 
 /** The native terminal every session renders, with its scroll button and prompts. */
@@ -85,6 +86,7 @@ export const TerminalView = forwardRef<TerminalViewApi, Props>(
       watchPrompt,
       onPromptLine,
       onSearch,
+      onTitle,
     },
     ref,
   ) {
@@ -197,6 +199,7 @@ export const TerminalView = forwardRef<TerminalViewApi, Props>(
           watchPrompt={watchPrompt}
           onPromptLine={onPromptLine}
           onSearch={onSearch}
+          onTitle={onTitle}
         />
         {showScrollButton && !atBottom ? (
           <TouchableOpacity

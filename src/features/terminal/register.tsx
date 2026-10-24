@@ -1,10 +1,17 @@
 import { forwardRef } from "react";
-import { SquareTerminal, Terminal as TerminalIcon } from "lucide-react-native";
+import {
+  Keyboard,
+  Layers,
+  Search,
+  SquareTerminal,
+  Terminal as TerminalIcon,
+} from "lucide-react-native";
 import type { FeatureDef, SessionTabProps } from "@/core/features/types";
 import { isSshHost, toTerminalHostConfig } from "@/utils/hosts";
 import { Terminal, type TerminalHandle } from "./Terminal";
 import HistoryBar from "./history/HistoryBar";
 import { hostTerminalEditor } from "./HostTerminalTab";
+import { HostKeyRowsView } from "./keys/HostKeyRowsView";
 
 const TerminalTab = forwardRef<TerminalHandle, SessionTabProps>(
   (
@@ -15,6 +22,7 @@ const TerminalTab = forwardRef<TerminalHandle, SessionTabProps>(
       onBackendSessionId,
       onTransportResolved,
       onBackgroundColorChange,
+      onTitle,
     },
     ref,
   ) => (
@@ -32,6 +40,7 @@ const TerminalTab = forwardRef<TerminalHandle, SessionTabProps>(
       onSessionIdChange={onBackendSessionId}
       onClose={onClose}
       onBackgroundColorChange={onBackgroundColorChange}
+      onTitle={onTitle}
     />
   ),
 );
@@ -100,6 +109,34 @@ export const terminalFeature: FeatureDef = {
   ],
   keyboardTabs: [
     { id: "history", label: "HISTORY", order: 20, component: HistoryBar },
+  ],
+  sessionMenuItems: [
+    {
+      id: "terminal.find",
+      label: "Find",
+      icon: Search,
+      order: 10,
+      // Find needs the native terminal.
+      isAvailable: ({ session, handle }) =>
+        session.type === "terminal" && !!handle?.keyTarget?.(),
+      run: ({ handle }) => handle?.command?.("search"),
+    },
+    {
+      id: "terminal.tmuxWindows",
+      label: "tmux windows",
+      icon: Layers,
+      order: 20,
+      isAvailable: ({ session }) => session.type === "terminal",
+      run: ({ handle }) => handle?.command?.("tmux.windows"),
+    },
+    {
+      id: "terminal.keyRows",
+      label: "Key rows for this host",
+      icon: Keyboard,
+      order: 30,
+      isAvailable: ({ session }) => session.type === "terminal",
+      view: HostKeyRowsView,
+    },
   ],
   capabilities: ["host.quickConnect"],
 };

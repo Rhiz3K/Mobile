@@ -10,6 +10,7 @@ import {
   vncFeature,
 } from "./remote-desktop/register";
 import { snippetsFeature } from "./snippets/register";
+import { sessionSharingFeature } from "./session-sharing/register";
 import { tailscaleFeature } from "./tailscale/register";
 import { terminalFeature } from "./terminal/register";
 import { totpFeature } from "./totp/register";
@@ -31,6 +32,7 @@ export const BUILT_IN_FEATURES = [
   totpFeature,
   tailscaleFeature,
   credentialToolsFeature,
+  sessionSharingFeature,
 ];
 
 let registered = false;

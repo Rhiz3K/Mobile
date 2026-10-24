@@ -26,6 +26,13 @@ import { ConnectionsPanel } from "@/screens/sessions/ConnectionsPanel";
 import { Screen } from "@/components/Screen";
 import { Text } from "@/ui";
 import TabBar from "@/screens/sessions/navigation/TabBar";
+import { SessionMenu } from "@/screens/sessions/SessionMenu";
+import { TabSwipeEdge } from "@/screens/sessions/TabSwipeEdge";
+import { neighborTab } from "@/contexts/session-tabs";
+import type {
+  SessionMenuContext,
+  SessionMenuItemDef,
+} from "@/core/features/types";
 import BottomToolbar from "@/features/terminal/keyboard/BottomToolbar";
 import KeyRowBar from "@/features/terminal/keys/KeyRowBar";
 import { useOrientation } from "@/utils/orientation";
@@ -69,6 +76,10 @@ export default function Sessions() {
     removeSession,
     setBackendSessionId,
     setSessionTransport,
+    renameSession,
+    setShellTitle,
+    moveSession,
+    duplicateSession,
     isCustomKeyboardVisible,
     toggleCustomKeyboard,
     lastKeyboardHeight,
@@ -78,6 +89,11 @@ export default function Sessions() {
   } = useTerminalSessions();
 
   const [showConnectionsPanel, setShowConnectionsPanel] = useState(false);
+  const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [featureView, setFeatureView] = useState<{
+    item: SessionMenuItemDef;
+    ctx: SessionMenuContext;
+  } | null>(null);
   const { keyboardHeight, isKeyboardVisible } = useKeyboard();
   const hiddenInputRef = useRef<TerminalImeInputHandle | null>(null);
   // Tab handles by session id. Tabs with "terminal-input" hand out a TerminalHandle.
@@ -472,6 +488,11 @@ export default function Sessions() {
     }, 100);
   };
 
+  const stepTab = (step: 1 | -1) => {
+    const next = neighborTab(sessions, activeSessionId, step);
+    if (next) handleTabPress(next.id);
+  };
+
   const handleTabClose = (sessionId: string) => {
     removeSession(sessionId);
     setTimeout(() => {
@@ -600,6 +621,7 @@ export default function Sessions() {
           setBackendSessionId(session.id, backendId)
         }
         onTransportResolved={(kind) => setSessionTransport(session.id, kind)}
+        onTitle={(title) => setShellTitle(session.id, title)}
         onBackgroundColorChange={(color) => {
           setTerminalBackgroundColors((prev) => ({
             ...prev,
@@ -634,6 +656,12 @@ export default function Sessions() {
             {renderSession(session)}
           </SessionAccountProvider>
         ))}
+        {sessions.length > 1 ? (
+          <>
+            <TabSwipeEdge side="left" onSwipe={() => stepTab(-1)} />
+            <TabSwipeEdge side="right" onSwipe={() => stepTab(1)} />
+          </>
+        ) : null}
       </View>
 
       {/* Connections panel: full screen when no sessions, overlay when sessions exist */}
@@ -782,6 +810,8 @@ export default function Sessions() {
           hasBackgroundSessions={backgroundTabRecords.some(
             (r) => !sessions.find((s) => s.instanceId === r.id),
           )}
+          onTabMenu={setMenuFor}
+          onTabMove={moveSession}
         />
       </View>
 
@@ -817,6 +847,43 @@ export default function Sessions() {
           </SessionAccountProvider>
         </View>
       )}
+
+      <SessionMenu
+        session={sessions.find((s) => s.id === menuFor) ?? null}
+        index={sessions.findIndex((s) => s.id === menuFor)}
+        count={sessions.length}
+        handle={menuFor ? (tabRefs.current[menuFor]?.current ?? null) : null}
+        onClose={() => setMenuFor(null)}
+        onRename={(title) => menuFor && renameSession(menuFor, title)}
+        onDuplicate={() => menuFor && duplicateSession(menuFor)}
+        onMove={(to) => menuFor && moveSession(menuFor, to)}
+        onCloseTab={() => menuFor && handleTabClose(menuFor)}
+        onView={(item, ctx) => {
+          keyboard("blur");
+          setFeatureView({ item, ctx });
+        }}
+      />
+
+      {featureView?.item.view ? (
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 1020,
+            backgroundColor: ui.background,
+          }}
+        >
+          <SessionAccountProvider accountId={featureView.ctx.session.accountId}>
+            <featureView.item.view
+              ctx={featureView.ctx}
+              onClose={() => setFeatureView(null)}
+            />
+          </SessionAccountProvider>
+        </View>
+      ) : null}
 
       {HIDDEN_INPUT &&
         sessions.length > 0 &&

@@ -58,6 +58,8 @@ export interface SessionTabProps {
   onTransportResolved?: (kind: TransportKind) => void;
   /** Lets the shell read the tab's background color. */
   onBackgroundColorChange?: (color: string) => void;
+  /** A title the program set, when the host shows those. Null clears it. */
+  onTitle?: (title: string | null) => void;
 }
 
 /**
@@ -240,6 +242,31 @@ export interface KeyboardTabDef {
   component: ComponentType<KeyboardTabProps>;
 }
 
+/** What a tab menu item gets: the tab, its handle and how it connects. */
+export interface SessionMenuContext extends FeatureContext {
+  session: SessionLike & {
+    accountId: string;
+    backendSessionId?: string | null;
+  };
+  /** The tab's ref handle; a TerminalInputHandle for terminal-input tabs. */
+  handle: TerminalInputHandle | null;
+  /** "relay" when the tab goes through the server. */
+  transport?: TransportKind | null;
+}
+
+/** An item in a session tab's menu (tap the active tab). */
+export interface SessionMenuItemDef {
+  id: string;
+  label: string;
+  icon: FeatureIcon;
+  order: number;
+  isAvailable: (ctx: SessionMenuContext) => boolean;
+  /** Runs when picked. */
+  run?: (ctx: SessionMenuContext) => void;
+  /** Or a view shown over the session until it closes. */
+  view?: ComponentType<{ ctx: SessionMenuContext; onClose: () => void }>;
+}
+
 export interface FeatureDef {
   id: string;
   title: string;
@@ -258,6 +285,7 @@ export interface FeatureDef {
   settingsLinks?: SettingsLinkDef[];
   quickActions?: QuickActionDef[];
   keyboardTabs?: KeyboardTabDef[];
+  sessionMenuItems?: SessionMenuItemDef[];
   /**
    * Named things in the app's own vocabulary that this feature fills, for
    * small spots like a form field. See CAPABILITIES.

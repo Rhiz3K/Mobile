@@ -97,6 +97,7 @@ interface TerminalProps {
   /** Fired when the backend session id is created/attached/cleared. */
   onSessionIdChange?: (sessionId: string | null) => void;
   onTransportResolved?: (kind: TransportKind) => void;
+  onTitle?: (title: string | null) => void;
 }
 
 export type TerminalHandle = TerminalInputHandle;
@@ -120,6 +121,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
       initialSessionId,
       onSessionIdChange,
       onTransportResolved,
+      onTitle,
     },
     ref,
   ) => {
@@ -152,6 +154,10 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
       onBackgroundColorChange?.(settings.colors.background);
     }, [settings.colors.background, onBackgroundColorChange]);
 
+    const useShellTitle = hostConfig.terminalConfig?.useSSHTitle === true;
+    useEffect(() => {
+      if (!useShellTitle) onTitle?.(null);
+    }, [useShellTitle, onTitle]);
     const historyOn = hostConfig.terminalConfig?.enableCommandHistory !== false;
     const hostRef = useRef(host);
     hostRef.current = host;
@@ -645,6 +651,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
                   watchPrompt={isConnected && (fillOn || historyOn)}
                   onPromptLine={(line) => watcherRef.current?.line(line)}
                   onSearch={setSearchResult}
+                  onTitle={useShellTitle ? onTitle : undefined}
                 />
                 {searchOpen && isVisible ? (
                   <SearchBar

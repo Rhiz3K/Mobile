@@ -111,3 +111,30 @@ test("This device gets the terminal and snippets, and no server features", () =>
   expect(r.canOpen("terminal", {}, ctx)).toBe(true);
   expect(r.canOpen("docker", {}, ctx)).toBe(false);
 });
+
+test("terminal tabs get find, tmux, key rows, and a share link through the server", () => {
+  const r = registry();
+  const server = {
+    account: { id: "s", kind: "server" } as any,
+    client: { supports: () => true, isPluginApi: () => true } as any,
+  };
+  const ctx = (over: object) =>
+    ({
+      ...server,
+      session: { type: "terminal", backendSessionId: "b" },
+      handle: { keyTarget: () => ({}) },
+      transport: "relay",
+      ...over,
+    }) as any;
+  expect(r.sessionMenuItems(ctx({})).map((i) => i.id)).toEqual([
+    "terminal.find",
+    "terminal.tmuxWindows",
+    "terminal.keyRows",
+    "session-sharing.link",
+  ]);
+  expect(
+    r
+      .sessionMenuItems(ctx({ transport: "local", handle: null }))
+      .map((i) => i.id),
+  ).toEqual(["terminal.tmuxWindows", "terminal.keyRows"]);
+});

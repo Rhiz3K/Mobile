@@ -3,7 +3,6 @@ import {
   View,
   Text,
   TouchableOpacity,
-  ScrollView,
   Keyboard,
   StyleSheet,
 } from "react-native";
@@ -27,6 +26,10 @@ import { useOrientation } from "@/utils/orientation";
 import { getTabBarHeight, getButtonSize } from "@/utils/responsive";
 import { useUiColors } from "@/contexts/ThemeContext";
 import { features } from "@/core/features";
+import { displayTitle } from "@/contexts/session-tabs";
+import DraggableFlatList, {
+  ScaleDecorator,
+} from "react-native-draggable-flatlist";
 
 function getSessionIcon(type: SessionType) {
   return features.sessionTab(type)?.icon ?? SquareTerminal;
@@ -48,6 +51,9 @@ interface TabBarProps {
   activeSessionType?: SessionType;
   onShowConnections?: () => void;
   hasBackgroundSessions?: boolean;
+  /** Tapping the active tab opens its menu. */
+  onTabMenu?: (sessionId: string) => void;
+  onTabMove?: (sessionId: string, toIndex: number) => void;
 }
 
 export default function TabBar({
@@ -63,6 +69,8 @@ export default function TabBar({
   keyboardIntentionallyHiddenRef,
   activeSessionType,
   onShowConnections,
+  onTabMenu,
+  onTabMove,
 }: TabBarProps) {
   const ui = useUiColors();
   const router = useRouter();
@@ -174,98 +182,98 @@ export default function TabBar({
           </TouchableOpacity>
 
           <View style={{ flex: 1, justifyContent: "center" }}>
-            <ScrollView
+            <DraggableFlatList
               horizontal
+              data={sessions}
+              keyExtractor={(session) => session.id}
               keyboardShouldPersistTaps="always"
               showsHorizontalScrollIndicator={false}
-              showsVerticalScrollIndicator={false}
-              focusable={false}
-              contentContainerStyle={{
-                paddingHorizontal: 0,
-                gap: 6,
-                alignItems: "center",
+              contentContainerStyle={{ gap: 6, alignItems: "center" }}
+              activationDistance={8}
+              onDragEnd={({ data, from, to }) => {
+                if (from !== to) onTabMove?.(data[to].id, to);
               }}
-              className="flex-row"
-              scrollEnabled={true}
-              directionalLockEnabled={true}
-              nestedScrollEnabled={false}
-              alwaysBounceVertical={false}
-              alwaysBounceHorizontal={false}
-              bounces={false}
-              bouncesZoom={false}
-              scrollEventThrottle={16}
-              removeClippedSubviews={false}
-              overScrollMode="never"
-              disableIntervalMomentum={true}
-              pagingEnabled={false}
-            >
-              {sessions.map((session) => {
+              renderItem={({ item: session, drag, isActive: dragging }) => {
                 const isActive = session.id === activeSessionId;
                 const SessionIcon = getSessionIcon(session.type);
                 const iconColor = isActive ? ui.brand : ui.textMuted;
-
+                const title = displayTitle(session);
                 return (
-                  <TouchableOpacity
-                    key={session.id}
-                    onPress={() => onTabPress(session.id)}
-                    focusable={false}
-                    className="flex-row items-center"
-                    style={{
-                      borderWidth: StyleSheet.hairlineWidth,
-                      borderColor: isActive ? ui.brand : ui.border,
-                      backgroundColor: ui.card,
-                      shadowColor: isActive ? ui.brand : "transparent",
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: isActive ? 0.2 : 0,
-                      shadowRadius: 4,
-                      elevation: isActive ? 3 : 0,
-                      minWidth: isLandscape ? 90 : 110,
-                      height: buttonSize,
-                    }}
-                  >
-                    <View
-                      className="flex-1 flex-row items-center gap-1.5 px-2"
-                      style={{ height: buttonSize }}
-                    >
-                      <SessionIcon
-                        size={isLandscape ? 12 : 13}
-                        color={iconColor}
-                        strokeWidth={2}
-                      />
-                      <Text
-                        className="flex-1 text-sm font-medium"
-                        style={{ color: iconColor }}
-                        numberOfLines={1}
-                      >
-                        {session.title}
-                      </Text>
-                    </View>
-
+                  <ScaleDecorator>
                     <TouchableOpacity
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        onTabClose(session.id);
-                      }}
+                      onPress={() =>
+                        isActive && onTabMenu
+                          ? onTabMenu(session.id)
+                          : onTabPress(session.id)
+                      }
+                      onLongPress={drag}
+                      delayLongPress={250}
+                      disabled={dragging}
                       focusable={false}
-                      className="items-center justify-center"
-                      activeOpacity={0.7}
+                      accessibilityRole="tab"
+                      accessibilityState={{ selected: isActive }}
+                      accessibilityLabel={title}
+                      accessibilityHint={
+                        isActive
+                          ? "Tap for tab options, hold to move"
+                          : "Hold to move"
+                      }
+                      className="flex-row items-center"
                       style={{
-                        width: isLandscape ? 28 : 32,
+                        borderWidth: StyleSheet.hairlineWidth,
+                        borderColor:
+                          isActive || dragging ? ui.brand : ui.border,
+                        backgroundColor: dragging ? ui.muted : ui.card,
+                        minWidth: isLandscape ? 90 : 110,
+                        maxWidth: 220,
                         height: buttonSize,
-                        borderLeftWidth: StyleSheet.hairlineWidth,
-                        borderLeftColor: isActive ? ui.brand : ui.border,
                       }}
                     >
-                      <X
-                        size={isLandscape ? 13 : 14}
-                        color={isActive ? ui.text : ui.textFaint}
-                        strokeWidth={2.5}
-                      />
+                      <View
+                        className="flex-1 flex-row items-center gap-1.5 px-2"
+                        style={{ height: buttonSize }}
+                      >
+                        <SessionIcon
+                          size={isLandscape ? 12 : 13}
+                          color={iconColor}
+                          strokeWidth={2}
+                        />
+                        <Text
+                          className="flex-1 text-sm font-medium"
+                          style={{ color: iconColor }}
+                          numberOfLines={1}
+                        >
+                          {title}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          onTabClose(session.id);
+                        }}
+                        focusable={false}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Close ${title}`}
+                        className="items-center justify-center"
+                        activeOpacity={0.7}
+                        style={{
+                          width: isLandscape ? 28 : 32,
+                          height: buttonSize,
+                          borderLeftWidth: StyleSheet.hairlineWidth,
+                          borderLeftColor: isActive ? ui.brand : ui.border,
+                        }}
+                      >
+                        <X
+                          size={isLandscape ? 13 : 14}
+                          color={isActive ? ui.text : ui.textFaint}
+                          strokeWidth={2.5}
+                        />
+                      </TouchableOpacity>
                     </TouchableOpacity>
-                  </TouchableOpacity>
+                  </ScaleDecorator>
                 );
-              })}
-            </ScrollView>
+              }}
+            />
           </View>
 
           {features.sessionHas(activeSessionType, "terminal-input") &&

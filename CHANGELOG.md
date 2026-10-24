@@ -52,6 +52,11 @@
 - Find text in the terminal and its scrollback from the Find key, with the count and next and previous. Match case, whole word and regex on Android
 - Open tmux for a host from its Terminal tab: it attaches to the only session, starts one when there is none and asks when there are several, also on This device
 - The tmux Windows key lists the session's windows to switch between them
+- Tap the open tab for its menu: rename it, open another tab on the same host, move it, find, tmux windows, key rows for that host and a share link
+- A host can have its own key rows
+- Hold a tab to drag it to a new place, and swipe in from the left or right edge to go to the next tab
+- Tabs show the title the program sets when the host turns that on
+- Share a link to a terminal that runs through the server, when the server has the Session Sharing plugin
 - Search the command history, and long press a command to run, copy or delete it
 - Past commands that start with what you type can show above the keys, if you turn it on
 - Command history of a linked server shows on the phone, and commands typed on the phone show in Termix

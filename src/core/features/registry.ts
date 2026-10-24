@@ -5,6 +5,7 @@ import type {
   FeatureDef,
   FeatureRequirement,
   SessionCapability,
+  SessionMenuContext,
   SessionTabDef,
 } from "./types";
 
@@ -177,6 +178,12 @@ export class FeatureRegistry {
 
   keyboardTabs(ctx: FeatureContext) {
     return this.collect(ctx, (d) => d.keyboardTabs).sort(byOrder);
+  }
+
+  sessionMenuItems(ctx: SessionMenuContext) {
+    return this.collect(ctx, (d) => d.sessionMenuItems)
+      .filter((item) => item.isAvailable(ctx))
+      .sort(byOrder);
   }
 
   hasCapability(capability: Capability, ctx: FeatureContext): boolean {
