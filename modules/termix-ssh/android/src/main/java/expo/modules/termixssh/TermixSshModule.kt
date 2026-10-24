@@ -235,7 +235,7 @@ class TermixSshModule : Module() {
         shells.entries.removeIf { (_, o) -> (o.sessionId == sessionId).also { if (it) o.value.destroy() } }
         telnets.entries.removeIf { (_, o) -> (o.sessionId == sessionId).also { if (it) o.value.destroy() } }
         displays.entries.removeIf { (_, o) ->
-            (o.sessionId == sessionId).also { if (it) { o.value.close(); o.value.destroy() } }
+            (o.sessionId == sessionId).also { if (it) { o.value.stop(); o.value.destroy() } }
         }
         execs.entries.removeIf { (_, o) -> (o.sessionId == sessionId).also { if (it) o.value.destroy() } }
         forwards.entries.removeIf { (_, o) ->
@@ -529,7 +529,7 @@ class TermixSshModule : Module() {
         Function("displayRefresh") { displayId: String -> displays[displayId]?.value?.refresh() }
 
         Function("closeDisplay") { displayId: String ->
-            displays.remove(displayId)?.value?.let { it.close(); it.destroy() }
+            displays.remove(displayId)?.value?.let { it.stop(); it.destroy() }
         }
 
         AsyncFunction("sftpList") Coroutine { id: String, path: String -> ssh { sftp(id).list(path) }.map { it.toMap() } }
@@ -637,7 +637,7 @@ class TermixSshModule : Module() {
             shells.clear()
             telnets.values.forEach { it.value.destroy() }
             telnets.clear()
-            displays.values.forEach { it.value.close(); it.value.destroy() }
+            displays.values.forEach { it.value.stop(); it.value.destroy() }
             displays.clear()
             sessions.values.forEach { it.destroy() }
             sessions.clear()

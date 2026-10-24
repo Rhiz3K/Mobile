@@ -1929,8 +1929,6 @@ public protocol RemoteDisplayProtocol: AnyObject, Sendable {
     
     func clipboardSet(text: String) 
     
-    func close() 
-    
     /**
      * An X11 keysym, as Guacamole and VNC use.
      */
@@ -1944,6 +1942,11 @@ public protocol RemoteDisplayProtocol: AnyObject, Sendable {
     func refresh() 
     
     func resize(width: UInt32, height: UInt32, scale: UInt32) 
+    
+    /**
+     * Ends the session. Not `close`, which Kotlin bindings already use for AutoCloseable.
+     */
+    func stop() 
     
     /**
      * A typed character, for text from the on-screen keyboard.
@@ -2013,14 +2016,6 @@ open func clipboardSet(text: String)  {try! rustCall() {
 }
 }
     
-open func close()  {try! rustCall() {
-        uniffiCallStatus in
-    uniffi_termix_ssh_core_fn_method_remotedisplay_close(
-            self.uniffiCloneHandle(),uniffiCallStatus
-    )
-}
-}
-    
     /**
      * An X11 keysym, as Guacamole and VNC use.
      */
@@ -2063,6 +2058,17 @@ open func resize(width: UInt32, height: UInt32, scale: UInt32)  {try! rustCall()
         FfiConverterUInt32.lower(width),
         FfiConverterUInt32.lower(height),
         FfiConverterUInt32.lower(scale),uniffiCallStatus
+    )
+}
+}
+    
+    /**
+     * Ends the session. Not `close`, which Kotlin bindings already use for AutoCloseable.
+     */
+open func stop()  {try! rustCall() {
+        uniffiCallStatus in
+    uniffi_termix_ssh_core_fn_method_remotedisplay_stop(
+            self.uniffiCloneHandle(),uniffiCallStatus
     )
 }
 }
@@ -6444,9 +6450,6 @@ private let initializationResult: InitializationResult = {
     if (uniffi_termix_ssh_core_checksum_method_remotedisplay_clipboard_set() != 37491) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_termix_ssh_core_checksum_method_remotedisplay_close() != 27184) {
-        return InitializationResult.apiChecksumMismatch
-    }
     if (uniffi_termix_ssh_core_checksum_method_remotedisplay_key_sym() != 39667) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -6457,6 +6460,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_termix_ssh_core_checksum_method_remotedisplay_resize() != 34941) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_termix_ssh_core_checksum_method_remotedisplay_stop() != 20200) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_termix_ssh_core_checksum_method_remotedisplay_unicode() != 50722) {

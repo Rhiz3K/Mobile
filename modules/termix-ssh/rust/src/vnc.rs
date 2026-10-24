@@ -897,6 +897,6 @@ mod tests {
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         let events = cb.0.lock().unwrap().clone();
         assert_eq!(events, ["size 2x1", "frame 1,0 1x1 [7, 8, 9, 255]"]);
-        display.close();
+        display.stop();
     }
 }

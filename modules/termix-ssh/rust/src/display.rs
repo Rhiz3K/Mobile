@@ -108,7 +108,8 @@ impl RemoteDisplay {
         self.send(Input::Refresh);
     }
 
-    pub fn close(&self) {
+    /// Ends the session. Not `close`, which Kotlin bindings already use for AutoCloseable.
+    pub fn stop(&self) {
         self.send(Input::Close);
     }
 }

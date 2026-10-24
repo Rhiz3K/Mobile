@@ -413,7 +413,7 @@ public final class TermixSshModule: Module {
     sessions[sessionId]?.sftp = nil
     _ = shells.removeWhere { $0.sessionId == sessionId }
     _ = telnets.removeWhere { $0.sessionId == sessionId }
-    displays.removeWhere { $0.sessionId == sessionId }.forEach { $0.value.close() }
+    displays.removeWhere { $0.sessionId == sessionId }.forEach { $0.value.stop() }
     _ = execs.removeWhere { $0.sessionId == sessionId }
     forwards.removeWhere { $0.sessionId == sessionId }.forEach { $0.value.stop() }
   }
@@ -610,7 +610,7 @@ public final class TermixSshModule: Module {
     Function("displayRefresh") { (displayId: String) in self.displays[displayId]?.value.refresh() }
 
     Function("closeDisplay") { (displayId: String) in
-      self.displays.remove(displayId)?.value.close()
+      self.displays.remove(displayId)?.value.stop()
     }
 
     AsyncFunction("sftpList") { (id: String, path: String) async throws -> [[String: Any?]] in
@@ -751,7 +751,7 @@ public final class TermixSshModule: Module {
       _ = self.execs.removeAll()
       _ = self.shells.removeAll()
       _ = self.telnets.removeAll()
-      self.displays.removeAll().forEach { $0.value.close() }
+      self.displays.removeAll().forEach { $0.value.stop() }
       _ = self.producers.removeAll()
       _ = self.sessions.removeAll()
     }

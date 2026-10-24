@@ -89,8 +89,7 @@ final class TermixDisplayView: ExpoView, FrameListener {
     if !report(presses, down: false) { super.pressesEnded(presses, with: event) }
   }
 
-  func destroy() {
+  deinit {
     buffer?.setListener(nil)
-    buffer = nil
   }
 }

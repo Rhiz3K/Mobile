@@ -15,8 +15,7 @@ public class TermixDisplayModule: Module {
           offsetX: CGFloat(v.count > 1 ? v[1] : 0),
           offsetY: CGFloat(v.count > 2 ? v[2] : 0))
       }
-      AsyncFunction("focus") { (view: TermixDisplayView) in view.becomeFirstResponder() }.runOnQueue(.main)
-      OnViewDestroys { (view: TermixDisplayView) in view.destroy() }
+      AsyncFunction("focus") { (view: TermixDisplayView) in _ = view.becomeFirstResponder() }.runOnQueue(.main)
     }
   }
 }

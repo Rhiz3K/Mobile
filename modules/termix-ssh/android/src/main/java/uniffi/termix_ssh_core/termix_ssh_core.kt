@@ -896,8 +896,6 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_termix_ssh_core_checksum_method_remotedisplay_clipboard_set(
     ): Int
-    external fun uniffi_termix_ssh_core_checksum_method_remotedisplay_close(
-    ): Int
     external fun uniffi_termix_ssh_core_checksum_method_remotedisplay_key_sym(
     ): Int
     external fun uniffi_termix_ssh_core_checksum_method_remotedisplay_pointer(
@@ -905,6 +903,8 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_termix_ssh_core_checksum_method_remotedisplay_refresh(
     ): Int
     external fun uniffi_termix_ssh_core_checksum_method_remotedisplay_resize(
+    ): Int
+    external fun uniffi_termix_ssh_core_checksum_method_remotedisplay_stop(
     ): Int
     external fun uniffi_termix_ssh_core_checksum_method_remotedisplay_unicode(
     ): Int
@@ -1109,8 +1109,6 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_termix_ssh_core_fn_method_remotedisplay_clipboard_set(`ptr`: Long,`text`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
-    external fun uniffi_termix_ssh_core_fn_method_remotedisplay_close(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
     external fun uniffi_termix_ssh_core_fn_method_remotedisplay_key_sym(`ptr`: Long,`sym`: Int,`down`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_termix_ssh_core_fn_method_remotedisplay_pointer(`ptr`: Long,`x`: Int,`y`: Int,`buttons`: Byte,uniffi_out_err: UniffiRustCallStatus, 
@@ -1118,6 +1116,8 @@ internal object UniffiLib {
     external fun uniffi_termix_ssh_core_fn_method_remotedisplay_refresh(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_termix_ssh_core_fn_method_remotedisplay_resize(`ptr`: Long,`width`: Int,`height`: Int,`scale`: Int,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_termix_ssh_core_fn_method_remotedisplay_stop(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_termix_ssh_core_fn_method_remotedisplay_unicode(`ptr`: Long,`ch`: Int,`down`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
@@ -1455,9 +1455,6 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_termix_ssh_core_checksum_method_remotedisplay_clipboard_set() and 0xFFFF) != 37491) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_termix_ssh_core_checksum_method_remotedisplay_close() and 0xFFFF) != 27184) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
     if ((lib.uniffi_termix_ssh_core_checksum_method_remotedisplay_key_sym() and 0xFFFF) != 39667) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1468,6 +1465,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_termix_ssh_core_checksum_method_remotedisplay_resize() and 0xFFFF) != 34941) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_termix_ssh_core_checksum_method_remotedisplay_stop() and 0xFFFF) != 20200) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_termix_ssh_core_checksum_method_remotedisplay_unicode() and 0xFFFF) != 50722) {
@@ -4291,8 +4291,6 @@ public interface RemoteDisplayInterface {
     
     fun `clipboardSet`(`text`: kotlin.String)
     
-    fun `close`()
-    
     /**
      * An X11 keysym, as Guacamole and VNC use.
      */
@@ -4306,6 +4304,11 @@ public interface RemoteDisplayInterface {
     fun `refresh`()
     
     fun `resize`(`width`: kotlin.UInt, `height`: kotlin.UInt, `scale`: kotlin.UInt)
+    
+    /**
+     * Ends the session. Not `close`, which Kotlin bindings already use for AutoCloseable.
+     */
+    fun `stop`()
     
     /**
      * A typed character, for text from the on-screen keyboard.
@@ -4429,18 +4432,6 @@ open class RemoteDisplay: Disposable, AutoCloseable, RemoteDisplayInterface
     
     
 
-    override fun `close`()
-        = 
-    callWithHandle {
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_termix_ssh_core_fn_method_remotedisplay_close(
-        it,
-        _status)
-}
-    }
-    
-    
-
     
     /**
      * An X11 keysym, as Guacamole and VNC use.
@@ -4498,6 +4489,21 @@ open class RemoteDisplay: Disposable, AutoCloseable, RemoteDisplayInterface
         FfiConverterUInt.lower(`width`),
         FfiConverterUInt.lower(`height`),
         FfiConverterUInt.lower(`scale`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * Ends the session. Not `close`, which Kotlin bindings already use for AutoCloseable.
+     */override fun `stop`()
+        = 
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_termix_ssh_core_fn_method_remotedisplay_stop(
+        it,
+        _status)
 }
     }
     
