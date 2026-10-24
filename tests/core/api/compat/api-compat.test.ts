@@ -117,6 +117,7 @@ test("pluginSettings fill the flat host fields", () => {
   expect(host.connectFrom).toBe("server");
   expect(host.enableFileManager).toBe(false);
   expect(host.defaultPath).toBe("/srv");
+  expect(host.showFilesPanel).toBe(true);
   expect(host.enableDocker).toBe(true);
   expect(host.enableTunnel).toBe(true);
   expect(host.tunnelConnections).toHaveLength(1);
@@ -155,4 +156,14 @@ test("version compare", () => {
   expect(isVersionAtLeast("v2.10.1", "2.9.0")).toBe(true);
   expect(isVersionAtLeast("2.8.4", "2.9.0")).toBe(false);
   expect(isVersionAtLeast(undefined, "2.9.0")).toBe(false);
+});
+
+test("the file manager's showPanel host setting turns the files panel off", () => {
+  const host: any = flattenPluginSettings({
+    id: 1,
+    pluginSettings: {
+      "file-manager": { enableFileManager: true, showPanel: false },
+    },
+  });
+  expect(host.showFilesPanel).toBe(false);
 });

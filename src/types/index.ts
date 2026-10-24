@@ -55,6 +55,8 @@ export interface SSHHost {
   enableTunnel: boolean;
   enableFileManager: boolean;
   defaultPath: string;
+  /** File Manager host setting showPanel: the files panel beside terminals. */
+  showFilesPanel?: boolean;
   tunnelConnections: TunnelConnection[];
   jumpHosts?: JumpHost[];
   quickActions?: QuickAction[];

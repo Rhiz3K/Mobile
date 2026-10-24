@@ -6,6 +6,8 @@ import type {
   FileManagerOperation,
 } from "@/types/index";
 import type { TrashItem } from "../types";
+import { toPluginPath } from "../compat/api-compat";
+import { ApiError } from "../errors";
 
 export function createFilesApi(c: AccountClient) {
   async function getFileManagerRecent(
@@ -250,7 +252,7 @@ export function createFilesApi(c: AccountClient) {
   async function readSSHFile(
     sessionId: string,
     path: string,
-  ): Promise<{ content: string; path: string }> {
+  ): Promise<{ content: string; path: string; encoding?: "utf8" | "base64" }> {
     try {
       const response = await c.http.files.get("/ssh/readFile", {
         params: { sessionId, path },
@@ -370,6 +372,7 @@ export function createFilesApi(c: AccountClient) {
     isDirectory: boolean,
     hostId?: number,
     userId?: string,
+    permanent?: boolean,
   ): Promise<any> {
     try {
       const response = await c.http.files.delete("/ssh/deleteItem", {
@@ -379,6 +382,7 @@ export function createFilesApi(c: AccountClient) {
           isDirectory,
           hostId,
           userId,
+          permanent,
         },
       });
       return response.data;
@@ -866,7 +870,99 @@ export function createFilesApi(c: AccountClient) {
     }
   }
 
+  /** Full URL of a file manager route that streams a body. */
+  function streamUrl(route: string): string {
+    const path = `/ssh/file_manager/ssh/${route}`;
+    return c.apiGeneration === "plugin"
+      ? `${c.rootBase()}${toPluginPath(path)}`
+      : c.apiUrl(path);
+  }
+
+  /** Streams a file from `offset` on. A 206 means the server resumed, a 200 sends it all. */
+  async function downloadStream(
+    sessionId: string,
+    path: string,
+    offset: number,
+    signal?: AbortSignal,
+  ): Promise<Response> {
+    const headers: Record<string, string> = {
+      ...c.requestHeaders(),
+      "Content-Type": "application/json",
+    };
+    if (offset > 0) headers.Range = `bytes=${offset}-`;
+    const response = await fetch(streamUrl("downloadFileStream"), {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ sessionId, path }),
+      signal,
+    });
+    if (!response.ok) await failStream(response, "download file");
+    return response;
+  }
+
+  /** Writes one raw chunk at `offset`. Returns where the next chunk starts. */
+  async function uploadChunk(
+    sessionId: string,
+    dir: string,
+    fileName: string,
+    offset: number,
+    totalSize: number,
+    bytes: Uint8Array,
+    signal?: AbortSignal,
+  ): Promise<{ nextOffset: number; complete: boolean }> {
+    const query = new URLSearchParams({
+      sessionId,
+      path: dir,
+      fileName,
+      offset: String(offset),
+      totalSize: String(totalSize),
+    });
+    const response = await fetch(
+      `${streamUrl("uploadFileChunk")}?${query.toString()}`,
+      {
+        method: "POST",
+        headers: {
+          ...c.requestHeaders(),
+          "Content-Type": "application/octet-stream",
+        },
+        // expo/fetch sends typed arrays as is; the DOM types just don't list them.
+        body: bytes as unknown as BodyInit,
+        signal,
+      },
+    );
+    if (!response.ok) await failStream(response, "upload file");
+    const data = (await response.json()) as {
+      nextOffset?: number;
+      complete?: boolean;
+    };
+    return {
+      nextOffset: data.nextOffset ?? offset + bytes.length,
+      complete: data.complete ?? offset + bytes.length >= totalSize,
+    };
+  }
+
+  async function failStream(
+    response: Response,
+    operation: string,
+  ): Promise<never> {
+    let data: { error?: string } | null = null;
+    try {
+      data = (await response.json()) as { error?: string };
+    } catch {
+      // Not JSON, keep the status alone.
+    }
+    const status = response.status;
+    throw new ApiError(
+      data?.error ?? `Could not ${operation} (${status})`,
+      status,
+      status === 416 ? "RANGE_NOT_SATISFIABLE" : undefined,
+    );
+  }
+
   return {
+    streamUrl,
+    downloadStream,
+    uploadChunk,
     getFileManagerRecent,
     addFileManagerRecent,
     removeFileManagerRecent,

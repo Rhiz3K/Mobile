@@ -26,10 +26,16 @@ test("a This device host opens a terminal from the phone", async () => {
 });
 
 test("server features on a This device host say what they need", async () => {
-  const check = await checkOpen("local", { id: 1 }, true, "filemanager");
+  const check = await checkOpen("local", { id: 1 }, true, "docker");
   expect(check.attempts).toEqual([]);
-  expect(check.blocked?.reason).toMatch(/File Manager needs a Termix server/);
+  expect(check.blocked?.reason).toMatch(/Docker needs a Termix server/);
   expect(check.blocked?.fix).toBeUndefined();
+});
+
+test("files on a This device host open over the phone's SFTP", async () => {
+  const check = await checkOpen("local", { id: 1 }, true, "filemanager");
+  expect(check.blocked).toBeUndefined();
+  expect(check.attempts.map((t) => t.kind)).toEqual(["local"]);
 });
 
 test("the saved origin is read from the account's store", async () => {
@@ -45,5 +51,5 @@ test("the saved origin is read from the account's store", async () => {
   // This device ignores it: it has no server to go through.
   const check = await checkOpen("local", host, true, "terminal");
   expect(check.plan.origin).toBe("device");
-  expect(features.sessionNeeds("terminal")).toEqual(["shell"]);
+  expect(features.sessionNeeds("terminal")).toEqual([["shell"]]);
 });

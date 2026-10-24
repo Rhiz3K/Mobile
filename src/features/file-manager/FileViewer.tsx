@@ -1,150 +1,159 @@
-import { useState, useEffect } from "react";
-import { View, TextInput, ActivityIndicator, Pressable } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Save, RotateCcw, FileText } from "lucide-react-native";
+import { useRef, useState } from "react";
+import { Pressable } from "react-native";
+import {
+  AArrowDown,
+  AArrowUp,
+  Save,
+  Search,
+  WrapText,
+} from "lucide-react-native";
 import { InlineView, useConfirm } from "@/ui";
-import { useThemeColor } from "@/contexts/ThemeContext";
-import { MONO_FONT } from "@/constants/fonts";
+import { useUiColors } from "@/contexts/ThemeContext";
+import { toUserMessage } from "@/core/errors";
 import { toast } from "@/utils/toast";
+import { EditorView, type EditorHandle } from "./editor/EditorView";
+import { updateFileSettings, useFileSettings } from "./settings";
 
-interface FileViewerProps {
-  visible: boolean;
-  onClose: () => void;
-  fileName: string;
-  filePath: string;
-  initialContent: string;
-  onSave: (content: string) => Promise<void>;
-  readOnly?: boolean;
+function HeaderButton({
+  label,
+  onPress,
+  disabled,
+  children,
+}: {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      hitSlop={4}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      className={`h-10 w-10 items-center justify-center active:bg-muted ${disabled ? "opacity-40" : ""}`}
+    >
+      {children}
+    </Pressable>
+  );
 }
 
+/** The code editor for one remote file, saved back over the same connection. */
 export function FileViewer({
-  visible,
+  open,
+  name,
+  path,
+  text,
+  readOnly,
   onClose,
-  fileName,
-  filePath,
-  initialContent,
   onSave,
-  readOnly = false,
-}: FileViewerProps) {
-  const insets = useSafeAreaInsets();
-  const color = useThemeColor();
+}: {
+  open: boolean;
+  name: string;
+  path: string;
+  text: string;
+  readOnly?: boolean;
+  onClose: () => void;
+  onSave: (text: string) => Promise<void>;
+}) {
+  const colors = useUiColors();
   const confirm = useConfirm();
-  const [content, setContent] = useState(initialContent);
-  const [isSaving, setIsSaving] = useState(false);
-  const [hasChanges, setHasChanges] = useState(false);
+  const settings = useFileSettings();
+  const editor = useRef<EditorHandle>(null);
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    setContent(initialContent);
-    setHasChanges(false);
-  }, [initialContent, visible]);
-
-  const handleContentChange = (newContent: string) => {
-    setContent(newContent);
-    setHasChanges(newContent !== initialContent);
-  };
-
-  const handleSave = async () => {
-    if (!hasChanges || readOnly) return;
+  const save = async () => {
+    if (readOnly || saving || !editor.current) return;
+    setSaving(true);
     try {
-      setIsSaving(true);
-      await onSave(content);
-      setHasChanges(false);
-    } catch (error: any) {
-      toast.error(error.message || "Failed to save file");
+      const current = await editor.current.getText();
+      await onSave(current);
+      editor.current.markSaved();
+      setDirty(false);
+      toast.success(`Saved ${name}`);
+    } catch (error) {
+      toast.error(toUserMessage(error, "Could not save the file"));
     } finally {
-      setIsSaving(false);
+      setSaving(false);
     }
   };
 
-  const handleRevert = async () => {
-    if (!hasChanges) return;
-    const ok = await confirm({
-      title: "Revert changes?",
-      description: "Your edits since the last save will be lost.",
-      confirmLabel: "Revert",
-    });
-    if (!ok) return;
-    setContent(initialContent);
-    setHasChanges(false);
-  };
-
-  // Unsaved edits ask before the view closes. Save stays in the header.
-  const confirmClose = async () => {
-    if (!hasChanges || readOnly) return true;
+  const beforeClose = async () => {
+    if (!dirty) return true;
     return confirm({
-      title: "Discard unsaved changes?",
-      description: "Save first if you want to keep them.",
+      title: "Discard changes?",
+      description: `${name} has changes that are not saved.`,
       confirmLabel: "Discard",
+      destructive: true,
     });
   };
 
+  const size = settings.editorFontSize;
   return (
     <InlineView
-      open={visible}
+      open={open}
       onClose={onClose}
-      onBeforeClose={confirmClose}
-      safeTop={false}
-      scroll={false}
+      onBeforeClose={beforeClose}
+      title={`${dirty ? "* " : ""}${name}`}
+      subtitle={readOnly ? `${path} | read only` : path}
       bare
-      title={fileName}
-      subtitle={readOnly ? `${filePath} | Read only` : filePath}
-      icon={<FileText size={16} color={color("muted-foreground")} />}
+      scroll={false}
       actions={
-        !readOnly && hasChanges ? (
-          <>
-            <Pressable
-              onPress={handleRevert}
-              hitSlop={6}
-              accessibilityRole="button"
-              accessibilityLabel="Revert changes"
-              className="h-9 w-9 items-center justify-center border border-border active:bg-muted"
+        <>
+          <HeaderButton
+            label="Find"
+            onPress={() => editor.current?.openSearch()}
+          >
+            <Search size={17} color={colors.text} />
+          </HeaderButton>
+          <HeaderButton
+            label="Smaller text"
+            onPress={() => updateFileSettings({ editorFontSize: size - 1 })}
+          >
+            <AArrowDown size={17} color={colors.text} />
+          </HeaderButton>
+          <HeaderButton
+            label="Bigger text"
+            onPress={() => updateFileSettings({ editorFontSize: size + 1 })}
+          >
+            <AArrowUp size={17} color={colors.text} />
+          </HeaderButton>
+          <HeaderButton
+            label={settings.editorWrap ? "Turn off line wrap" : "Wrap lines"}
+            onPress={() =>
+              updateFileSettings({ editorWrap: !settings.editorWrap })
+            }
+          >
+            <WrapText
+              size={17}
+              color={settings.editorWrap ? colors.brand : colors.text}
+            />
+          </HeaderButton>
+          {!readOnly ? (
+            <HeaderButton
+              label="Save"
+              onPress={() => void save()}
+              disabled={!dirty || saving}
             >
-              <RotateCcw size={16} color={color("muted-foreground")} />
-            </Pressable>
-            <Pressable
-              onPress={handleSave}
-              disabled={isSaving}
-              hitSlop={6}
-              accessibilityRole="button"
-              accessibilityLabel="Save"
-              className="h-9 w-9 items-center justify-center border border-accent-brand/40 bg-accent-brand/15 active:bg-accent-brand/25"
-            >
-              {isSaving ? (
-                <ActivityIndicator size="small" color={color("accent-brand")} />
-              ) : (
-                <Save size={16} color={color("accent-brand")} />
-              )}
-            </Pressable>
-          </>
-        ) : null
+              <Save size={17} color={dirty ? colors.brand : colors.textMuted} />
+            </HeaderButton>
+          ) : null}
+        </>
       }
     >
-      <View className="flex-1">
-        <TextInput
-          className="flex-1 bg-background text-foreground"
-          value={content}
-          onChangeText={handleContentChange}
-          multiline
-          editable={!readOnly}
-          scrollEnabled
-          autoCapitalize="none"
-          autoCorrect={false}
-          spellCheck={false}
-          style={{
-            fontFamily: MONO_FONT,
-            fontSize: 13,
-            lineHeight: 20,
-            paddingTop: 12,
-            paddingBottom: Math.max(insets.bottom, 12),
-            paddingLeft: Math.max(insets.left, 12),
-            paddingRight: Math.max(insets.right, 12),
-            textAlignVertical: "top",
-            color: color("foreground"),
-          }}
-          placeholder={readOnly ? "File content" : "Enter file content"}
-          placeholderTextColor={color("muted-foreground", 0.5)}
-        />
-      </View>
+      <EditorView
+        ref={editor}
+        text={text}
+        name={name}
+        path={path}
+        readOnly={readOnly}
+        fontSize={size}
+        wrap={settings.editorWrap}
+        onDirty={setDirty}
+        onSave={() => void save()}
+      />
     </InlineView>
   );
 }

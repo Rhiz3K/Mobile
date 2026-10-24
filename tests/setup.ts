@@ -45,6 +45,14 @@ jest.mock("react-native-webview", () => {
   return { __esModule: true, WebView: View, default: View };
 });
 
+jest.mock("expo-video", () => {
+  const { View } = require("react-native");
+  return {
+    VideoView: View,
+    useVideoPlayer: () => ({ play: jest.fn(), pause: jest.fn() }),
+  };
+});
+
 // The real store is SQLCipher in native code. Tests use better-sqlite3
 // through tests/helpers/db.ts instead.
 jest.mock("expo-sqlite", () => ({

@@ -100,16 +100,48 @@ test("Tailscale discovery is off on older servers", () => {
   expect(registry().hasCapability("hosts.discovery", legacyServer)).toBe(false);
 });
 
-test("This device gets the terminal and snippets, and no server features", () => {
+test("This device gets the terminal, files and snippets, and no server features", () => {
   const ctx = {
     account: { id: "local", kind: "local" } as const,
     client: null,
   };
   const r = registry();
-  expect(r.available(ctx).map((f) => f.id)).toEqual(["terminal", "snippets"]);
+  expect(r.available(ctx).map((f) => f.id)).toEqual([
+    "terminal",
+    "file-manager",
+    "snippets",
+  ]);
   expect(r.keyboardTabs(ctx).map((t) => t.id)).toEqual(["snippets", "history"]);
   expect(r.canOpen("terminal", {}, ctx)).toBe(true);
+  expect(r.canOpen("filemanager", {}, ctx)).toBe(true);
   expect(r.canOpen("docker", {}, ctx)).toBe(false);
+});
+
+test("files work over SFTP or the server, and sit beside terminals", () => {
+  const r = registry();
+  expect(r.sessionNeeds("filemanager")).toEqual([["sftp"], ["server"]]);
+  expect(r.serverOnly("filemanager")).toBe(false);
+  expect(r.sessionTab("filemanager")?.relayRequires).toEqual({
+    plugin: "file-manager",
+  });
+  const local = {
+    account: { id: "local", kind: "local" } as const,
+    client: null,
+  };
+  const host = (over: object) =>
+    ({ enableFileManager: true, enableSsh: true, ...over }) as any;
+  expect(r.companionsFor("terminal", host({}), local).map((c) => c.id)).toEqual(
+    ["files"],
+  );
+  expect(
+    r.companionsFor("terminal", host({ showFilesPanel: false }), local),
+  ).toEqual([]);
+  expect(
+    r.companionsFor("terminal", host({ enableFileManager: false }), local),
+  ).toEqual([]);
+  expect(r.companionsFor("terminal", host({}), local)[0].phoneTabType).toBe(
+    "filemanager",
+  );
 });
 
 test("terminal tabs get find, tmux, key rows, and a share link through the server", () => {

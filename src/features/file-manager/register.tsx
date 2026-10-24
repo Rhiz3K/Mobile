@@ -1,37 +1,85 @@
-import { forwardRef } from "react";
+import { forwardRef, useCallback } from "react";
 import { Folder, FolderSearch } from "lucide-react-native";
 import type { FeatureDef, SessionTabProps } from "@/core/features/types";
+import { useSessionAccountId } from "@/core/accounts/session";
+import { sessionHandles } from "@/core/sessions/handles";
 import { isSshHost } from "@/utils/hosts";
+import { CompanionFiles, FILES_TAB_TYPE } from "./CompanionFiles";
 import { FileManager, type FileManagerHandle } from "./FileManager";
+import { getFileSettings, updateFileSettings } from "./settings";
 
 const FilesTab = forwardRef<FileManagerHandle, SessionTabProps>(
-  ({ session, isVisible }, ref) => (
-    <FileManager
-      ref={ref}
-      host={session.host}
-      sessionId={session.id}
-      isVisible={isVisible}
-    />
-  ),
+  ({ session, isVisible, onClose }, ref) => {
+    const accountId = useSessionAccountId() ?? "local";
+    const linked = session.linkedSessionId;
+    const getHandle = useCallback(() => sessionHandles.get(linked), [linked]);
+    if (linked) {
+      return (
+        <CompanionFiles
+          session={{ ...session, accountId }}
+          getHandle={getHandle}
+          isVisible={isVisible}
+          layout="tab"
+          close={onClose}
+        />
+      );
+    }
+    return (
+      <FileManager
+        ref={ref}
+        host={session.host}
+        type={session.type}
+        isVisible={isVisible}
+        origin={session.origin}
+        onClose={onClose}
+      />
+    );
+  },
 );
 FilesTab.displayName = "FilesTab";
+
+const filesOn = (host: Parameters<typeof isSshHost>[0]) =>
+  isSshHost(host) && !!host.enableFileManager;
 
 export const fileManagerFeature: FeatureDef = {
   id: "file-manager",
   title: "File Manager",
   source: "native",
-  requires: { plugin: "file-manager" },
+  availableOn: ["local", "server"],
   sessionTabs: [
     {
-      type: "filemanager",
+      type: FILES_TAB_TYPE,
       icon: Folder,
       titleSuffix: () => "Files",
       shortLabel: () => "Files",
-      needs: ["server"],
+      // The phone's own SFTP, or the server's File Manager plugin.
+      needsOneOf: [["sftp"], ["server"]],
+      relayRequires: { plugin: "file-manager" },
       serverTabTypes: ["files", "sftp"],
       toServerTabType: () => "files",
       capabilities: ["keyboard-cover"],
       component: FilesTab,
+    },
+  ],
+  companions: [
+    {
+      id: "files",
+      title: "Files",
+      icon: FolderSearch,
+      order: 10,
+      forTabTypes: ["terminal"],
+      isAvailable: (host) => filesOn(host) && host.showFilesPanel !== false,
+      component: CompanionFiles,
+      phoneTabType: FILES_TAB_TYPE,
+      layout: () => {
+        const s = getFileSettings();
+        return {
+          side: s.companionSide,
+          size: s.companionSize,
+          autoOpen: s.companionAutoOpen,
+        };
+      },
+      onResize: (size) => void updateFileSettings({ companionSize: size }),
     },
   ],
   hostActions: [
@@ -41,8 +89,8 @@ export const fileManagerFeature: FeatureDef = {
       icon: FolderSearch,
       group: "connect",
       order: 20,
-      isAvailable: (host) => isSshHost(host) && !!host.enableFileManager,
-      run: (_host, ctx) => ctx.openSession("filemanager"),
+      isAvailable: (host) => filesOn(host),
+      run: (_host, ctx) => ctx.openSession(FILES_TAB_TYPE),
     },
   ],
   hostToggles: [
@@ -67,6 +115,15 @@ export const fileManagerFeature: FeatureDef = {
       label: "File Manager",
       order: 20,
       matches: (host) => !!host.enableFileManager,
+    },
+  ],
+  settingsLinks: [
+    {
+      id: "files",
+      label: "Files",
+      icon: Folder,
+      order: 45,
+      href: "/tabs/settings/FileSettings",
     },
   ],
   capabilities: ["files.defaultPath"],

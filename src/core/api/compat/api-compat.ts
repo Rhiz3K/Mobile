@@ -125,6 +125,7 @@ export function flattenPluginSettings<T extends Record<string, any>>(
   const files = settings["file-manager"];
   set("enableFileManager", files ? files.enableFileManager !== false : false);
   set("defaultPath", (files?.defaultPath as string) || "/");
+  set("showFilesPanel", files ? files.showPanel !== false : true);
 
   const docker = settings.docker;
   set("enableDocker", Boolean(docker?.enableDocker));

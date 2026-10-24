@@ -14,26 +14,6 @@ export function getFileExtension(filename: string): string {
   return parts[parts.length - 1].toLowerCase();
 }
 
-export function getFileName(path: string): string {
-  const parts = path.split("/");
-  return parts[parts.length - 1] || path;
-}
-
-export function getParentPath(path: string): string {
-  if (path === "/" || !path) return "/";
-  const parts = path.split("/").filter((p) => p);
-  parts.pop();
-  return "/" + parts.join("/");
-}
-
-export function joinPath(...parts: string[]): string {
-  const joined = parts
-    .map((part) => part.replace(/^\/+|\/+$/g, ""))
-    .filter((part) => part)
-    .join("/");
-  return "/" + joined;
-}
-
 export function isTextFile(filename: string): boolean {
   // Dotfiles with no extension (e.g. .bashrc, .zshrc, .profile) are always text
   if (filename.startsWith(".") && !filename.slice(1).includes(".")) return true;
@@ -125,85 +105,94 @@ export function isVideoFile(filename: string): boolean {
   return videoExtensions.includes(ext);
 }
 
-export function formatDate(dateString: string | undefined): string {
-  if (!dateString) return "";
+export function isPdfFile(filename: string): boolean {
+  return getFileExtension(filename) === "pdf";
+}
 
-  try {
-    const now = new Date();
-    let date: Date;
+/** A short date for a list row: "5m ago", "3d ago", then "Mar 4". */
+export function formatDate(
+  value: number | string | null | undefined,
+  now = new Date(),
+): string {
+  if (value == null || value === "") return "";
+  // Numbers are seconds since the epoch, strings are ISO dates.
+  const date =
+    typeof value === "number" ? new Date(value * 1000) : new Date(value);
+  if (isNaN(date.getTime())) return typeof value === "string" ? value : "";
 
-    const parts = dateString.trim().split(/\s+/);
-    if (parts.length === 3) {
-      const [month, day, yearOrTime] = parts;
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
 
-      if (yearOrTime.includes(":")) {
-        const dateStr = `${month} ${day}, ${now.getFullYear()} ${yearOrTime}:00`;
-        date = new Date(dateStr);
-
-        if (date > now) {
-          const lastYearStr = `${month} ${day}, ${now.getFullYear() - 1} ${yearOrTime}:00`;
-          date = new Date(lastYearStr);
-        }
-      } else {
-        date = new Date(`${month} ${day}, ${yearOrTime}`);
-      }
-    } else {
-      date = new Date(dateString);
-    }
-
-    if (isNaN(date.getTime())) {
-      return dateString;
-    }
-
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
+  if (diffMs >= 0) {
     if (diffMins < 1) return "Just now";
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
     if (diffDays < 7) return `${diffDays}d ago`;
-
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
-    });
-  } catch {
-    return dateString;
   }
+
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
+  });
 }
 
-export function sortFiles(
-  files: any[],
-  sortBy: "name" | "size" | "modified" = "name",
-  sortOrder: "asc" | "desc" = "asc",
-): any[] {
-  const sorted = [...files].sort((a, b) => {
-    if (a.type === "directory" && b.type !== "directory") return -1;
-    if (a.type !== "directory" && b.type === "directory") return 1;
-
-    let compareValue = 0;
-
-    switch (sortBy) {
-      case "name":
-        compareValue = a.name.localeCompare(b.name);
-        break;
-      case "size":
-        compareValue = (a.size || 0) - (b.size || 0);
-        break;
-      case "modified":
-        compareValue =
-          new Date(a.modified || 0).getTime() -
-          new Date(b.modified || 0).getTime();
-        break;
-    }
-
-    return sortOrder === "asc" ? compareValue : -compareValue;
+/** A full date and time for the properties view. */
+export function formatDateTime(seconds: number | null | undefined): string {
+  if (!seconds) return "Unknown";
+  return new Date(seconds * 1000).toLocaleString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
+}
 
-  return sorted;
+export type SortBy = "name" | "size" | "modified";
+
+/** Folders first (links to folders count), then by the chosen field. */
+export function sortEntries<
+  T extends {
+    name: string;
+    type: string;
+    size: number;
+    mtime: number | null;
+    targetType?: string | null;
+  },
+>(files: T[], sortBy: SortBy = "name", order: "asc" | "desc" = "asc"): T[] {
+  const isDir = (f: T) =>
+    f.type === "directory" ||
+    (f.type === "link" && f.targetType === "directory");
+  return [...files].sort((a, b) => {
+    if (isDir(a) !== isDir(b)) return isDir(a) ? -1 : 1;
+    let compare = 0;
+    if (sortBy === "size") compare = (a.size || 0) - (b.size || 0);
+    else if (sortBy === "modified") compare = (a.mtime ?? 0) - (b.mtime ?? 0);
+    if (compare === 0) {
+      compare = a.name.localeCompare(b.name, undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
+    }
+    return order === "asc" ? compare : -compare;
+  });
+}
+
+/** Octal like 755, and the ls style string like rwxr-xr-x. */
+export function modeText(mode: number | null | undefined): {
+  octal: string;
+  symbolic: string;
+} {
+  if (mode == null) return { octal: "", symbolic: "" };
+  const bits = "rwxrwxrwx";
+  let symbolic = "";
+  for (let i = 0; i < 9; i++) {
+    symbolic += mode & (1 << (8 - i)) ? bits[i] : "-";
+  }
+  return { octal: (mode & 0o7777).toString(8).padStart(3, "0"), symbolic };
 }
 
 export function getFileIconColor(filename: string, type: string): string {
@@ -240,26 +229,4 @@ export function getFileIconColor(filename: string, type: string): string {
   if (["sh", "bash", "zsh", "fish"].includes(ext)) return "#10B981";
 
   return "#9CA3AF";
-}
-
-export function breadcrumbsFromPath(path: string): string[] {
-  if (!path || path === "/") return ["/"];
-
-  const parts = path.split("/").filter((p) => p.trim() !== "");
-
-  const breadcrumbs: string[] = ["/"];
-
-  parts.forEach((part, index) => {
-    const cumulativeParts = parts.slice(0, index + 1);
-    const breadcrumbPath = "/" + cumulativeParts.join("/");
-    breadcrumbs.push(breadcrumbPath);
-  });
-
-  return breadcrumbs;
-}
-
-export function getBreadcrumbLabel(path: string): string {
-  if (path === "/") return "/";
-  const parts = path.split("/").filter((p) => p);
-  return parts[parts.length - 1] || "/";
 }

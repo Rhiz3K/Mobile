@@ -14,25 +14,24 @@ import {
   formatDate,
   getFileIconColor,
 } from "./utils/fileUtils";
-import { useSessionClient } from "@/core/accounts/session";
 import type { TrashItem } from "@/core/api/types";
+import type { TrashApi } from "./backend/types";
 
 /**
- * Deleted files are moved to a server-side trash rather than removed, so this
- * lists them and allows restoring or permanently deleting.
+ * Deleted files go to the host's trash rather than away, so this lists them
+ * and allows restoring or deleting them for good.
  */
 export function TrashView({
   visible,
-  sessionId,
+  trash,
   onClose,
   onRestored,
 }: {
   visible: boolean;
-  sessionId: string;
+  trash: TrashApi;
   onClose: () => void;
   onRestored: () => void;
 }) {
-  const client = useSessionClient();
   const color = useThemeColor();
   const [items, setItems] = useState<TrashItem[]>([]);
   const [retentionDays, setRetentionDays] = useState(0);
@@ -42,7 +41,7 @@ export function TrashView({
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await client.api.files.listSSHTrash(sessionId);
+      const res = await trash.list();
       setItems(res.items);
       setRetentionDays(res.retentionDays);
     } catch (e: any) {
@@ -50,7 +49,7 @@ export function TrashView({
     } finally {
       setLoading(false);
     }
-  }, [sessionId]);
+  }, [trash]);
 
   useEffect(() => {
     if (visible) load();
@@ -59,7 +58,7 @@ export function TrashView({
   const restore = async (item: TrashItem) => {
     setBusyId(item.id);
     try {
-      await client.api.files.restoreSSHTrashItem(sessionId, item.id);
+      await trash.restore(item.id);
       toast.success(`Restored ${item.name}`);
       setItems((prev) => prev.filter((i) => i.id !== item.id));
       onRestored();
@@ -73,7 +72,7 @@ export function TrashView({
   const purge = async (item: TrashItem) => {
     setBusyId(item.id);
     try {
-      await client.api.files.deleteSSHTrashItem(sessionId, item.id);
+      await trash.remove(item.id);
       setItems((prev) => prev.filter((i) => i.id !== item.id));
     } catch (e: any) {
       toast.error(e?.message || "Failed to delete");
@@ -85,7 +84,7 @@ export function TrashView({
   const empty = async () => {
     setLoading(true);
     try {
-      await client.api.files.emptySSHTrash(sessionId);
+      await trash.empty();
       setItems([]);
       toast.success("Trash emptied");
     } catch (e: any) {
