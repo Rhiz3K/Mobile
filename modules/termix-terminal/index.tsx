@@ -18,6 +18,7 @@ import type {
   StickyState,
   TerminalBell,
   TerminalCursor,
+  TerminalSearchOptions,
   TerminalStats,
   TerminalTheme,
   TerminalViewHandle,
@@ -41,6 +42,10 @@ interface NativeHandle {
   typeText(text: string): Promise<void>;
   answerClipboard(id: number, allow: boolean): Promise<void>;
   getStats(): Promise<TerminalStats>;
+  search(query: string, options: TerminalSearchOptions): Promise<void>;
+  searchNext(): Promise<void>;
+  searchPrevious(): Promise<void>;
+  clearSearch(): Promise<void>;
 }
 
 interface NativeProps {
@@ -67,6 +72,7 @@ interface NativeProps {
   onModifiers?: (e: Ev<{ ctrl: StickyState; alt: StickyState }>) => void;
   watchPrompt?: boolean;
   onPromptLine?: (e: Ev<{ line: string }>) => void;
+  onSearch?: (e: Ev<{ total: number; index: number }>) => void;
   style?: StyleProp<ViewStyle>;
   ref?: Ref<NativeHandle>;
 }
@@ -143,6 +149,17 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(
         typeText: (text) => call((n) => n.typeText(text)),
         answerClipboard: (id, allow) =>
           call((n) => n.answerClipboard(id, allow)),
+        search: (query, options = {}) =>
+          call((n) =>
+            n.search(query, {
+              caseSensitive: !!options.caseSensitive,
+              wholeWord: !!options.wholeWord,
+              regex: !!options.regex,
+            }),
+          ),
+        searchNext: () => call((n) => n.searchNext()),
+        searchPrevious: () => call((n) => n.searchPrevious()),
+        clearSearch: () => call((n) => n.clearSearch()),
         getStats: async () =>
           queue.ready && native.current ? native.current.getStats() : null,
       };
@@ -166,6 +183,12 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(
         accentColor={props.accentColor}
         watchPrompt={props.watchPrompt ?? false}
         onPromptLine={(e) => props.onPromptLine?.(e.nativeEvent.line)}
+        onSearch={(e) =>
+          props.onSearch?.({
+            total: e.nativeEvent.total,
+            index: e.nativeEvent.index,
+          })
+        }
         onInput={(e) => props.onInput(e.nativeEvent.data)}
         onResize={(e) => {
           queue.markReady();

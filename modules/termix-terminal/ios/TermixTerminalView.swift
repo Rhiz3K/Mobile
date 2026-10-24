@@ -161,6 +161,9 @@ class TermixTerminalView: ExpoView {
   let onFontSize = EventDispatcher()
   let onModifiers = EventDispatcher()
   let onPromptLine = EventDispatcher()
+  let onSearch = EventDispatcher()
+  private var searchTotal = 0
+  private var searchSelected = -1
 
   /// Reports the line at the prompt once output settles, for password fill.
   var promptWatch = false {
@@ -340,6 +343,30 @@ class TermixTerminalView: ExpoView {
     terminalView.selectAll(nil)
   }
 
+  /// Ghostty's own search: plain text over the screen and scrollback.
+  func search(_ query: String) {
+    if query.isEmpty {
+      clearSearch()
+      return
+    }
+    _ = terminalView.performBindingAction("search:\(query)")
+  }
+
+  func searchStep(forward: Bool) {
+    _ = terminalView.performBindingAction("navigate_search:\(forward ? "next" : "previous")")
+  }
+
+  func clearSearch() {
+    _ = terminalView.performBindingAction("end_search")
+    searchTotal = 0
+    searchSelected = -1
+    onSearch(["total": 0, "index": -1])
+  }
+
+  fileprivate func reportSearch() {
+    onSearch(["total": searchTotal, "index": searchSelected])
+  }
+
   func focusTerminal() {
     _ = terminalView.acquireProgrammaticFocus()
   }
@@ -495,8 +522,27 @@ extension TermixTerminalView:
   TerminalSurfaceFontSizeDelegate,
   TerminalSurfaceClipboardConfirmationDelegate,
   TerminalSurfaceHoverLinkDelegate,
-  TerminalSurfaceOpenURLDelegate
+  TerminalSurfaceOpenURLDelegate,
+  TerminalSurfaceSearchDelegate
 {
+  func terminalDidStartSearch(needle _: String?) {}
+
+  func terminalDidEndSearch() {
+    searchTotal = 0
+    searchSelected = -1
+    reportSearch()
+  }
+
+  func terminalDidUpdateSearchTotal(_ total: Int?) {
+    searchTotal = total ?? 0
+    reportSearch()
+  }
+
+  func terminalDidUpdateSearchSelected(_ selected: Int?) {
+    searchSelected = selected ?? -1
+    reportSearch()
+  }
+
   func terminalDidRingBell() {
     ringBell()
   }

@@ -151,4 +151,10 @@ internal object GhosttyVt {
 
   /** Focus in or out report, for programs that turned on mode 1004. */
   external fun nativeEncodeFocus(focused: Boolean): ByteArray?
+
+  /** Scrollback and screen as UTF-8, one line per screen row, for search. */
+  external fun nativeScreenText(handle: Long): ByteArray?
+
+  /** Selects cells startCol..endCol of one screen row (scrollback counts). */
+  external fun nativeSelectScreenRange(handle: Long, row: Int, startCol: Int, endCol: Int): Boolean
 }

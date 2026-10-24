@@ -158,6 +158,10 @@ export const XtermSurface = forwardRef<
     sendKey: () => {},
     typeText: () => {},
     answerClipboard: () => {},
+    search: () => {},
+    searchNext: () => {},
+    searchPrevious: () => {},
+    clearSearch: () => {},
     getStats: () =>
       new Promise<EngineStats | null>((resolve) => {
         if (!ready.current) return resolve(null);

@@ -61,6 +61,10 @@ beforeEach(() => {
       "typeText",
       "answerClipboard",
       "getStats",
+      "search",
+      "searchNext",
+      "searchPrevious",
+      "clearSearch",
     ].map((name) => [name, jest.fn(async () => undefined)]),
   );
 });
@@ -182,4 +186,51 @@ test("native events become plain callbacks", async () => {
   });
   expect(handlers.onTitle).toHaveBeenCalledWith("vim");
   expect(handlers.onBell).toHaveBeenCalled();
+});
+
+test("search calls reach the native view with every option set", async () => {
+  const ref = createRef<TerminalViewHandle>();
+  await render(
+    <TerminalView
+      ref={ref}
+      fontSize={14}
+      theme={theme}
+      onInput={() => {}}
+      onResize={() => {}}
+    />,
+  );
+  mockNative.props.onResize(ev({ cols: 80, rows: 24 }));
+  ref.current!.search("error", { regex: true });
+  ref.current!.searchNext();
+  ref.current!.searchPrevious();
+  ref.current!.clearSearch();
+  expect(mockNative.handle.search).toHaveBeenCalledWith("error", {
+    caseSensitive: false,
+    wholeWord: false,
+    regex: true,
+  });
+  expect(mockNative.handle.searchNext).toHaveBeenCalled();
+  expect(mockNative.handle.searchPrevious).toHaveBeenCalled();
+  expect(mockNative.handle.clearSearch).toHaveBeenCalled();
+});
+
+test("prompt lines and search results come back as plain callbacks", async () => {
+  const onPromptLine = jest.fn();
+  const onSearch = jest.fn();
+  await render(
+    <TerminalView
+      fontSize={14}
+      theme={theme}
+      watchPrompt
+      onInput={() => {}}
+      onResize={() => {}}
+      onPromptLine={onPromptLine}
+      onSearch={onSearch}
+    />,
+  );
+  expect(mockNative.props.watchPrompt).toBe(true);
+  mockNative.props.onPromptLine(ev({ line: "Password:" }));
+  mockNative.props.onSearch(ev({ total: 4, index: 3 }));
+  expect(onPromptLine).toHaveBeenCalledWith("Password:");
+  expect(onSearch).toHaveBeenCalledWith({ total: 4, index: 3 });
 });

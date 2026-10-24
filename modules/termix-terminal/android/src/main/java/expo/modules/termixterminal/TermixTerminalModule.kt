@@ -16,7 +16,8 @@ class TermixTerminalModule : Module() {
     View(TermixTerminalView::class) {
       Events(
         "onInput", "onResize", "onBell", "onTitleChange", "onScrollState", "onLink", "onCopy",
-        "onClipboardRequest", "onFontSize", "onModifiers", "onPromptLine"
+        "onClipboardRequest", "onFontSize", "onModifiers", "onPromptLine",
+        "onSearch"
       )
 
       Prop("pipeId") { view: TermixTerminalView, id: String? -> view.setPipe(id) }
@@ -53,6 +54,12 @@ class TermixTerminalModule : Module() {
       AsyncFunction("scrollToBottom") { view: TermixTerminalView -> view.scrollToBottom() }
       AsyncFunction("copySelection") { view: TermixTerminalView -> view.copySelection() }
       AsyncFunction("selectAll") { view: TermixTerminalView -> view.selectAll() }
+      AsyncFunction("search") { view: TermixTerminalView, query: String, options: SearchRecord ->
+        view.search(query, options.caseSensitive, options.wholeWord, options.regex)
+      }
+      AsyncFunction("searchNext") { view: TermixTerminalView -> view.searchStep(true) }
+      AsyncFunction("searchPrevious") { view: TermixTerminalView -> view.searchStep(false) }
+      AsyncFunction("clearSearch") { view: TermixTerminalView -> view.clearSearch() }
       AsyncFunction("focus") { view: TermixTerminalView -> view.focusTerminal() }
       AsyncFunction("blur") { view: TermixTerminalView -> view.blurTerminal() }
       AsyncFunction("toggleModifier") { view: TermixTerminalView, name: String -> view.toggleModifier(name) }
@@ -84,6 +91,12 @@ internal class TerminalThemeRecord : Record {
 internal class CursorRecord : Record {
   @Field val style: String? = null
   @Field val blink: Boolean = true
+}
+
+internal class SearchRecord : Record {
+  @Field val caseSensitive: Boolean = false
+  @Field val wholeWord: Boolean = false
+  @Field val regex: Boolean = false
 }
 
 internal class BellRecord : Record {

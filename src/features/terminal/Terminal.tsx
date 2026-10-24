@@ -40,6 +40,8 @@ import { resolveTerminalSettings } from "./settings";
 import { findStartupSnippet, startupLines } from "./startup";
 import { CommandLineTracker } from "./history/capture";
 import { SuggestionStrip } from "./history/SuggestionStrip";
+import { SearchBar } from "./SearchBar";
+import type { TerminalSearchResult } from "@/modules/termix-terminal";
 import { PromptWatcher, pickPassword } from "./password-prompt";
 import { PasswordFillSheet, type FillChoice } from "./PasswordFillSheet";
 import { PASSWORD_FILL_PREF, hostCanFill } from "./password-fill";
@@ -365,6 +367,26 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
       [fontScale, settings.fontSize, updateFontSize],
     );
 
+    // Find in the terminal, opened by a key row key, the menu or Ctrl+F.
+    const [searchOpen, setSearchOpen] = useState(false);
+    const [searchResult, setSearchResult] = useState<TerminalSearchResult>({
+      total: 0,
+      index: -1,
+    });
+    const closeSearch = useCallback(() => {
+      setSearchOpen(false);
+      setSearchResult({ total: 0, index: -1 });
+      nativeRef.current?.clearSearch();
+    }, []);
+    const runCommand = useCallback((id: string) => {
+      if (XTERM_FALLBACK) return false;
+      if (id === "search") {
+        setSearchOpen(true);
+        return true;
+      }
+      return false;
+    }, []);
+
     const modifiersRef = useRef<ModifierState>({
       ctrl: "inactive",
       alt: "inactive",
@@ -415,8 +437,9 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
         isSelecting: () =>
           XTERM_FALLBACK ? (xtermRef.current?.isSelecting() ?? false) : false,
         keyTarget: () => (XTERM_FALLBACK ? null : keyTarget),
+        command: runCommand,
       }),
-      [isDialogOpen, sendInput, keyTarget],
+      [isDialogOpen, sendInput, keyTarget, runCommand],
     );
 
     const background = settings.colors.background;
@@ -482,7 +505,26 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
                   showScrollButton={isVisible && isConnected && !isDialogOpen}
                   watchPrompt={isConnected && (fillOn || historyOn)}
                   onPromptLine={(line) => watcherRef.current?.line(line)}
+                  onSearch={setSearchResult}
                 />
+                {searchOpen && isVisible ? (
+                  <SearchBar
+                    result={searchResult}
+                    onSearch={(query, options) => {
+                      if (query) nativeRef.current?.search(query, options);
+                      else {
+                        nativeRef.current?.clearSearch();
+                        setSearchResult({ total: 0, index: -1 });
+                      }
+                    }}
+                    onStep={(forward) =>
+                      forward
+                        ? nativeRef.current?.searchNext()
+                        : nativeRef.current?.searchPrevious()
+                    }
+                    onClose={closeSearch}
+                  />
+                ) : null}
                 {suggestionsOn && isVisible && isConnected ? (
                   <SuggestionStrip
                     tracker={tracker}

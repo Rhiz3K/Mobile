@@ -22,6 +22,7 @@ class TermixTerminalView(context: Context, appContext: AppContext) :
   private val onFontSize by EventDispatcher<Map<String, Any>>()
   private val onModifiers by EventDispatcher<Map<String, Any>>()
   private val onPromptLine by EventDispatcher<Map<String, Any>>()
+  private val onSearch by EventDispatcher<Map<String, Any>>()
 
   private val terminal = GhosttyTerminalView(context).also { view ->
     view.onInputBytes = { bytes ->
@@ -39,6 +40,7 @@ class TermixTerminalView(context: Context, appContext: AppContext) :
     view.onFontSizeChange = { size -> onFontSize(mapOf("size" to size)) }
     view.onModifiers = { ctrl, alt -> onModifiers(mapOf("ctrl" to ctrl, "alt" to alt)) }
     view.onPromptLine = { line -> onPromptLine(mapOf("line" to line)) }
+    view.onSearch = { total, index -> onSearch(mapOf("total" to total, "index" to index)) }
   }
 
   init {
@@ -86,6 +88,13 @@ class TermixTerminalView(context: Context, appContext: AppContext) :
   fun copySelection() = terminal.copySelectionToClipboard()
 
   fun selectAll() = terminal.selectAll()
+
+  fun search(query: String, caseSensitive: Boolean, wholeWord: Boolean, regex: Boolean) =
+    terminal.search(query, caseSensitive, wholeWord, regex)
+
+  fun searchStep(forward: Boolean) = terminal.searchStep(forward)
+
+  fun clearSearch() = terminal.clearSearch()
 
   fun focusTerminal() = terminal.showKeyboard()
 

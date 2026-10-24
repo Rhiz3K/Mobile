@@ -9,7 +9,8 @@ public class TermixTerminalModule: Module {
     View(TermixTerminalView.self) {
       Events(
         "onInput", "onResize", "onBell", "onTitleChange", "onScrollState", "onLink", "onCopy",
-        "onClipboardRequest", "onFontSize", "onModifiers", "onPromptLine"
+        "onClipboardRequest", "onFontSize", "onModifiers", "onPromptLine",
+        "onSearch"
       )
 
       Prop("pipeId") { (view: TermixTerminalView, id: String?) in
@@ -101,6 +102,23 @@ public class TermixTerminalModule: Module {
         view.selectAll()
       }.runOnQueue(.main)
 
+      // Ghostty searches plain text; the options are Android only.
+      AsyncFunction("search") { (view: TermixTerminalView, query: String, _: SearchRecord) in
+        view.search(query)
+      }.runOnQueue(.main)
+
+      AsyncFunction("searchNext") { (view: TermixTerminalView) in
+        view.searchStep(forward: true)
+      }.runOnQueue(.main)
+
+      AsyncFunction("searchPrevious") { (view: TermixTerminalView) in
+        view.searchStep(forward: false)
+      }.runOnQueue(.main)
+
+      AsyncFunction("clearSearch") { (view: TermixTerminalView) in
+        view.clearSearch()
+      }.runOnQueue(.main)
+
       AsyncFunction("focus") { (view: TermixTerminalView) in
         view.focusTerminal()
       }.runOnQueue(.main)
@@ -151,6 +169,12 @@ internal struct TerminalThemeRecord: Record {
 internal struct CursorRecord: Record {
   @Field var style: String?
   @Field var blink: Bool = true
+}
+
+internal struct SearchRecord: Record {
+  @Field var caseSensitive: Bool = false
+  @Field var wholeWord: Bool = false
+  @Field var regex: Bool = false
 }
 
 internal struct BellRecord: Record {

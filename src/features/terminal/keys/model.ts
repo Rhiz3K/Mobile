@@ -240,7 +240,7 @@ export function defaultLayout(): KeyLayout {
           {
             id: "actions",
             label: "Actions",
-            keys: keys("paste", "snippets"),
+            keys: keys("paste", "search", "snippets"),
           },
         ],
       },

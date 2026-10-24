@@ -23,6 +23,9 @@ so it works with any transport (the local SSH engine or the server relay).
 - Mouse reporting: taps are clicks and drags are wheel steps while the program tracks the mouse
 - Cursor style and blink, bell with sound, flash and haptics, title events
 - Screen reader text and announcements of new output
+- Search in the screen and scrollback (`search`, `searchNext`, `searchPrevious`, `clearSearch`,
+  `onSearch`)
+- The prompt line once output settles (`watchPrompt`, `onPromptLine`), for password fill
 
 ## Use
 
@@ -59,6 +62,9 @@ the scroll to bottom button. Calls made before the view reports its first size a
 - Android: `scrollback` only applies before the first output.
 - iOS reports no frame times (Metal draws on its own thread); `getStats` only has bytes there.
 - The app's own key row is used; the accessory bars of the wrappers are left out.
+- iOS search is ghostty's plain text search; match case, whole word and regex are Android only.
+- Android search hits count wide characters as two cells and can be off by a cell around
+  combining marks.
 
 ## Binaries
 

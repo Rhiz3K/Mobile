@@ -1057,4 +1057,85 @@ Java_expo_modules_termixterminal_GhosttyVt_nativeEncodeFocus(
   return toByteArray(env, buf, written);
 }
 
+// Scrollback and screen as plain UTF-8, one line per row (no unwrap), for
+// search. Rows line up with GHOSTTY_POINT_TAG_SCREEN y values.
+JNIEXPORT jbyteArray JNICALL
+Java_expo_modules_termixterminal_GhosttyVt_nativeScreenText(
+    JNIEnv* env, jobject, jlong handle) {
+  auto* session = fromHandle(handle);
+  if (session == nullptr) return nullptr;
+  uint16_t cols = 0;
+  size_t total = 0;
+  if (ghostty_terminal_get(session->term, GHOSTTY_TERMINAL_DATA_COLS, &cols) != GHOSTTY_SUCCESS ||
+      ghostty_terminal_get(session->term, GHOSTTY_TERMINAL_DATA_TOTAL_ROWS, &total) !=
+          GHOSTTY_SUCCESS ||
+      cols == 0 || total == 0) {
+    return nullptr;
+  }
+  GhosttyPoint first{};
+  first.tag = GHOSTTY_POINT_TAG_SCREEN;
+  first.value.coordinate.x = 0;
+  first.value.coordinate.y = 0;
+  GhosttyPoint last = first;
+  last.value.coordinate.x = static_cast<uint16_t>(cols - 1);
+  last.value.coordinate.y = static_cast<uint32_t>(total - 1);
+  GhosttySelection selection{};
+  selection.size = sizeof(selection);
+  selection.start.size = sizeof(selection.start);
+  selection.end.size = sizeof(selection.end);
+  if (ghostty_terminal_grid_ref(session->term, first, &selection.start) != GHOSTTY_SUCCESS ||
+      ghostty_terminal_grid_ref(session->term, last, &selection.end) != GHOSTTY_SUCCESS) {
+    return nullptr;
+  }
+  selection.rectangle = false;
+
+  GhosttyFormatterTerminalOptions options{};
+  options.size = sizeof(options);
+  options.emit = GHOSTTY_FORMATTER_FORMAT_PLAIN;
+  options.unwrap = false;
+  options.trim = true;
+  options.extra.size = sizeof(options.extra);
+  options.extra.screen.size = sizeof(options.extra.screen);
+  options.selection = &selection;
+  GhosttyFormatter formatter = nullptr;
+  if (ghostty_formatter_terminal_new(nullptr, &formatter, session->term, options) !=
+      GHOSTTY_SUCCESS) {
+    return nullptr;
+  }
+  size_t needed = 0;
+  GhosttyResult result = ghostty_formatter_format_buf(formatter, nullptr, 0, &needed);
+  std::vector<uint8_t> buf(needed);
+  size_t written = 0;
+  if ((result == GHOSTTY_OUT_OF_SPACE || result == GHOSTTY_SUCCESS) && needed > 0) {
+    result = ghostty_formatter_format_buf(formatter, buf.data(), buf.size(), &written);
+  }
+  ghostty_formatter_free(formatter);
+  if (result != GHOSTTY_SUCCESS && needed > 0) return nullptr;
+  return toByteArray(env, buf.data(), written);
+}
+
+// Selects cells startCol..endCol (inclusive) of one screen row, for a search hit.
+JNIEXPORT jboolean JNICALL
+Java_expo_modules_termixterminal_GhosttyVt_nativeSelectScreenRange(
+    JNIEnv*, jobject, jlong handle, jint row, jint startCol, jint endCol) {
+  auto* session = fromHandle(handle);
+  if (session == nullptr || row < 0 || startCol < 0 || endCol < startCol) return JNI_FALSE;
+  GhosttyPoint a{};
+  a.tag = GHOSTTY_POINT_TAG_SCREEN;
+  a.value.coordinate.x = static_cast<uint16_t>(startCol);
+  a.value.coordinate.y = static_cast<uint32_t>(row);
+  GhosttyPoint b = a;
+  b.value.coordinate.x = static_cast<uint16_t>(endCol);
+  GhosttySelection selection{};
+  selection.size = sizeof(selection);
+  selection.start.size = sizeof(selection.start);
+  selection.end.size = sizeof(selection.end);
+  if (ghostty_terminal_grid_ref(session->term, a, &selection.start) != GHOSTTY_SUCCESS ||
+      ghostty_terminal_grid_ref(session->term, b, &selection.end) != GHOSTTY_SUCCESS) {
+    return JNI_FALSE;
+  }
+  selection.rectangle = false;
+  return installSelection(session, &selection) ? JNI_TRUE : JNI_FALSE;
+}
+
 }  // extern "C"

@@ -14,6 +14,8 @@ import {
   type ClipboardRequest,
   type StickyState,
   type TerminalKeyName,
+  type TerminalSearchOptions,
+  type TerminalSearchResult,
   type TerminalViewHandle,
 } from "@/modules/termix-terminal";
 import { fromBase64 } from "@/modules/termix-ssh/src/base64";
@@ -46,6 +48,10 @@ export interface TerminalViewApi {
   sendKey(name: TerminalKeyName, shift?: boolean): void;
   typeText(text: string): void;
   toggleModifier(name: "ctrl" | "alt"): void;
+  search(query: string, options?: TerminalSearchOptions): void;
+  searchNext(): void;
+  searchPrevious(): void;
+  clearSearch(): void;
 }
 
 interface Props {
@@ -62,6 +68,7 @@ interface Props {
   /** Report the prompt line for password fill and history. */
   watchPrompt?: boolean;
   onPromptLine?: (line: string) => void;
+  onSearch?: (result: TerminalSearchResult) => void;
 }
 
 /** The native terminal every session renders, with its scroll button and prompts. */
@@ -77,6 +84,7 @@ export const TerminalView = forwardRef<TerminalViewApi, Props>(
       showScrollButton = true,
       watchPrompt,
       onPromptLine,
+      onSearch,
     },
     ref,
   ) {
@@ -103,6 +111,10 @@ export const TerminalView = forwardRef<TerminalViewApi, Props>(
         sendKey: (name, shift) => native.current?.sendKey(name, shift),
         typeText: (text) => native.current?.typeText(text),
         toggleModifier: (name) => native.current?.toggleModifier(name),
+        search: (query, options) => native.current?.search(query, options),
+        searchNext: () => native.current?.searchNext(),
+        searchPrevious: () => native.current?.searchPrevious(),
+        clearSearch: () => native.current?.clearSearch(),
       }),
       [batcher],
     );
@@ -184,6 +196,7 @@ export const TerminalView = forwardRef<TerminalViewApi, Props>(
           onModifiers={onModifiers}
           watchPrompt={watchPrompt}
           onPromptLine={onPromptLine}
+          onSearch={onSearch}
         />
         {showScrollButton && !atBottom ? (
           <TouchableOpacity

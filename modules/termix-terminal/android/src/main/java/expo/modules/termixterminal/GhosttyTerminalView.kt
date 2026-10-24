@@ -818,6 +818,60 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
 
   fun selectAll() = selectAllContent()
 
+  // ── Search ──
+
+  var onSearch: ((total: Int, index: Int) -> Unit)? = null
+  private var searchHits: List<SearchHit> = emptyList()
+  private var searchIndex = -1
+
+  /** Finds every hit and shows the newest, nearest the prompt. */
+  fun search(query: String, caseSensitive: Boolean, wholeWord: Boolean, regex: Boolean) {
+    val text = synchronized(vtLock) {
+      if (handle == 0L) null else GhosttyVt.nativeScreenText(handle)
+    }
+    val lines = text?.toString(Charsets.UTF_8)?.split('\n') ?: emptyList()
+    searchHits = TerminalSearch.find(lines, query, caseSensitive, wholeWord, regex)
+    searchIndex = searchHits.size - 1
+    showSearchHit()
+  }
+
+  fun searchStep(forward: Boolean) {
+    if (searchHits.isEmpty()) return
+    val n = searchHits.size
+    searchIndex = (searchIndex + (if (forward) 1 else -1) + n) % n
+    showSearchHit()
+  }
+
+  fun clearSearch() {
+    val had = searchHits.isNotEmpty()
+    searchHits = emptyList()
+    searchIndex = -1
+    if (had) clearSelection()
+    onSearch?.invoke(0, -1)
+  }
+
+  private fun showSearchHit() {
+    val hit = searchHits.getOrNull(searchIndex)
+    if (hit == null) {
+      onSearch?.invoke(0, -1)
+      return
+    }
+    synchronized(vtLock) {
+      if (handle == 0L) return
+      GhosttyVt.nativeSelectScreenRange(handle, hit.row, hit.startCol, hit.endCol)
+      // Bring the hit's row near the middle when it is off screen.
+      GhosttyVt.nativeScrollbar(handle)?.let { bar ->
+        val offset = bar[1].toInt()
+        val len = bar[2].toInt()
+        if (hit.row < offset || hit.row >= offset + len) {
+          GhosttyVt.nativeScroll(handle, hit.row - offset - len / 2)
+        }
+      }
+    }
+    scheduleFrame()
+    onSearch?.invoke(searchHits.size, searchIndex)
+  }
+
   fun showKeyboard() {
     requestFocus()
     context.getSystemService(InputMethodManager::class.java)?.showSoftInput(this, 0)

@@ -105,6 +105,8 @@ export interface TerminalViewProps {
   watchPrompt?: boolean;
   /** The prompt line changed, while `watchPrompt` is on. */
   onPromptLine?: (line: string) => void;
+  /** Hits of the current search, and which one shows (-1 for none). */
+  onSearch?: (result: TerminalSearchResult) => void;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -127,4 +129,22 @@ export interface TerminalViewHandle {
   typeText(text: string): void;
   answerClipboard(id: number, allow: boolean): void;
   getStats(): Promise<TerminalStats | null>;
+  /** Finds text in the screen and scrollback and shows the newest hit. */
+  search(query: string, options?: TerminalSearchOptions): void;
+  searchNext(): void;
+  searchPrevious(): void;
+  clearSearch(): void;
+}
+
+/** iOS searches plain text and ignores these. */
+export interface TerminalSearchOptions {
+  caseSensitive?: boolean;
+  wholeWord?: boolean;
+  regex?: boolean;
+}
+
+export interface TerminalSearchResult {
+  total: number;
+  /** -1 when nothing is shown. */
+  index: number;
 }
