@@ -51,11 +51,13 @@ export function createSnippetsApi(c: AccountClient) {
   async function executeSnippet(
     snippetId: number,
     hostId: number,
+    inputValues?: Record<string, string>,
   ): Promise<{ success: boolean; output: string; error?: string }> {
     try {
       const response = await c.http.auth.post("/snippets/execute", {
         snippetId,
         hostId,
+        ...(inputValues ? { inputValues } : {}),
       });
       return response.data;
     } catch (error) {

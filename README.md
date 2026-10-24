@@ -34,14 +34,14 @@ Try Termix at [demo.termix.site](https://demo.termix.site/). Any username and pa
 
 ## Features
 
-- SSH terminal: several sessions in tabs you can rename, drag and swipe between, key rows with a tmux row that you can change per host, snippets with variables, history with search and suggestions, find, sudo password fill, tmux and screen attach, share links, hardware keyboard shortcuts, dictation and VoiceOver. Tabs reconnect on their own and come back after the app was closed. On Android sessions keep running in the background with a notification; on iOS they reconnect when you come back.
+- SSH terminal: several sessions in tabs you can rename, drag and swipe between, key rows with a tmux row that you can change per host, snippets with variables and folders that can run on many hosts at once, history with search and suggestions, find, sudo password fill, tmux and screen attach, share links, hardware keyboard shortcuts, dictation and VoiceOver. Tabs reconnect on their own and come back after the app was closed. On Android sessions keep running in the background with a notification; on iOS they reconnect when you come back.
 - File manager: browse, edit and move files over SFTP from the phone or through your server. Download and upload with pause and resume, share files in from other apps, edit code with syntax highlighting, and keep a files panel beside the terminal.
 - Host metrics: CPU, memory, disk, network, uptime, processes, ports, firewall rules and login history, plus server alerts on the hosts screen.
 - SSH tunnels: create, start and stop tunnels, set up per host in the host editor.
 - Docker: view and manage containers.
 - Remote desktop: RDP, VNC and Telnet.
 - Home screen widgets on iOS and Android: open a host, run a snippet or check metrics without opening the app.
-- Hosts: folders, saved credentials and keys, Quick Connect and Wake-on-LAN.
+- Hosts: folders, saved credentials and keys, host defaults, import and export (Termix files and SSH config), QR sharing, Quick Connect and Wake-on-LAN.
 - Accounts: link more than one Termix server and switch between them. Open tabs keep running.
 - Sync: each linked server keeps its own encrypted copy on the phone, synced both ways and in the background, so its hosts work offline too. Pick what syncs, merge This device's hosts in on first link, and keep a copy when you unlink. Needs the Sync plugin on the server.
 - Reverse proxies: extra headers, Cloudflare service tokens, basic auth, client certificates and proxy sign in pages (Cloudflare Access, Authelia, Authentik).

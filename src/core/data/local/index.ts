@@ -288,6 +288,7 @@ export function localRepositories(
             description: draft.description || null,
             folder: draft.folder || null,
             order: draft.order ?? 0,
+            hostFilter: draft.hostFilter || null,
             isNote: Boolean(draft.isNote),
           })
           .returning()
@@ -317,6 +318,10 @@ export function localRepositories(
                 ? current.folder
                 : draft.folder || null,
             order: draft.order ?? current.order,
+            hostFilter:
+              draft.hostFilter === undefined
+                ? current.hostFilter
+                : draft.hostFilter || null,
             isNote: draft.isNote ?? current.isNote,
             updatedAt: now(),
           })

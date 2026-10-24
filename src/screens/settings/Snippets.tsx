@@ -12,6 +12,8 @@ import {
   Pencil,
   Trash2,
   Check,
+  Play,
+  ArrowDownUp,
 } from "lucide-react-native";
 import { useRouter } from "expo-router";
 import { Snippet, SnippetFolder } from "@/types";
@@ -32,6 +34,17 @@ import {
 import { useTerminalCustomization } from "@/contexts/TerminalCustomizationContext";
 import { toast } from "@/utils/toast";
 import { useRepositories } from "@/core/data/hooks";
+import { useActiveAccount } from "@/core/accounts";
+import { HostPicker } from "@/features/snippets/HostPicker";
+import { RunOnHostsSheet } from "@/features/snippets/RunOnHostsSheet";
+import { SnippetTransferSheet } from "@/features/snippets/SnippetTransferSheet";
+import {
+  filterIdOf,
+  parseHostFilter,
+  serializeHostFilter,
+} from "@/features/snippets/targets";
+import { isSshActive } from "@/utils/hosts";
+import type { SSHHost } from "@/types";
 
 type SnippetFormData = {
   name: string;
@@ -46,6 +59,13 @@ export default function Snippets() {
   const repos = useRepositories();
   const router = useRouter();
   const { config, updateConfig } = useTerminalCustomization();
+  const account = useActiveAccount();
+  const [hostList, setHostList] = useState<SSHHost[]>([]);
+  const [targetIds, setTargetIds] = useState<Set<number>>(new Set());
+  const [unknownTargets, setUnknownTargets] = useState<number[]>([]);
+  const [targetsOpen, setTargetsOpen] = useState(false);
+  const [runTarget, setRunTarget] = useState<Snippet | null>(null);
+  const [transferOpen, setTransferOpen] = useState(false);
 
   const [snippets, setSnippets] = useState<Snippet[]>([]);
   const [folders, setFolders] = useState<SnippetFolder[]>([]);
@@ -108,13 +128,25 @@ export default function Snippets() {
   }, [repos]);
 
   useEffect(() => {
+    const loadHosts = () =>
+      repos.hosts
+        .list()
+        .then((list) =>
+          setHostList(list.filter((h) => isSshActive(h) && !h.shared)),
+        )
+        .catch(() => {});
+    void loadHosts();
+    const stopHosts = repos.hosts.subscribe(() => void loadHosts());
     load().finally(() => setLoading(false));
     const reload = () => void load();
     const stops = [
       repos.snippets.subscribe(reload),
       repos.snippetFolders.subscribe(reload),
     ];
-    return () => stops.forEach((stop) => stop());
+    return () => {
+      stopHosts();
+      stops.forEach((stop) => stop());
+    };
   }, [load, repos]);
 
   const onRefresh = async () => {
@@ -152,6 +184,8 @@ export default function Snippets() {
       folder: "",
       isNote: false,
     });
+    setTargetIds(new Set());
+    setUnknownTargets([]);
     setEditDialog(true);
   };
 
@@ -164,6 +198,14 @@ export default function Snippets() {
       folder: snippet.folder ?? "",
       isNote: !!snippet.isNote,
     });
+    const saved = parseHostFilter(snippet.hostFilter);
+    const known = new Map(
+      hostList.map((h) => [filterIdOf(h, account.kind), h.id]),
+    );
+    setTargetIds(
+      new Set(saved.flatMap((id) => (known.has(id) ? [known.get(id)!] : []))),
+    );
+    setUnknownTargets(saved.filter((id) => !known.has(id)));
     setEditDialog(true);
   };
 
@@ -184,6 +226,12 @@ export default function Snippets() {
         description: form.description.trim() || undefined,
         folder: form.folder.trim() || undefined,
         isNote: form.isNote,
+        hostFilter: serializeHostFilter([
+          ...unknownTargets,
+          ...hostList
+            .filter((h) => targetIds.has(h.id))
+            .map((h) => filterIdOf(h, account.kind)),
+        ]),
       };
       if (editingSnippet) {
         await repos.snippets.update(editingSnippet.id, payload);
@@ -350,6 +398,17 @@ export default function Snippets() {
       >
         <ChevronDown size={14} color={color("muted-foreground")} />
       </Pressable>
+      {!snippet.isNote && hostList.length > 0 ? (
+        <Pressable
+          onPress={() => setRunTarget(snippet)}
+          accessibilityRole="button"
+          accessibilityLabel={`Run ${snippet.name} on hosts`}
+          hitSlop={8}
+          className="p-1 active:opacity-60"
+        >
+          <Play size={14} color={color("muted-foreground")} />
+        </Pressable>
+      ) : null}
       <Pressable
         onPress={() => handleCopy(snippet)}
         hitSlop={8}
@@ -451,6 +510,13 @@ export default function Snippets() {
       }
       headerRight={
         <View className="flex-row gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            accessibilityLabel="Import and export"
+            onPress={() => setTransferOpen(true)}
+            icon={<ArrowDownUp size={18} color={color("muted-foreground")} />}
+          />
           <Button
             variant="ghost"
             size="sm"
@@ -588,6 +654,24 @@ export default function Snippets() {
                 <ChevronRight size={14} color={color("muted-foreground")} />
               </Pressable>
             </View>
+            {!form.isNote ? (
+              <View className="gap-1">
+                <Label>Target hosts (optional)</Label>
+                <Pressable
+                  onPress={() => setTargetsOpen(true)}
+                  className="h-10 flex-row items-center gap-2 border border-input bg-card px-2.5 active:opacity-70"
+                >
+                  <Text
+                    className={`flex-1 text-sm ${targetIds.size ? "text-foreground" : "text-muted-foreground"}`}
+                  >
+                    {targetIds.size
+                      ? `${targetIds.size} ${targetIds.size === 1 ? "host" : "hosts"}`
+                      : "None"}
+                  </Text>
+                  <ChevronRight size={14} color={color("muted-foreground")} />
+                </Pressable>
+              </View>
+            ) : null}
             <SettingRow
               label="Note"
               description="Pasted into the terminal without running"
@@ -601,6 +685,20 @@ export default function Snippets() {
           </View>
         </SheetBody>
       </Sheet>
+
+      <HostPicker
+        visible={targetsOpen}
+        title="Target hosts"
+        hosts={hostList}
+        selected={targetIds}
+        onChange={setTargetIds}
+        onClose={() => setTargetsOpen(false)}
+      />
+      <RunOnHostsSheet snippet={runTarget} onClose={() => setRunTarget(null)} />
+      <SnippetTransferSheet
+        visible={transferOpen}
+        onClose={() => setTransferOpen(false)}
+      />
 
       {/* Folder picker */}
       <Sheet

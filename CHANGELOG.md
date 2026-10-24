@@ -83,6 +83,13 @@
 - Copy, move, cut and paste, permissions, properties with owner and folder size, symbolic links and the host's trash
 - A files panel beside the terminal on tablets, and Files here in the tab menu on phones. It follows the terminal's folder and can cd the terminal to the folder on screen
 - Settings, Files for the trash prompt, transfers at once, hidden files, the editor and the files panel
+- Run a snippet on several hosts at once without opening a terminal, from the phone or through the server, and see each result
+- Give a snippet target hosts, so they are one tap away and show on the web too
+- Import and export snippets as the same JSON file the web app uses
+- Host defaults: new hosts start from your defaults, the folder's and the server's, and a host keeps any value you set on it. Edit yours in Settings, Host defaults
+- Import hosts from a Termix host file or an SSH config, and export hosts with or without passwords and keys, in Settings, Import and export
+- Share a host as a QR code or link and scan one from another phone
+- Quick Connect reads user@host:port and can save the host
 
 ### Changed
 
