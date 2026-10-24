@@ -165,7 +165,8 @@ export function resolveTerminalSettings(
   return {
     colors,
     theme: nativeTheme(colors),
-    fontFamily: terminalFont(user.fontFamily),
+    // A host may pick its own font; the size stays the phone's.
+    fontFamily: terminalFont(host?.fontFamily ?? user.fontFamily),
     fontSize,
     scaledFontSize: Math.round(fontSize * scale * 2) / 2,
     lineHeight: clamp(merged.lineHeight ?? 1, 0.8, 2),

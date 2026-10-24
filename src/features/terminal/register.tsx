@@ -4,6 +4,7 @@ import type { FeatureDef, SessionTabProps } from "@/core/features/types";
 import { isSshHost, toTerminalHostConfig } from "@/utils/hosts";
 import { Terminal, type TerminalHandle } from "./Terminal";
 import HistoryBar from "./keyboard/HistoryBar";
+import { hostTerminalEditor } from "./HostTerminalTab";
 
 const TerminalTab = forwardRef<TerminalHandle, SessionTabProps>(
   (
@@ -68,7 +69,18 @@ export const terminalFeature: FeatureDef = {
     },
   ],
   hostToggles: [
-    { key: "enableTerminal", label: "Terminal", group: "feature", order: 10 },
+    {
+      key: "enableTerminal",
+      label: "Terminal",
+      group: "feature",
+      order: 10,
+      formTab: {
+        id: "terminal",
+        label: "Terminal",
+        order: 0,
+        editor: hostTerminalEditor,
+      },
+    },
   ],
   hostBadges: [
     {

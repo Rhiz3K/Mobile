@@ -84,6 +84,7 @@ export function hostFromRow(row: HostRow): SSHHost {
     key: row.key ?? undefined,
     keyPassword: row.keyPassword ?? undefined,
     keyType: row.keyType ?? undefined,
+    sudoPassword: row.sudoPassword ?? undefined,
     forceKeyboardInteractive: row.forceKeyboardInteractive === "true",
     credentialId: row.credentialId ?? undefined,
     overrideCredentialUsername: row.overrideCredentialUsername ?? false,
@@ -95,6 +96,7 @@ export function hostFromRow(row: HostRow): SSHHost {
     sshPort: row.sshPort ?? row.port,
     statusCheckEnabled: row.statusCheckEnabled,
     statusCheckInterval: row.statusCheckInterval,
+    sshOptions: parseJson<Json>(row.sshOptions, {}),
     pluginSettings,
     protocolAuth,
     createdAt: row.createdAt,
@@ -203,6 +205,7 @@ export function hostToRow(
     ),
     keyPassword: keep("keyPassword", data.keyPassword, auth === "key"),
     keyType: auth === "key" ? orNull(data.keyType) : null,
+    sudoPassword: keep("sudoPassword", data.sudoPassword, true),
     credentialId: auth === "credential" ? (data.credentialId ?? null) : null,
     overrideCredentialUsername: Boolean(data.overrideCredentialUsername),
     forceKeyboardInteractive: data.forceKeyboardInteractive ? "true" : "false",
@@ -214,6 +217,10 @@ export function hostToRow(
       stats.statusCheckEnabled ?? current?.statusCheckEnabled ?? true,
     statusCheckInterval:
       stats.statusCheckInterval ?? current?.statusCheckInterval ?? null,
+    sshOptions:
+      data.sshOptions !== undefined
+        ? json(data.sshOptions)
+        : (current?.sshOptions ?? null),
     pluginSettings: json(pluginSettings),
     protocolAuth: json(protocolAuth),
   };

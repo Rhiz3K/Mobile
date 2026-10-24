@@ -38,6 +38,8 @@
 - Pasting text that could run commands asks first, and paste works with bracketed paste
 - Screen readers read new terminal output, and the terminal follows the system text size
 - Option sends Alt on iPad hardware keyboards when you turn it on, and Cmd+. sends Escape
+- A Terminal tab in the host editor for the theme, font, cursor, bell, scrollback, startup snippet, keepalive, environment variables and terminal behavior of one host
+- A sudo password field in the host editor
 
 ### Changed
 
@@ -58,6 +60,7 @@
 ### Fixed
 
 - A reverse proxy asking you to sign in again no longer signs you out of Termix
+- Terminal settings saved on a host in Termix 2.9 and newer are now used on the phone
 - The first letter typed in the terminal is no longer a capital (#93)
 - Copying text no longer freezes the terminal on Android (#101)
 - Japanese, Chinese and Korean keyboards and voice typing now work in the terminal

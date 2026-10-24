@@ -97,6 +97,19 @@ describe("resolveTerminalSettings", () => {
     expect(s.fontSize).toBe(13);
   });
 
+  test("a host may pick its own font", () => {
+    const s = resolveTerminalSettings(
+      { fontFamily: "JetBrainsMono NFM" },
+      { fontFamily: "Fira Code" },
+      "dark",
+    );
+    expect(s.fontFamily).toBe("FiraCode Nerd Font Mono");
+    expect(
+      resolveTerminalSettings({ fontFamily: "JetBrainsMono NFM" }, {}, "dark")
+        .fontFamily,
+    ).toBe("JetBrainsMono NFM");
+  });
+
   test("large text grows the drawn size, capped", () => {
     expect(
       resolveTerminalSettings({ fontSize: 14 }, undefined, "dark", 1.3)

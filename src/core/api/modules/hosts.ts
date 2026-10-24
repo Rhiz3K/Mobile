@@ -32,8 +32,20 @@ export function createHostsApi(c: AccountClient) {
 
   function normalizeSSHHost(host: SSHHost): SSHHost {
     const flat = flattenPluginSettings(host as SSHHost & Record<string, any>);
+    let sshOptions: unknown = (host as { sshOptions?: unknown }).sshOptions;
+    if (typeof sshOptions === "string") {
+      try {
+        sshOptions = JSON.parse(sshOptions);
+      } catch {
+        sshOptions = undefined;
+      }
+    }
     return {
       ...flat,
+      sshOptions:
+        sshOptions && typeof sshOptions === "object"
+          ? (sshOptions as Record<string, unknown>)
+          : undefined,
       jumpHosts: normalizeJumpHosts(
         (host as { jumpHosts?: unknown }).jumpHosts,
       ),
@@ -202,6 +214,12 @@ export function createHostsApi(c: AccountClient) {
             : JSON.stringify(hostData.statsConfig)
           : null,
         terminalConfig: hostData.terminalConfig || null,
+        ...(hostData.sudoPassword !== undefined
+          ? { sudoPassword: hostData.sudoPassword || null }
+          : {}),
+        ...(hostData.sshOptions !== undefined
+          ? { sshOptions: hostData.sshOptions }
+          : {}),
         forceKeyboardInteractive: Boolean(hostData.forceKeyboardInteractive),
         ...buildProtocolFields(hostData),
       };
@@ -305,6 +323,12 @@ export function createHostsApi(c: AccountClient) {
             : JSON.stringify(hostData.statsConfig)
           : null,
         terminalConfig: hostData.terminalConfig || null,
+        ...(hostData.sudoPassword !== undefined
+          ? { sudoPassword: hostData.sudoPassword || null }
+          : {}),
+        ...(hostData.sshOptions !== undefined
+          ? { sshOptions: hostData.sshOptions }
+          : {}),
         forceKeyboardInteractive: Boolean(hostData.forceKeyboardInteractive),
         ...buildProtocolFields(hostData),
       };

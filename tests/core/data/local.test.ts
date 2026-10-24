@@ -443,3 +443,39 @@ test("a host's origin saves in its ssh-terminal settings and survives an edit", 
     code: "NOT_FOUND",
   });
 });
+
+test("host terminal settings, sudo password and ssh options round trip", async () => {
+  const { repos } = setup();
+  const saved = await repos.hosts.create({
+    ...fullHost,
+    sudoPassword: "root-pass",
+    terminalConfig: { theme: "nord", autoTmux: true, startupSnippetId: "s-1" },
+    sshOptions: {
+      keepaliveInterval: 15,
+      environmentVariables: [{ key: "EDITOR", value: "vim" }],
+    },
+  });
+  const loaded = (await repos.hosts.get(saved.id))!;
+  expect(loaded.sudoPassword).toBe("root-pass");
+  expect(loaded.terminalConfig).toEqual({
+    theme: "nord",
+    autoTmux: true,
+    startupSnippetId: "s-1",
+  });
+  expect(loaded.sshOptions).toEqual({
+    keepaliveInterval: 15,
+    environmentVariables: [{ key: "EDITOR", value: "vim" }],
+  });
+  expect(loaded.pluginSettings?.["ssh-terminal"]).toMatchObject({
+    theme: "nord",
+    autoTmux: true,
+  });
+
+  // Undefined keeps the stored secret and options, an empty string clears.
+  await repos.hosts.update(saved.id, { ...fullHost });
+  const kept = (await repos.hosts.get(saved.id))!;
+  expect(kept.sudoPassword).toBe("root-pass");
+  expect(kept.sshOptions?.keepaliveInterval).toBe(15);
+  await repos.hosts.update(saved.id, { ...fullHost, sudoPassword: "" });
+  expect((await repos.hosts.get(saved.id))!.sudoPassword).toBeUndefined();
+});

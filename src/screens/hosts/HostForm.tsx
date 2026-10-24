@@ -14,7 +14,12 @@ import {
   InlineView,
 } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
-import { useCapability, useHostToggles } from "@/core/features";
+import {
+  useCapability,
+  useHostToggles,
+  type HostFormEditor,
+  type HostFormValues,
+} from "@/core/features";
 import { toast } from "@/utils/toast";
 import { TailscaleDevicePicker } from "@/features/tailscale/TailscaleDevices";
 import { tailnetAddress } from "@/features/tailscale/tailscale";
@@ -52,6 +57,7 @@ interface FormState {
   password: string;
   key: string;
   keyPassword: string;
+  sudoPassword: string;
   credentialId?: number;
   enableTerminal: boolean;
   enableTunnel: boolean;
@@ -92,6 +98,7 @@ const EMPTY: FormState = {
   password: "",
   key: "",
   keyPassword: "",
+  sudoPassword: "",
   credentialId: undefined,
   enableTerminal: true,
   enableTunnel: false,
@@ -135,8 +142,20 @@ export default function HostForm({
   const [tunnels, setTunnels] = useState<TunnelConnection[]>([]);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("general");
+  // Values of the feature tabs that draw themselves, by tab id.
+  const [editorValues, setEditorValues] = useState<
+    Record<string, HostFormValues>
+  >({});
+  const savedSudo = useRef("");
   const isEdit = !!host;
   const hostToggles = useHostToggles();
+  const editors = useMemo(() => {
+    const map: Record<string, HostFormEditor> = {};
+    for (const t of hostToggles) {
+      if (t.formTab?.editor) map[t.formTab.id] = t.formTab.editor;
+    }
+    return map;
+  }, [hostToggles]);
   const canWake = useCapability("host.wake");
   const hasDefaultPath = useCapability("files.defaultPath");
   const tailscaleAvailable = useCapability("hosts.discovery");
@@ -182,6 +201,12 @@ export default function HostForm({
     }
     const source = host ?? draft;
     autoNameRef.current = host ? "" : (draft?.name ?? "");
+    savedSudo.current = "";
+    const values: Record<string, HostFormValues> = {};
+    for (const [id, editor] of Object.entries(editors)) {
+      values[id] = editor.read(host ?? null);
+    }
+    setEditorValues(values);
     if (!source) {
       setForm(EMPTY);
       setTunnels([]);
@@ -227,11 +252,13 @@ export default function HostForm({
       .get(host.id)
       .then((full) => {
         if (!full || cancelled) return;
+        savedSudo.current = full.sudoPassword ?? "";
         setForm((f) => ({
           ...f,
           password: full.password ?? "",
           key: full.key ?? "",
           keyPassword: full.keyPassword ?? "",
+          sudoPassword: full.sudoPassword ?? "",
           rdpPassword: full.rdpPassword ?? "",
           vncPassword: full.vncPassword ?? "",
           telnetPassword: full.telnetPassword ?? "",
@@ -241,7 +268,7 @@ export default function HostForm({
     return () => {
       cancelled = true;
     };
-  }, [visible, host, draft, repos]);
+  }, [visible, host, draft, repos, editors]);
 
   // The tab strip: General is always present; feature tabs follow their switch.
   const tabs = useMemo<{ id: TabId; label: string }[]>(() => {
@@ -404,6 +431,13 @@ export default function HostForm({
       telnetPassword: form.telnetPassword,
       telnetPort: parseInt(form.telnetPort, 10) || 23,
     };
+    // Only sent when changed, so a host whose secret the phone can't read keeps it.
+    if (form.enableSsh && form.sudoPassword !== savedSudo.current) {
+      payload.sudoPassword = form.sudoPassword;
+    }
+    for (const [id, editor] of Object.entries(editors)) {
+      if (editorValues[id]) editor.write(editorValues[id], payload);
+    }
 
     setSaving(true);
     try {
@@ -714,6 +748,20 @@ export default function HostForm({
                   )}
                 </Field>
               ) : null}
+
+              <Field label="Sudo password">
+                <Input
+                  value={form.sudoPassword}
+                  onChangeText={(v) => set("sudoPassword", v)}
+                  secureTextEntry
+                  placeholder="Not set"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </Field>
+              <Text className="text-meta text-muted-foreground">
+                Filled into sudo prompts when the Terminal tab turns that on.
+              </Text>
             </Section>
 
             {picksOrigin ? (
@@ -763,6 +811,24 @@ export default function HostForm({
             ) : null}
           </>
         ) : null}
+
+        {editors[activeTab]
+          ? (() => {
+              const Editor = editors[activeTab].component;
+              return (
+                <Editor
+                  host={host}
+                  value={editorValues[activeTab] ?? {}}
+                  onChange={(patch) =>
+                    setEditorValues((all) => ({
+                      ...all,
+                      [activeTab]: { ...(all[activeTab] ?? {}), ...patch },
+                    }))
+                  }
+                />
+              );
+            })()
+          : null}
 
         {activeTab === "tunnels" ? (
           <Section title="Tunnels">

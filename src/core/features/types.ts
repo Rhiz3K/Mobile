@@ -6,7 +6,7 @@ import type {
   TransportCapability,
   TransportKind,
 } from "@/core/transport/types";
-import type { SSHHost } from "@/types";
+import type { SSHHost, SSHHostData } from "@/types";
 
 /**
  * Everything the UI can show for a feature comes from here. Screens list
@@ -130,7 +130,29 @@ export interface HostToggleDef {
   group: "protocol" | "feature";
   order: number;
   /** An editor tab shown while the switch is on. */
-  formTab?: { id: string; label: string; order: number };
+  formTab?: {
+    id: string;
+    label: string;
+    order: number;
+    /** Draws the tab itself. Tabs without one are drawn by the host form. */
+    editor?: HostFormEditor;
+  };
+}
+
+/** The values a feature's host editor tab works on. */
+export type HostFormValues = Record<string, unknown>;
+
+export interface HostFormTabProps {
+  host: SSHHost | null;
+  value: HostFormValues;
+  onChange: (patch: HostFormValues) => void;
+}
+
+export interface HostFormEditor {
+  read: (host: SSHHost | null) => HostFormValues;
+  /** Puts the tab's values on the payload the form saves. */
+  write: (value: HostFormValues, payload: SSHHostData) => void;
+  component: ComponentType<HostFormTabProps>;
 }
 
 /** A short tag on host rows, like DKR. */

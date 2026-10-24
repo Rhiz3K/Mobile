@@ -1,6 +1,11 @@
 // Maps the pre 2.9 server routes onto the 2.9 plugin routes. The rest of the
 // app keeps calling the old paths and this decides where they really go.
 
+import {
+  pluginSettingsFromTerminalConfig,
+  terminalConfigFromPluginSettings,
+} from "./terminal-settings";
+
 export type ApiGeneration = "legacy" | "plugin";
 
 const PLUGIN_RULES: [RegExp, string][] = [
@@ -109,6 +114,13 @@ export function flattenPluginSettings<T extends Record<string, any>>(
   const terminal = settings["ssh-terminal"];
   set("enableTerminal", terminal ? terminal.enableTerminal !== false : false);
   if (terminal?.connectFrom) set("connectFrom", terminal.connectFrom);
+  const terminalConfig = terminalConfigFromPluginSettings(
+    terminal,
+    settings.snippets,
+  );
+  if (Object.keys(terminalConfig).length > 0) {
+    set("terminalConfig", terminalConfig);
+  }
 
   const files = settings["file-manager"];
   set("enableFileManager", files ? files.enableFileManager !== false : false);
@@ -167,8 +179,12 @@ export function buildPluginHostSettings(
   const tunnelConnections = data.enableTunnel
     ? data.tunnelConnections || []
     : [];
-  return {
-    "ssh-terminal": { enableTerminal: data.enableTerminal !== false },
+  const terminal = pluginSettingsFromTerminalConfig(data.terminalConfig);
+  const out: Record<string, Record<string, unknown>> = {
+    "ssh-terminal": {
+      ...terminal.terminal,
+      enableTerminal: data.enableTerminal !== false,
+    },
     "file-manager": {
       enableFileManager: Boolean(data.enableFileManager),
       defaultPath: data.enableFileManager ? data.defaultPath || "/" : "/",
@@ -188,6 +204,10 @@ export function buildPluginHostSettings(
     },
     "wake-on-lan": { macAddress: data.macAddress?.trim() || "" },
   };
+  if (Object.keys(terminal.snippets).length > 0) {
+    out.snippets = terminal.snippets;
+  }
+  return out;
 }
 
 /** ws(s):// form of the server root, without a trailing slash or /ssh. */

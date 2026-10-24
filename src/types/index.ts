@@ -40,6 +40,8 @@ export interface SSHHost {
   key?: string;
   keyPassword?: string;
   keyType?: string;
+  /** Typed into sudo prompts when the host turns that on. */
+  sudoPassword?: string;
   forceKeyboardInteractive?: boolean;
 
   autostartPassword?: string;
@@ -57,7 +59,9 @@ export interface SSHHost {
   jumpHosts?: JumpHost[];
   quickActions?: QuickAction[];
   statsConfig?: string;
-  terminalConfig?: TerminalConfig;
+  terminalConfig?: Partial<TerminalConfig>;
+  /** Keepalive, environment variables and other SSH options. */
+  sshOptions?: Record<string, unknown>;
   /** Where the app connects from: "auto", "device" or "server". */
   connectFrom?: string;
   createdAt: string;
@@ -120,6 +124,8 @@ export interface SSHHostData {
   key?: File | null;
   keyPassword?: string;
   keyType?: string;
+  /** Undefined keeps the saved one, an empty string clears it. */
+  sudoPassword?: string;
   credentialId?: number | null;
   overrideCredentialUsername?: boolean;
   enableTerminal?: boolean;
@@ -131,7 +137,8 @@ export interface SSHHostData {
   jumpHosts?: JumpHostData[];
   quickActions?: QuickActionData[];
   statsConfig?: string | Record<string, unknown>;
-  terminalConfig?: TerminalConfig;
+  terminalConfig?: Partial<TerminalConfig>;
+  sshOptions?: Record<string, unknown>;
 
   // --- Modern multi-protocol model (optional; SSH-only hosts omit these).
   enableSsh?: boolean;
@@ -440,7 +447,8 @@ export interface TerminalConfig {
   backspaceMode: "normal" | "control-h";
   agentForwarding: boolean;
   environmentVariables: { key: string; value: string }[];
-  startupSnippetId: number | null;
+  /** A server's snippet id, or the snippet's syncId in a local copy. */
+  startupSnippetId: number | string | null;
   autoMosh: boolean;
   moshCommand: string;
   sudoPasswordAutoFill: boolean;
@@ -453,6 +461,14 @@ export interface TerminalConfig {
   haptics: boolean;
   /** Phone only: Option on an iPad keyboard sends Alt instead of symbols. */
   optionAsMeta: boolean;
+
+  // Host only, from the ssh-terminal plugin.
+  useSSHTitle?: boolean;
+  autoReconnect?: boolean;
+  keepOpenOnExit?: boolean;
+  autoTmux?: boolean;
+  passwordPromptAutoFill?: boolean;
+  enableCommandHistory?: boolean;
 }
 
 // ============================================================================

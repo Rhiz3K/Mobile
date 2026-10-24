@@ -19,3 +19,4 @@ export { EmptyState } from "./EmptyState";
 export { Toaster } from "./Toast";
 export { Badge } from "./Badge";
 export type { BadgeVariant } from "./Badge";
+export { ChoiceRow } from "./ChoiceRow";
