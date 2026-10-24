@@ -52,7 +52,7 @@ test("the banner says the session ended and offers to sign in again", async () =
   await linkedAccount({ status: "signed_out", lastError: "expired" });
   await render(<SyncBanner />);
   expect(screen.getByText("Signed out")).toBeTruthy();
-  fireEvent.press(screen.getByText("Sign in again"));
+  await fireEvent.press(screen.getByText("Sign in again"));
   expect(mockOpenAuthFlow).toHaveBeenCalledWith("login");
 });
 
@@ -69,7 +69,7 @@ test("the sync screen lists what syncs and offers unlink with keep", async () =>
   expect(screen.getByText("Hosts and folders")).toBeTruthy();
   expect(screen.getByText("Snippets")).toBeTruthy();
   expect(screen.getByText("Headers")).toBeTruthy();
-  fireEvent.press(screen.getByText("Unlink this server"));
+  await fireEvent.press(screen.getByText("Unlink this server"));
   expect(await screen.findByText("Keep a copy on This device")).toBeTruthy();
 });
 
