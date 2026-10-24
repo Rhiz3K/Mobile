@@ -17,6 +17,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Toaster } from "@/ui/Toast";
 import { ConfirmProvider } from "@/ui/Confirm";
+import { SudoPromptHost } from "@/screens/exec/SudoPromptHost";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useFonts } from "expo-font";
 import { FONT_MAP, MONO_FONT, MONO_FONT_BOLD } from "@/constants/fonts";
@@ -127,6 +128,7 @@ export default function RootLayout() {
                         <ConfirmProvider>
                           <RootLayoutContent />
                         </ConfirmProvider>
+                        <SudoPromptHost />
                         <Toaster />
                       </KeyPrefsProvider>
                     </KeyboardProvider>

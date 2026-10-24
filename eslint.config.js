@@ -36,6 +36,24 @@ module.exports = defineConfig([
     },
   },
   {
+    // The rest of the plugin SDK needs Node; only the host scripts run in the app.
+    files: ["src/**/*.{ts,tsx}", "app/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              regex: "^@termix-ssh/plugin-sdk(?!/host-scripts$)",
+              message:
+                "Only @termix-ssh/plugin-sdk/host-scripts runs in the app.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ["scripts/**/*.{js,cjs,mjs}", "plugins/**/*.js"],
     languageOptions: { globals: { ...globals.node } },
     rules: { "react-hooks/rules-of-hooks": "off" },
