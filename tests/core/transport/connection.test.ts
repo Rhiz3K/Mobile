@@ -390,12 +390,14 @@ describe("HostConnection", () => {
       initialSessionId: "s1",
       tabInstanceId: "tab",
       pipeId: "pipe",
+      protocol: "telnet",
     });
     await conn.connect(80, 24);
     const { options, channel } = t.last();
     expect(options.initialSessionId).toBe("s1");
     expect(options.tabInstanceId).toBe("tab");
     expect(options.pipeId).toBe("pipe");
+    expect(options.protocol).toBe("telnet");
 
     // Typed before the shell is up: kept, then sent once it is.
     conn.sendInput("ls\r");

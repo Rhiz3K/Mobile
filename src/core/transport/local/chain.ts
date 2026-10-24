@@ -107,22 +107,21 @@ function promptsFor(
   };
 }
 
-export async function openChain(
+/**
+ * Logs in to every jump host of `host` in order. Telnet and remote desktops
+ * dial their target through the last one.
+ */
+export async function openJumps(
   repo: HostConnectRepository | undefined,
   host: TerminalHostConfig,
-  overrides: LoginOverrides | null,
+  jumpHostIds: number[],
   h: ChainHandlers,
-): Promise<Chain> {
-  const profile = host.id > 0 && repo ? await repo.profile(host.id) : null;
-  const login = withTimeout(
-    applyOverrides(resolveLogin(profile, host), overrides),
-    h.connectTimeoutSecs,
-  );
+): Promise<SshSession[]> {
   const hops: SshSession[] = [];
   const opts = { signal: h.signal };
   try {
-    const total = login.jumpHostIds.length;
-    for (const [index, id] of login.jumpHostIds.entries()) {
+    const total = jumpHostIds.length;
+    for (const [index, id] of jumpHostIds.entries()) {
       const p = repo ? await repo.profile(id) : null;
       if (!p) {
         throw new AppError(
@@ -150,7 +149,27 @@ export async function openChain(
         throw err;
       }
     }
+    return hops;
+  } catch (err) {
+    closeAll(hops);
+    throw err;
+  }
+}
 
+export async function openChain(
+  repo: HostConnectRepository | undefined,
+  host: TerminalHostConfig,
+  overrides: LoginOverrides | null,
+  h: ChainHandlers,
+): Promise<Chain> {
+  const profile = host.id > 0 && repo ? await repo.profile(host.id) : null;
+  const login = withTimeout(
+    applyOverrides(resolveLogin(profile, host), overrides),
+    h.connectTimeoutSecs,
+  );
+  const hops = await openJumps(repo, host, login.jumpHostIds, h);
+  const opts = { signal: h.signal };
+  try {
     const last = hops[hops.length - 1];
     const open = (l: ResolvedLogin) => {
       const prompts = promptsFor(l, null, h, repo);

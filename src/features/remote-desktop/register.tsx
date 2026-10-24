@@ -3,13 +3,21 @@ import {
   Monitor,
   MousePointerClick,
 } from "lucide-react-native";
+import { forwardRef } from "react";
+import { checkOpen } from "@/core/features/open-check";
 import type {
   FeatureDef,
   FeatureIcon,
+  HostActionDef,
   SessionTabProps,
 } from "@/core/features/types";
+import { Terminal, type TerminalHandle } from "@/features/terminal/Terminal";
+import KeyRowBar from "@/features/terminal/keys/KeyRowBar";
+import BottomToolbar from "@/features/terminal/keyboard/BottomToolbar";
 import type { SSHHost } from "@/types";
+import { isSshHost, toTerminalHostConfig } from "@/utils/hosts";
 import { RemoteDesktop, type RemoteDesktopProtocol } from "./RemoteDesktop";
+import { REMOTE_DESKTOP_TAB, TELNET_TAB, telnetTabFor } from "./telnet";
 
 const PLUGIN = "remote-desktop";
 const PROTOCOLS: RemoteDesktopProtocol[] = ["rdp", "vnc", "telnet"];
@@ -38,7 +46,46 @@ function RemoteDesktopTab({
   );
 }
 
-/** The tab all three protocols open. */
+/** Telnet the phone opens itself, in the native terminal. */
+const TelnetTab = forwardRef<TerminalHandle, SessionTabProps>(
+  (
+    {
+      session,
+      isVisible,
+      onClose,
+      onTransportResolved,
+      onBackgroundColorChange,
+      onTitle,
+      onMenu,
+      onShortcut,
+      onStatus,
+    },
+    ref,
+  ) => (
+    <Terminal
+      ref={ref}
+      host={session.host}
+      hostConfig={toTerminalHostConfig(session.host)}
+      type={session.type}
+      origin={session.origin}
+      protocol="telnet"
+      onTransportResolved={onTransportResolved}
+      isVisible={isVisible}
+      title={session.title}
+      tabInstanceId={session.instanceId}
+      onClose={onClose}
+      onBackgroundColorChange={onBackgroundColorChange}
+      onTitle={onTitle}
+      onMenu={onMenu}
+      onShortcut={onShortcut}
+      restored={session.restored}
+      onStatus={onStatus}
+    />
+  ),
+);
+TelnetTab.displayName = "TelnetTab";
+
+/** The tab all three protocols open through the server. */
 export const remoteDesktopFeature: FeatureDef = {
   id: "remote-desktop",
   title: "Remote Desktop",
@@ -46,7 +93,7 @@ export const remoteDesktopFeature: FeatureDef = {
   requires: { plugin: PLUGIN },
   sessionTabs: [
     {
-      type: "remoteDesktop",
+      type: REMOTE_DESKTOP_TAB,
       icon: Monitor,
       titleSuffix: (s) =>
         s.remoteProtocol ? s.remoteProtocol.toUpperCase() : "Remote",
@@ -81,6 +128,8 @@ function protocolFeature(
     order: number;
     enabled: (host: SSHHost) => boolean;
     toggleKey: string;
+    run?: HostActionDef["run"];
+    extra?: Partial<FeatureDef>;
   },
 ): FeatureDef {
   return {
@@ -96,8 +145,10 @@ function protocolFeature(
         group: "connect",
         order: 60 + opts.order,
         isAvailable: opts.enabled,
-        run: (_host, ctx) =>
-          ctx.openSession("remoteDesktop", { remoteProtocol: protocol }),
+        run:
+          opts.run ??
+          ((_host, ctx) =>
+            ctx.openSession(REMOTE_DESKTOP_TAB, { remoteProtocol: protocol })),
       },
     ],
     hostToggles: [
@@ -126,6 +177,7 @@ function protocolFeature(
         matches: opts.enabled,
       },
     ],
+    ...opts.extra,
   };
 }
 
@@ -148,6 +200,8 @@ export const vncFeature = protocolFeature("vnc", {
   toggleKey: "enableVnc",
 });
 
+// The phone dials Telnet itself, so it works with no server and on servers
+// without the remote desktop plugin. Through a server it uses that plugin.
 export const telnetFeature = protocolFeature("telnet", {
   label: "Telnet",
   badge: "TEL",
@@ -155,4 +209,37 @@ export const telnetFeature = protocolFeature("telnet", {
   order: 2,
   enabled: (host) => !!host.enableTelnet,
   toggleKey: "enableTelnet",
+  run: async (host, ctx) => {
+    const check = await checkOpen(
+      ctx.account.id,
+      host,
+      isSshHost(host),
+      TELNET_TAB,
+    );
+    const tab = telnetTabFor(check);
+    await ctx.openSession(
+      tab,
+      tab === TELNET_TAB ? undefined : { remoteProtocol: "telnet" },
+    );
+  },
+  extra: {
+    requires: undefined,
+    availableOn: ["local", "server"],
+    sessionTabs: [
+      {
+        type: TELNET_TAB,
+        icon: MessagesSquare,
+        titleSuffix: () => "Telnet",
+        shortLabel: () => "Telnet",
+        needsOneOf: [["tcp"]],
+        dialsDirectly: true,
+        // Server tab records named telnet still reopen in the server's view.
+        serverTabTypes: [],
+        toServerTabType: () => "telnet",
+        capabilities: ["terminal-input"],
+        component: TelnetTab,
+        inputChrome: { keyRow: KeyRowBar, keyPanel: BottomToolbar },
+      },
+    ],
+  },
 });

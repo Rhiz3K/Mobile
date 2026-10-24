@@ -1,4 +1,4 @@
-import { checkOpen } from "@/core/features/open-check";
+import { checkOpen, deviceDialOnly } from "@/core/features/open-check";
 import { features } from "@/core/features/registry";
 import { localStores } from "@/core/db/stores";
 import { localRepositories } from "@/core/data/local";
@@ -58,4 +58,27 @@ test("the saved origin is read from the account's store", async () => {
   const check = await checkOpen("local", host, true, "terminal");
   expect(check.plan.origin).toBe("device");
   expect(features.sessionNeeds("terminal")).toEqual([["shell"]]);
+});
+
+test("a This device telnet host opens from the phone, even with SSH off", async () => {
+  const check = await checkOpen("local", { id: 1 }, false, "telnet");
+  expect(check.blocked).toBeUndefined();
+  expect(check.attempts.map((t) => t.kind)).toEqual(["local"]);
+  // RDP and VNC still need a server.
+  const rdp = await checkOpen("local", { id: 1 }, false, "remoteDesktop");
+  expect(rdp.attempts).toEqual([]);
+});
+
+test("telnet in the terminal keeps only the phone's way", () => {
+  const local = { kind: "local", provides: ["shell", "tcp"] } as never;
+  const relay = { kind: "relay", provides: ["shell", "guacd"] } as never;
+  const plan = { origin: "auto" as const, attempts: [local, relay] };
+  expect(deviceDialOnly({ plan, attempts: [local, relay] }).attempts).toEqual([
+    local,
+  ]);
+  const onlyServer = deviceDialOnly({ plan, attempts: [relay] });
+  expect(onlyServer.attempts).toEqual([]);
+  expect(onlyServer.blocked?.fix).toBe("device");
+  const blocked = { reason: "signed out" };
+  expect(deviceDialOnly({ plan, attempts: [], blocked }).blocked).toBe(blocked);
 });

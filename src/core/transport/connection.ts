@@ -16,6 +16,7 @@ import type {
   ShellExecResult,
   ShellChannel,
   ShellOptions,
+  ShellProtocol,
   TerminalHostConfig,
   Transport,
   TransportKind,
@@ -171,6 +172,8 @@ export interface HostConnectionOptions {
   initialSessionId?: string | null;
   /** Native pipe of the terminal view, for shells that can feed it directly. */
   pipeId?: string;
+  /** Telnet instead of SSH. Only phone transports can open it. */
+  protocol?: ShellProtocol;
   /** Connect timeout for a try that has a fallback after it. */
   fallbackTimeoutSecs?: number;
   /** A tab brought back after the app restarted: its first connect is a resume. */
@@ -386,6 +389,7 @@ export class HostConnection {
       hostConfig: this.options.host,
       tabInstanceId: this.options.tabInstanceId,
       pipeId: this.options.pipeId,
+      protocol: this.options.protocol,
       initialSessionId: this.sessionId,
       connectTimeoutSecs: hasFallback
         ? (this.options.fallbackTimeoutSecs ?? 8)

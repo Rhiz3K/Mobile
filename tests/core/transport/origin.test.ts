@@ -95,7 +95,10 @@ describe("a linked server", () => {
   test("non-SSH hosts never use the phone", () => {
     expect(kinds(inputs(true, true, false), "auto")).toEqual(["relay"]);
     expect(planConnection("device", inputs(true, true, false)).blocked).toEqual(
-      { reason: "The phone only connects to SSH hosts.", fix: "server" },
+      {
+        reason: "The phone only connects to SSH and Telnet hosts.",
+        fix: "server",
+      },
     );
   });
 });

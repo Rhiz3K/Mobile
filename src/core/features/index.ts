@@ -6,4 +6,4 @@ export {
   meets,
 } from "./registry";
 export * from "./hooks";
-export { checkOpen, type OpenCheck } from "./open-check";
+export { checkOpen, deviceDialOnly, type OpenCheck } from "./open-check";

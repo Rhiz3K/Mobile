@@ -25,8 +25,9 @@ export async function checkOpen(
   type: string,
   origin?: ConnectionOrigin,
 ): Promise<OpenCheck> {
-  const plan = await planFor(accountId, host, isSsh, origin);
-  const inputs = originInputs(accountId, isSsh);
+  const deviceOk = isSsh || !!features.sessionTab(type)?.dialsDirectly;
+  const plan = await planFor(accountId, host, deviceOk, origin);
+  const inputs = originInputs(accountId, deviceOk);
   const title = features.sessionFeature(type)?.title ?? "This";
   const relayRequires = features.sessionTab(type)?.relayRequires;
   const client =
@@ -42,4 +43,21 @@ export async function checkOpen(
     { relayOk },
   );
   return { ...result, plan };
+}
+
+/**
+ * Keeps only the ways where the phone dials the host itself, for Telnet in
+ * the terminal. The server opens Telnet in its own view instead.
+ */
+export function deviceDialOnly(check: OpenCheck): OpenCheck {
+  const attempts = check.attempts.filter((t) => t.provides.includes("tcp"));
+  if (attempts.length || check.blocked) return { ...check, attempts };
+  return {
+    ...check,
+    attempts,
+    blocked: {
+      reason: "Telnet in the terminal needs a connection from the phone.",
+      fix: "device",
+    },
+  };
 }

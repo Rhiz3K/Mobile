@@ -103,6 +103,7 @@
 - Import hosts from a Termix host file or an SSH config, and export hosts with or without passwords and keys, in Settings, Import and export
 - Share a host as a QR code or link and scan one from another phone
 - Quick Connect reads user@host:port and can save the host
+- Telnet hosts connect straight from the phone, with no Termix server needed, and open in the terminal with its key rows and find
 
 ### Changed
 

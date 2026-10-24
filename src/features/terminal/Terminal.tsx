@@ -27,6 +27,7 @@ import type {
 } from "@/core/features/types";
 import type {
   ConnectionOrigin,
+  ShellProtocol,
   HostConnection,
   TerminalHostConfig,
   TransportKind,
@@ -106,6 +107,8 @@ interface TerminalProps {
   type: string;
   /** Overrides the host's saved origin for this tab. */
   origin?: ConnectionOrigin;
+  /** Telnet instead of SSH. */
+  protocol?: ShellProtocol;
   isVisible: boolean;
   title?: string;
   onClose?: () => void;
@@ -142,6 +145,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
       hostConfig,
       type,
       origin,
+      protocol,
       isVisible,
       onClose,
       onBackgroundColorChange,
@@ -520,6 +524,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
       useHostConnection(host, hostConfig, {
         type,
         origin,
+        protocol,
         tabInstanceId,
         initialSessionId,
         restored,

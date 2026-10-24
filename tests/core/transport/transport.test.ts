@@ -50,7 +50,7 @@ test("the phone needs the engine and the account's local copy", () => {
   expect(noCopy.unavailableReason).toBe(NO_SERVER_COPY);
   const ready = createLocalTransport(true, () => repo);
   expect(ready.available).toBe(true);
-  expect(ready.provides).toEqual(["shell", "exec", "sftp", "forward"]);
+  expect(ready.provides).toEqual(["shell", "exec", "sftp", "forward", "tcp"]);
 });
 
 test("the relay works while signed in and opens server shells", async () => {

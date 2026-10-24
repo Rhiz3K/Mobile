@@ -21,9 +21,10 @@ export type TransportKind = "relay" | "local";
  * - `server`: the server's own routes (file manager, docker, metrics, ...)
  * - `guacd`: remote desktop through the server
  * - `forward`: port forwards opened by the app itself (tunnels on the phone)
+ * - `tcp`: plain connections the app opens itself (Telnet on the phone)
  */
 export type TransportCapability =
-  "shell" | "exec" | "sftp" | "server" | "guacd" | "forward";
+  "shell" | "exec" | "sftp" | "server" | "guacd" | "forward" | "tcp";
 
 export interface TerminalHostConfig {
   id: number;
@@ -138,7 +139,11 @@ export interface ShellOptions extends ShellEvents {
   pipeId?: string;
   /** Reconnecting after a drop or an app restart, not a first connect. */
   resume?: boolean;
+  /** What the shell speaks. Telnet only goes through the phone. */
+  protocol?: ShellProtocol;
 }
+
+export type ShellProtocol = "ssh" | "telnet";
 
 /** A live shell on a host. */
 export interface ShellChannel {

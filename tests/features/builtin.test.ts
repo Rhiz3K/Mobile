@@ -34,6 +34,7 @@ test("every session type is owned by exactly one feature", () => {
       "remoteDesktop",
       "services",
       "stats",
+      "telnet",
       "terminal",
       "tunnel",
     ].sort(),
@@ -116,6 +117,7 @@ test("This device gets the features that run on the phone, and no server only on
     "service-manager",
     "tunnels",
     "host-metrics",
+    "remote-desktop.telnet",
     "snippets",
     "host-defaults",
     "host-transfer",
@@ -125,6 +127,17 @@ test("This device gets the features that run on the phone, and no server only on
   expect(r.canOpen("filemanager", {}, ctx)).toBe(true);
   expect(r.canOpen("docker", {}, ctx)).toBe(true);
   expect(r.canOpen("remoteDesktop", {}, ctx)).toBe(false);
+  // The phone dials Telnet itself.
+  expect(r.canOpen("telnet", {}, ctx)).toBe(true);
+});
+
+test("telnet runs on the phone and is never a server only tab", () => {
+  const r = registry();
+  expect(r.sessionNeeds("telnet")).toEqual([["tcp"]]);
+  expect(r.serverOnly("telnet")).toBe(false);
+  expect(r.sessionTab("telnet")?.dialsDirectly).toBe(true);
+  // Server tab records named telnet still reopen in the server's view.
+  expect(r.sessionTabForServerType("telnet")?.tab.type).toBe("remoteDesktop");
 });
 
 test("files work over SFTP or the server, and sit beside terminals", () => {

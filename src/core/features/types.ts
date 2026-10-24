@@ -130,6 +130,8 @@ export interface SessionTabDef {
   needsOneOf?: TransportCapability[][];
   /** What the server needs to run this tab through it. Ways through the server drop out without it. */
   relayRequires?: FeatureRequirement;
+  /** The phone opens this protocol itself, so hosts without SSH can still connect from the phone. */
+  dialsDirectly?: boolean;
   // Each tab has its own handle type, so the ref stays loose here.
   component: ComponentType<SessionTabProps & { ref?: Ref<any> }>;
   /** The key row and keys panel of a `terminal-input` tab. */

@@ -7,6 +7,7 @@ import type { HostSession, Transport } from "../types";
 import { closeAll, openChain } from "./chain";
 import { autoAnswer } from "./kbd";
 import { LocalShell } from "./LocalShell";
+import { LocalTelnetShell } from "./LocalTelnetShell";
 
 export const NO_ENGINE =
   "This build has no SSH engine. Use the app from the store, or link a Termix server to connect.";
@@ -31,7 +32,7 @@ export function createLocalTransport(
   const refuse = () => new AppError(reason() ?? "", "TRANSPORT_UNAVAILABLE");
   return {
     kind: "local",
-    provides: ["shell", "exec", "sftp", "forward"],
+    provides: ["shell", "exec", "sftp", "forward", "tcp"],
     get available() {
       return !reason();
     },
@@ -40,7 +41,9 @@ export function createLocalTransport(
     },
     openShell(options) {
       if (reason()) throw refuse();
-      return new LocalShell(options, repo);
+      return options.protocol === "telnet"
+        ? new LocalTelnetShell(options, repo)
+        : new LocalShell(options, repo);
     },
     async openSession(host, options = {}): Promise<HostSession> {
       if (reason()) throw refuse();

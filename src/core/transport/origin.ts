@@ -39,7 +39,10 @@ export interface OriginInputs {
   local: Transport;
   /** Null on This device, which has no server. */
   relay: Transport | null;
-  /** Non-SSH hosts (RDP, VNC, Telnet) never use the phone's SSH engine. */
+  /**
+   * The phone can dial this host for this tab: an SSH host, or a protocol the
+   * phone opens itself like Telnet. RDP and VNC still go through the server.
+   */
   isSsh: boolean;
 }
 
@@ -67,7 +70,7 @@ export function planConnection(
   const localOk = isSsh && usable(local);
   const localReason = isSsh
     ? local.unavailableReason
-    : "The phone only connects to SSH hosts.";
+    : "The phone only connects to SSH and Telnet hosts.";
 
   // This device has nothing to relay through.
   if (inputs.accountKind === "local" || !relay) {
@@ -134,6 +137,7 @@ const NEED_WORDS: Record<TransportCapability, string> = {
   forward: "an SSH connection",
   server: "a Termix server",
   guacd: "a Termix server",
+  tcp: "a connection from the phone",
 };
 
 /**

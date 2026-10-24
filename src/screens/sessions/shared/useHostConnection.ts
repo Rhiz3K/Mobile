@@ -6,7 +6,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { useSessionAccountId } from "@/core/accounts/session";
-import { checkOpen } from "@/core/features";
+import { checkOpen, deviceDialOnly } from "@/core/features";
 import { sessionLifecycle } from "@/core/sessions/lifecycle";
 import {
   HostConnection,
@@ -17,6 +17,7 @@ import {
   type ConnectionOrigin,
   type ConnectionStatus,
   type RelayTmuxSession,
+  type ShellProtocol,
   type TerminalHostConfig,
   type TransportKind,
 } from "@/core/transport";
@@ -60,10 +61,13 @@ export function useHostConnection(
     pipeId?: string;
     /** A tab brought back after the app was closed. */
     restored?: boolean;
+    /** Telnet only goes through the phone, so other ways drop out. */
+    protocol?: ShellProtocol;
   },
 ) {
   const accountId = useSessionAccountId();
   const isSsh = opts.isSsh ?? true;
+  const protocol = opts.protocol;
   const handlers = useRef(opts);
   useEffect(() => {
     handlers.current = opts;
@@ -74,8 +78,17 @@ export function useHostConnection(
     () =>
       new HostConnection({
         host: hostConfig,
-        plan: () =>
-          checkOpen(accountId, host, isSsh, opts.type, originRef.current),
+        plan: async () => {
+          const check = await checkOpen(
+            accountId,
+            host,
+            isSsh,
+            opts.type,
+            originRef.current,
+          );
+          return opts.protocol === "telnet" ? deviceDialOnly(check) : check;
+        },
+        protocol: opts.protocol,
         tabInstanceId: opts.tabInstanceId,
         initialSessionId: opts.initialSessionId,
         pipeId: opts.pipeId,
@@ -112,6 +125,8 @@ export function useHostConnection(
   const switchTo = useMemo((): ConnectionOrigin | undefined => {
     if (state.status !== "failed") return undefined;
     if (state.fix) return state.fix;
+    // Telnet through the server opens in another view, not this one.
+    if (protocol === "telnet") return undefined;
     if (!SWITCHABLE.has(state.failure.stage)) return undefined;
     const inputs = originInputs(accountId, isSsh);
     const failed = state.failure.origin;
@@ -119,7 +134,7 @@ export function useHostConnection(
       const first = planConnection(o, inputs).attempts[0];
       return first && first.kind !== failed;
     });
-  }, [state, accountId, isSsh]);
+  }, [state, accountId, isSsh, protocol]);
 
   /** Saves the origin on the host and connects that way. */
   const switchOrigin = useCallback(
