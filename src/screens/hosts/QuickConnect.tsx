@@ -1,12 +1,24 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { View, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
 import { Zap } from "lucide-react-native";
 import { SSHHost } from "@/types";
 import { useTerminalSessions } from "@/contexts/TerminalSessionsContext";
-import { Sheet, Input, Button, Label, Tabs, Text } from "@/ui";
+import {
+  Sheet,
+  Input,
+  Button,
+  Label,
+  Tabs,
+  Text,
+  SettingRow,
+  FakeSwitch,
+} from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { features } from "@/core/features";
 import { toast } from "@/utils/toast";
+import { useRepositories } from "@/core/data/hooks";
+import { formDefaults } from "@/core/hosts/defaults/form";
+import { parseTarget, targetName } from "@/core/hosts/target";
 
 type AuthType = "password" | "key";
 
@@ -30,8 +42,41 @@ export function QuickConnect({
   const [authType, setAuthType] = useState<AuthType>("password");
   const [password, setPassword] = useState("");
   const [key, setKey] = useState("");
+  const [save, setSave] = useState(false);
+  const repos = useRepositories();
+
+  // Start from the user's defaults, like a new host.
+  useEffect(() => {
+    if (!visible || !repos.hostDefaults) return;
+    let cancelled = false;
+    repos.hostDefaults
+      .index()
+      .then((index) => {
+        if (cancelled) return;
+        const found = formDefaults(index, "");
+        if (found.username) setUsername((u) => u || found.username!);
+        if (found.port) setPort((p) => (p === "22" ? String(found.port) : p));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, repos]);
+
+  // user@host:port typed or pasted into the address splits into the fields.
+  const changeAddress = (value: string) => {
+    const target = parseTarget(value);
+    if (target && (target.user || target.port)) {
+      setIp(target.host);
+      if (target.user) setUsername(target.user);
+      if (target.port) setPort(String(target.port));
+      return;
+    }
+    setIp(value);
+  };
 
   const reset = () => {
+    setSave(false);
     setIp("");
     setPort("22");
     setUsername("");
@@ -65,6 +110,23 @@ export function QuickConnect({
       createdAt: "",
       updatedAt: "",
     };
+    if (save) {
+      repos.hosts
+        .create({
+          name: targetName({ user: transient.username, host: transient.ip }),
+          ip: transient.ip,
+          port: transient.port,
+          username: transient.username,
+          authType,
+          password: transient.password,
+          key: transient.key as never,
+          enableTerminal: true,
+          enableFileManager: true,
+          enableSsh: true,
+        })
+        .then(() => toast.success("Host saved"))
+        .catch((e) => toast.error(e?.message || "Could not save the host"));
+    }
     onClose();
     reset();
     navigateToSessions(transient, features.defaultSessionType());
@@ -100,10 +162,10 @@ export function QuickConnect({
               <Label>Host / IP</Label>
               <Input
                 value={ip}
-                onChangeText={setIp}
+                onChangeText={changeAddress}
                 autoCapitalize="none"
                 autoCorrect={false}
-                placeholder="192.168.1.10"
+                placeholder="user@192.168.1.10:22"
               />
             </View>
             <View className="flex-1 gap-1.5">
@@ -160,6 +222,18 @@ export function QuickConnect({
               />
             </View>
           )}
+
+          <SettingRow
+            label="Save to my hosts"
+            description="Keep this host after connecting"
+            last
+          >
+            <FakeSwitch
+              checked={save}
+              onChange={setSave}
+              accessibilityLabel="Save to my hosts"
+            />
+          </SettingRow>
 
           {/* Actions */}
           <View className="flex-row justify-end gap-2 pt-1">

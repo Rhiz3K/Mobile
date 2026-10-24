@@ -41,6 +41,13 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Scan a host QR code.",
+          "recordAudioAndroid": false
+        }
+      ],
       "./plugins/withOidcCallbackIntentFilter.js",
       [
         "expo-local-authentication",
