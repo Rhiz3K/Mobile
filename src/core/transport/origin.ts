@@ -136,16 +136,40 @@ const NEED_WORDS: Record<TransportCapability, string> = {
 };
 
 /**
+ * What a feature needs: one list that must all be there, or several lists
+ * where any one will do (like SFTP from the phone or the server's routes).
+ */
+export type Needs = TransportCapability[] | TransportCapability[][];
+
+export function needGroups(needs: Needs): TransportCapability[][] {
+  if (!needs.length) return [[]];
+  return Array.isArray(needs[0])
+    ? (needs as TransportCapability[][])
+    : [needs as TransportCapability[]];
+}
+
+export interface NeedsOptions {
+  /** False when the server lacks what the feature needs there, so relay attempts drop out. */
+  relayOk?: boolean;
+}
+
+/**
  * Narrows a plan to the ways that can do everything a feature needs. When
  * none can, says why and which origin would work.
  */
 export function checkNeeds(
-  needs: TransportCapability[],
+  needs: Needs,
   plan: ConnectionPlan,
   title: string,
   planFor: (origin: ConnectionOrigin) => ConnectionPlan,
+  options: NeedsOptions = {},
 ): NeedsResult {
-  const fits = (t: Transport) => needs.every((n) => t.provides.includes(n));
+  const groups = needGroups(needs);
+  const relayOff = options.relayOk === false;
+  const provides = (t: Transport, group: TransportCapability[]) =>
+    group.every((n) => t.provides.includes(n));
+  const fits = (t: Transport) =>
+    !(relayOff && t.kind === "relay") && groups.some((g) => provides(t, g));
   const attempts = plan.attempts.filter(fits);
   if (attempts.length) return { attempts };
   if (plan.blocked && !plan.attempts.length) {
@@ -154,12 +178,29 @@ export function checkNeeds(
   const fix = (["server", "device"] as const).find(
     (o) => o !== plan.origin && planFor(o).attempts.some(fits),
   );
-  const missing = needs.find(
+  const how =
+    fix === "server"
+      ? "Connect this host through the server"
+      : "Connect this host from the phone";
+  // The server could do it but has it turned off.
+  if (
+    relayOff &&
+    plan.attempts.some(
+      (t) => t.kind === "relay" && groups.some((g) => provides(t, g)),
+    )
+  ) {
+    const reason = fix
+      ? `${title} is off on this server. ${how} to use it.`
+      : `${title} is off on this server.`;
+    return { attempts, blocked: { reason, fix } };
+  }
+  const first = groups[0];
+  const missing = first.find(
     (n) => !plan.attempts.some((t) => t.provides.includes(n)),
   );
-  const what = NEED_WORDS[missing ?? needs[0]] ?? "another way to connect";
+  const what = NEED_WORDS[missing ?? first[0]] ?? "another way to connect";
   const reason = fix
-    ? `${title} needs ${what}. ${fix === "server" ? "Connect this host through the server" : "Connect this host from the phone"} to use it.`
+    ? `${title} needs ${what}. ${how} to use it.`
     : `${title} needs ${what}, which this host can't use right now.`;
   return { attempts, blocked: { reason, fix } };
 }

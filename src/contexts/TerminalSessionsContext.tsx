@@ -70,6 +70,8 @@ export interface TerminalSession {
   restored?: boolean;
   /** What the tab saved to pick up again, like its tmux session. */
   resumeData?: Record<string, string> | null;
+  /** The tab this one was opened from as a companion, like a terminal. */
+  linkedSessionId?: string | null;
 }
 
 function getSessionTypeLabel(type: SessionType, remoteProtocol?: string) {
@@ -123,6 +125,8 @@ interface TerminalSessionsContextType {
       origin?: ConnectionOrigin;
       /** Opens it for this account instead of the active one. */
       accountId?: string;
+      /** Opens as the companion of this tab, right after it. */
+      linkedSessionId?: string;
     },
   ) => string;
   removeSession: (sessionId: string) => void;
@@ -212,6 +216,8 @@ export const TerminalSessionsProvider: React.FC<
         remoteProtocol?: string;
         origin?: ConnectionOrigin;
         accountId?: string;
+        /** Opens as the companion of this tab, right after it. */
+        linkedSessionId?: string;
       },
     ): string => {
       const instanceId = opts?.instanceId ?? uuid();
@@ -247,6 +253,7 @@ export const TerminalSessionsProvider: React.FC<
           // A server session from another device can only attach through it.
           origin:
             opts?.origin ?? (opts?.restoredSessionId ? "server" : undefined),
+          linkedSessionId: opts?.linkedSessionId ?? null,
         };
 
         // Persist this tab server-side for cross-device awareness.
@@ -268,6 +275,13 @@ export const TerminalSessionsProvider: React.FC<
           ...session,
           isActive: false,
         }));
+        const after = opts?.linkedSessionId
+          ? updatedSessions.findIndex((s) => s.id === opts.linkedSessionId)
+          : -1;
+        if (after >= 0) {
+          updatedSessions.splice(after + 1, 0, newSession);
+          return updatedSessions;
+        }
         return [...updatedSessions, newSession];
       });
 

@@ -151,9 +151,62 @@ test("session tabs name their feature and what they need from the transport", ()
     }),
   );
   expect(r.sessionFeature("fm")?.title).toBe("File Manager");
-  expect(r.sessionNeeds("fm")).toEqual(["server"]);
+  expect(r.sessionNeeds("fm")).toEqual([["server"]]);
   expect(r.sessionFeature("missing")).toBeNull();
-  expect(r.sessionNeeds("missing")).toEqual([]);
+  expect(r.sessionNeeds("missing")).toEqual([[]]);
   expect(r.serverOnly("fm")).toBe(true);
   expect(r.serverOnly("missing")).toBe(false);
+});
+
+test("a tab that works over SFTP or the server is not server only", () => {
+  const r = new FeatureRegistry();
+  r.register(
+    feature("files", {
+      sessionTabs: [
+        {
+          type: "fm",
+          icon: Dummy,
+          titleSuffix: () => "",
+          shortLabel: () => "",
+          serverTabTypes: [],
+          toServerTabType: () => "fm",
+          needs: ["server"],
+          needsOneOf: [["sftp"], ["server"]],
+          component: Dummy,
+        },
+      ],
+    }),
+  );
+  expect(r.sessionNeeds("fm")).toEqual([["sftp"], ["server"]]);
+  expect(r.serverOnly("fm")).toBe(false);
+});
+
+test("companions are listed per tab type and host, by order", () => {
+  const r = new FeatureRegistry();
+  const companion = (id: string, order: number, ok = true) => ({
+    id,
+    title: id,
+    icon: Dummy,
+    order,
+    forTabTypes: ["terminal"],
+    isAvailable: () => ok,
+    component: Dummy,
+  });
+  r.register(
+    feature("a", {
+      availableOn: ["local"],
+      companions: [
+        companion("b", 2),
+        companion("a", 1),
+        companion("off", 0, false),
+      ],
+    }),
+  );
+  r.register(feature("server-only", { companions: [companion("s", 3)] }));
+  const host = { id: 1 } as any;
+  expect(r.companionsFor("terminal", host, local).map((c) => c.id)).toEqual([
+    "a",
+    "b",
+  ]);
+  expect(r.companionsFor("filemanager", host, local)).toEqual([]);
 });

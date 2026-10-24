@@ -156,6 +156,45 @@ describe("checkNeeds", () => {
     );
   });
 
+  test("any one list of needs will do", () => {
+    const needs = [["sftp"], ["server"]] as const;
+    const groups = needs.map((g) => [...g]);
+    expect(
+      checkNeeds(groups, planFor("auto"), "Files", planFor).attempts.map(
+        (t) => t.kind,
+      ),
+    ).toEqual(["local", "relay"]);
+    expect(
+      checkNeeds(groups, planFor("server"), "Files", planFor).attempts.map(
+        (t) => t.kind,
+      ),
+    ).toEqual(["relay"]);
+  });
+
+  test("with the server side off, relay drops out and the phone is the fix", () => {
+    const r = checkNeeds(
+      [["sftp"], ["server"]],
+      planFor("server"),
+      "File Manager",
+      planFor,
+      { relayOk: false },
+    );
+    expect(r.attempts).toEqual([]);
+    expect(r.blocked).toEqual({
+      reason:
+        "File Manager is off on this server. Connect this host from the phone to use it.",
+      fix: "device",
+    });
+    const auto = checkNeeds(
+      [["sftp"], ["server"]],
+      planFor("auto"),
+      "File Manager",
+      planFor,
+      { relayOk: false },
+    );
+    expect(auto.attempts.map((t) => t.kind)).toEqual(["local"]);
+  });
+
   test("no needs fits anything", () => {
     expect(checkNeeds([], planFor("auto"), "X", planFor).attempts).toHaveLength(
       2,

@@ -50,6 +50,8 @@ export interface SessionLike {
   restored?: boolean;
   /** What the tab saved to pick up where it was, like a tmux session name. */
   resumeData?: Record<string, string> | null;
+  /** The tab this one was opened from as a companion, like a terminal. */
+  linkedSessionId?: string | null;
 }
 
 /** How a tab's connection is doing, shown in the tab bar and the notification. */
@@ -124,6 +126,10 @@ export interface SessionTabDef {
    * can't do it shows a message instead of opening.
    */
   needs?: TransportCapability[];
+  /** Like `needs`, but any one of the lists will do. Wins over `needs`. */
+  needsOneOf?: TransportCapability[][];
+  /** What the server needs to run this tab through it. Ways through the server drop out without it. */
+  relayRequires?: FeatureRequirement;
   // Each tab has its own handle type, so the ref stays loose here.
   component: ComponentType<SessionTabProps & { ref?: Ref<any> }>;
   /** The key row and keys panel of a `terminal-input` tab. */
@@ -276,6 +282,38 @@ export interface TerminalInputHandle {
   keyTarget?: () => TerminalKeyTarget | null;
   /** Runs a key row command the tab knows, like "search". False when it doesn't. */
   command?: (id: string) => boolean;
+  /** The shell's working directory, or null when it can't tell. */
+  getCwd?: () => Promise<string | null>;
+}
+
+// Companions
+
+/** What a companion panel gets: the tab it sits beside and that tab's handle. */
+export interface CompanionProps {
+  session: SessionLike & { accountId: string };
+  getHandle: () => TerminalInputHandle | null;
+  isVisible: boolean;
+  /** "side" beside the tab on a tablet, "tab" as its own tab on a phone. */
+  layout: "side" | "tab";
+  close: () => void;
+}
+
+/** A panel shown beside a tab on tablets, or opened as a linked tab on phones. */
+export interface CompanionDef {
+  id: string;
+  title: string;
+  icon: FeatureIcon;
+  order: number;
+  /** Session tab types it can sit beside. */
+  forTabTypes: string[];
+  isAvailable: (host: SSHHost) => boolean;
+  component: ComponentType<CompanionProps>;
+  /** On phones it opens as a tab of this type, linked to the tab it came from. */
+  phoneTabType?: string;
+  /** Where it sits and how wide on a tablet, and whether it opens with new tabs. */
+  layout?: () => { side: "left" | "right"; size: number; autoOpen: boolean };
+  /** The user dragged the panel edge to this width. */
+  onResize?: (size: number) => void;
 }
 
 export interface KeyboardTabProps {
@@ -339,6 +377,7 @@ export interface FeatureDef {
   quickActions?: QuickActionDef[];
   keyboardTabs?: KeyboardTabDef[];
   sessionMenuItems?: SessionMenuItemDef[];
+  companions?: CompanionDef[];
   /**
    * Named things in the app's own vocabulary that this feature fills, for
    * small spots like a form field. See CAPABILITIES.

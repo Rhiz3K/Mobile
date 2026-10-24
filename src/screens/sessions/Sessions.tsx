@@ -17,17 +17,20 @@ import {
   useTerminalSessions,
 } from "@/contexts/TerminalSessionsContext";
 import { X } from "lucide-react-native";
+import { accounts } from "@/core/accounts";
 import { SessionAccountProvider } from "@/core/accounts/session";
 import { LOCAL_ACCOUNT_ID } from "@/core/accounts/types";
 import { useKeyboard } from "@/contexts/KeyboardContext";
 import type { TerminalHandle } from "@/features/terminal/Terminal";
 import { features } from "@/core/features";
+import { sessionHandles } from "@/core/sessions/handles";
 import { sessionStatus } from "@/core/sessions/status";
 import { ConnectionsPanel } from "@/screens/sessions/ConnectionsPanel";
 import { Screen } from "@/components/Screen";
 import { Text } from "@/ui";
 import TabBar from "@/screens/sessions/navigation/TabBar";
 import { SessionMenu } from "@/screens/sessions/SessionMenu";
+import { CompanionPane } from "@/screens/sessions/CompanionPane";
 import { TabSwipeEdge } from "@/screens/sessions/TabSwipeEdge";
 import { neighborTab, tabNumber } from "@/contexts/session-tabs";
 import type {
@@ -70,6 +73,7 @@ export default function Sessions() {
   const {
     sessions,
     activeSessionId,
+    addSession,
     backgroundTabRecords,
     setActiveSession,
     removeSession,
@@ -295,7 +299,63 @@ export default function Sessions() {
       next[s.id] = tabRefs.current[s.id] ?? React.createRef();
     }
     tabRefs.current = next;
+    const offs = sessions.map((s) =>
+      sessionHandles.register(
+        s.id,
+        () => tabRefs.current[s.id]?.current ?? null,
+      ),
+    );
+    return () => offs.forEach((off) => off());
   }, [sessions]);
+
+  // Panels beside a tab (tablets), by session id.
+  const isTablet =
+    Math.min(screenDimensions.width, screenDimensions.height) >= 600;
+  const [companionFor, setCompanionFor] = useState<Record<string, string>>({});
+  const companionsOf = useCallback((session: TerminalSession | undefined) => {
+    if (!session) return [];
+    const ctx = {
+      account: accounts.find(session.accountId) ?? accounts.active(),
+      client: accounts.client(session.accountId),
+    };
+    return features.companionsFor(session.type, session.host, ctx);
+  }, []);
+  const seenForCompanions = useRef(new Set<string>());
+  useEffect(() => {
+    const opened: Record<string, string> = {};
+    for (const s of sessions) {
+      if (seenForCompanions.current.has(s.id)) continue;
+      seenForCompanions.current.add(s.id);
+      if (!isTablet || s.restored) continue;
+      const auto = companionsOf(s).find((c) => c.layout?.().autoOpen);
+      if (auto) opened[s.id] = auto.id;
+    }
+    if (Object.keys(opened).length) {
+      setCompanionFor((prev) => ({ ...prev, ...opened }));
+    }
+  }, [sessions, isTablet, companionsOf]);
+  const toggleCompanion = useCallback(
+    (session: TerminalSession, companionId: string) => {
+      if (!isTablet) {
+        const def = companionsOf(session).find((c) => c.id === companionId);
+        if (def?.phoneTabType) {
+          addSession(session.host, def.phoneTabType, {
+            accountId: session.accountId,
+            origin: session.origin,
+            linkedSessionId: session.id,
+          });
+        }
+        return;
+      }
+      setCompanionFor((prev) => {
+        const next = { ...prev };
+        if (next[session.id] === companionId) delete next[session.id];
+        else next[session.id] = companionId;
+        return next;
+      });
+    },
+    [isTablet, companionsOf, addSession],
+  );
 
   useFocusEffect(
     React.useCallback(() => {
@@ -657,14 +717,49 @@ export default function Sessions() {
           marginBottom: getBottomMargin(activeSession?.type),
         }}
       >
-        {sessions.map((session) => (
-          <SessionAccountProvider
-            key={session.id}
-            accountId={session.accountId}
-          >
-            {renderSession(session)}
-          </SessionAccountProvider>
-        ))}
+        {(() => {
+          const tabs = sessions.map((session) => (
+            <SessionAccountProvider
+              key={session.id}
+              accountId={session.accountId}
+            >
+              {renderSession(session)}
+            </SessionAccountProvider>
+          ));
+          const companionId =
+            isTablet && activeSession ? companionFor[activeSession.id] : null;
+          const def = companionId
+            ? companionsOf(activeSession).find((c) => c.id === companionId)
+            : null;
+          if (!activeSession || !def) return tabs;
+          const side = def.layout?.().side ?? "right";
+          const pane = (
+            <SessionAccountProvider
+              key={`companion-${activeSession.id}`}
+              accountId={activeSession.accountId}
+            >
+              <CompanionPane
+                def={def}
+                side={side}
+                screenWidth={screenDimensions.width}
+                props={{
+                  session: activeSession,
+                  getHandle: () => sessionHandles.get(activeSession.id),
+                  isVisible: true,
+                  layout: "side",
+                  close: () => toggleCompanion(activeSession, def.id),
+                }}
+              />
+            </SessionAccountProvider>
+          );
+          return (
+            <View style={{ flex: 1, flexDirection: "row" }}>
+              {side === "left" ? pane : null}
+              <View style={{ flex: 1 }}>{tabs}</View>
+              {side === "right" ? pane : null}
+            </View>
+          );
+        })()}
         {sessions.length > 1 ? (
           <>
             <TabSwipeEdge side="left" onSwipe={() => stepTab(-1)} />
@@ -873,6 +968,13 @@ export default function Sessions() {
         onDuplicate={() => menuFor && duplicateSession(menuFor)}
         onMove={(to) => menuFor && moveSession(menuFor, to)}
         onCloseTab={() => menuFor && handleTabClose(menuFor)}
+        companions={companionsOf(sessions.find((s) => s.id === menuFor))}
+        companionOpen={menuFor ? (companionFor[menuFor] ?? null) : null}
+        companionAsTab={!isTablet}
+        onCompanion={(id) => {
+          const session = sessions.find((s) => s.id === menuFor);
+          if (session) toggleCompanion(session, id);
+        }}
         onView={(item, ctx) => {
           keyboard("blur");
           setFeatureView({ item, ctx });

@@ -11,6 +11,7 @@ import { useThemeColor } from "@/contexts/ThemeContext";
 import { accounts, useClient } from "@/core/accounts";
 import { features } from "@/core/features";
 import type {
+  CompanionDef,
   SessionMenuContext,
   SessionMenuItemDef,
 } from "@/core/features/types";
@@ -32,6 +33,10 @@ export function SessionMenu({
   onMove,
   onCloseTab,
   onView,
+  companions = [],
+  companionOpen,
+  companionAsTab,
+  onCompanion,
 }: {
   session: TerminalSession | null;
   index: number;
@@ -44,6 +49,12 @@ export function SessionMenu({
   onCloseTab: () => void;
   /** A feature item asked to show its view. */
   onView: (item: SessionMenuItemDef, ctx: SessionMenuContext) => void;
+  /** Panels that can sit beside this tab. */
+  companions?: CompanionDef[];
+  companionOpen?: string | null;
+  /** On phones a panel opens as its own tab instead. */
+  companionAsTab?: boolean;
+  onCompanion?: (id: string) => void;
 }) {
   const color = useThemeColor();
   const client = useClient(session?.accountId ?? null);
@@ -90,6 +101,20 @@ export function SessionMenu({
           label="New tab on this host"
           onPress={pick(onDuplicate)}
         />
+        {companions.map((c) => (
+          <SheetRow
+            key={`companion-${c.id}`}
+            icon={icon(c.icon as typeof Pencil)}
+            label={
+              companionAsTab
+                ? `${c.title} here`
+                : companionOpen === c.id
+                  ? `Hide ${c.title} panel`
+                  : `Show ${c.title} panel`
+            }
+            onPress={pick(() => onCompanion?.(c.id))}
+          />
+        ))}
         {items.map((item) => (
           <SheetRow
             key={item.id}

@@ -1,6 +1,8 @@
 import type { TransportCapability } from "@/core/transport/types";
+import type { SSHHost } from "@/types";
 import type {
   Capability,
+  CompanionDef,
   FeatureContext,
   FeatureDef,
   FeatureRequirement,
@@ -93,14 +95,18 @@ export class FeatureRegistry {
     return null;
   }
 
-  /** What tabs of this type need from the host's transport. */
-  sessionNeeds(type: string): TransportCapability[] {
-    return this.sessionTab(type)?.needs ?? [];
+  /** What tabs of this type need from the host's transport, as lists where any one will do. */
+  sessionNeeds(type: string): TransportCapability[][] {
+    const tab = this.sessionTab(type);
+    if (tab?.needsOneOf?.length) return tab.needsOneOf;
+    return [tab?.needs ?? []];
   }
 
   /** Tabs that only ever run through a server (other devices can list them at once). */
   serverOnly(type: string): boolean {
-    return this.sessionNeeds(type).some((n) => n === "server" || n === "guacd");
+    return this.sessionNeeds(type).every((group) =>
+      group.some((n) => n === "server" || n === "guacd"),
+    );
   }
 
   /** Whether tabs of this type have a session screen capability. */
@@ -183,6 +189,17 @@ export class FeatureRegistry {
   sessionMenuItems(ctx: SessionMenuContext) {
     return this.collect(ctx, (d) => d.sessionMenuItems)
       .filter((item) => item.isAvailable(ctx))
+      .sort(byOrder);
+  }
+
+  /** Panels that can sit beside a tab of this type for this host. */
+  companionsFor(
+    tabType: string,
+    host: SSHHost,
+    ctx: FeatureContext,
+  ): CompanionDef[] {
+    return this.collect(ctx, (d) => d.companions)
+      .filter((c) => c.forTabTypes.includes(tabType) && c.isAvailable(host))
       .sort(byOrder);
   }
 
