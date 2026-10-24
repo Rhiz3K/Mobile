@@ -1,30 +1,35 @@
+// Copied from Plugin-SSH-Terminal src/frontend/look/terminal-themes.ts so the
+// phone shows the same terminal themes as Termix. A test checks the copy.
+
+export interface TerminalThemeColors {
+  background: string;
+  foreground: string;
+  cursor?: string;
+  cursorAccent?: string;
+  selectionBackground?: string;
+  selectionForeground?: string;
+  black: string;
+  red: string;
+  green: string;
+  yellow: string;
+  blue: string;
+  magenta: string;
+  cyan: string;
+  white: string;
+  brightBlack: string;
+  brightRed: string;
+  brightGreen: string;
+  brightYellow: string;
+  brightBlue: string;
+  brightMagenta: string;
+  brightCyan: string;
+  brightWhite: string;
+}
+
 export interface TerminalTheme {
   name: string;
   category: "dark" | "light" | "colorful";
-  colors: {
-    background: string;
-    foreground: string;
-    cursor?: string;
-    cursorAccent?: string;
-    selectionBackground?: string;
-    selectionForeground?: string;
-    black: string;
-    red: string;
-    green: string;
-    yellow: string;
-    blue: string;
-    magenta: string;
-    cyan: string;
-    white: string;
-    brightBlack: string;
-    brightRed: string;
-    brightGreen: string;
-    brightYellow: string;
-    brightBlue: string;
-    brightMagenta: string;
-    brightCyan: string;
-    brightWhite: string;
-  };
+  colors: TerminalThemeColors;
 }
 
 export const TERMINAL_THEMES: Record<string, TerminalTheme> = {
@@ -53,6 +58,62 @@ export const TERMINAL_THEMES: Record<string, TerminalTheme> = {
       brightMagenta: "#ad7fa8",
       brightCyan: "#34e2e2",
       brightWhite: "#eeeeec",
+    },
+  },
+
+  termixDark: {
+    name: "Termix Dark",
+    category: "dark",
+    colors: {
+      background: "#0c0d0b",
+      foreground: "#f7f7f7",
+      cursor: "#f7f7f7",
+      cursorAccent: "#0c0d0b",
+      selectionBackground: "#3a3a3d",
+      black: "#2e3436",
+      red: "#cc0000",
+      green: "#4e9a06",
+      yellow: "#c4a000",
+      blue: "#3465a4",
+      magenta: "#75507b",
+      cyan: "#06989a",
+      white: "#d3d7cf",
+      brightBlack: "#555753",
+      brightRed: "#ef2929",
+      brightGreen: "#8ae234",
+      brightYellow: "#fce94f",
+      brightBlue: "#729fcf",
+      brightMagenta: "#ad7fa8",
+      brightCyan: "#34e2e2",
+      brightWhite: "#eeeeec",
+    },
+  },
+
+  termixLight: {
+    name: "Termix Light",
+    category: "light",
+    colors: {
+      background: "#ffffff",
+      foreground: "#18181b",
+      cursor: "#18181b",
+      cursorAccent: "#ffffff",
+      selectionBackground: "#d1d5db",
+      black: "#18181b",
+      red: "#dc2626",
+      green: "#16a34a",
+      yellow: "#ca8a04",
+      blue: "#2563eb",
+      magenta: "#9333ea",
+      cyan: "#0891b2",
+      white: "#f4f4f5",
+      brightBlack: "#71717a",
+      brightRed: "#ef4444",
+      brightGreen: "#22c55e",
+      brightYellow: "#eab308",
+      brightBlue: "#3b82f6",
+      brightMagenta: "#a855f7",
+      brightCyan: "#06b6d4",
+      brightWhite: "#ffffff",
     },
   },
 
@@ -615,96 +676,88 @@ export const TERMINAL_THEMES: Record<string, TerminalTheme> = {
       brightWhite: "#a6adc8",
     },
   },
+
+  gentlemansChoice: {
+    name: "Gentleman's Choice",
+    category: "dark",
+    colors: {
+      background: "#1a1c1a",
+      foreground: "#d1c7a3",
+      cursor: "#d1c7a3",
+      cursorAccent: "#1a1c1a",
+      selectionBackground: "#3e4437",
+      black: "#1a1c1a",
+      red: "#9d3a3a",
+      green: "#5a7a3a",
+      yellow: "#b39a3a",
+      blue: "#3a5a7a",
+      magenta: "#7a3a5a",
+      cyan: "#3a7a7a",
+      white: "#d1c7a3",
+      brightBlack: "#3e4437",
+      brightRed: "#bf4a4a",
+      brightGreen: "#7a9a4a",
+      brightYellow: "#d1b34a",
+      brightBlue: "#4a7abf",
+      brightMagenta: "#9a4abf",
+      brightCyan: "#4abfbf",
+      brightWhite: "#e3dbc3",
+    },
+  },
+
+  midnightEspresso: {
+    name: "Midnight Espresso",
+    category: "dark",
+    colors: {
+      background: "#120f0d",
+      foreground: "#ceb195",
+      cursor: "#ceb195",
+      cursorAccent: "#120f0d",
+      selectionBackground: "#3d2b1f",
+      black: "#120f0d",
+      red: "#a05a4a",
+      green: "#7a8a5a",
+      yellow: "#b08a4a",
+      blue: "#5a7a9a",
+      magenta: "#8a5a7a",
+      cyan: "#5a8a8a",
+      white: "#ceb195",
+      brightBlack: "#3d2b1f",
+      brightRed: "#c07a6a",
+      brightGreen: "#9aaa7a",
+      brightYellow: "#d0aa6a",
+      brightBlue: "#7a9aba",
+      brightMagenta: "#aa7aba",
+      brightCyan: "#7ababa",
+      brightWhite: "#e0cbb5",
+    },
+  },
+
+  custom: {
+    name: "Custom",
+    category: "dark",
+    colors: {
+      background: "#0c0d0b",
+      foreground: "#f7f7f7",
+      cursor: "#f7f7f7",
+      cursorAccent: "#0c0d0b",
+      selectionBackground: "#3a3a3d",
+      black: "#2e3436",
+      red: "#cc0000",
+      green: "#4e9a06",
+      yellow: "#c4a000",
+      blue: "#3465a4",
+      magenta: "#75507b",
+      cyan: "#06989a",
+      white: "#d3d7cf",
+      brightBlack: "#555753",
+      brightRed: "#ef2929",
+      brightGreen: "#8ae234",
+      brightYellow: "#fce94f",
+      brightBlue: "#729fcf",
+      brightMagenta: "#ad7fa8",
+      brightCyan: "#34e2e2",
+      brightWhite: "#eeeeec",
+    },
+  },
 };
-
-export const TERMINAL_FONTS = [
-  {
-    value: "Caskaydia Cove Nerd Font Mono",
-    label: "Caskaydia Cove Nerd Font Mono",
-    fallback:
-      '"Caskaydia Cove Nerd Font Mono", "SF Mono", Consolas, "Liberation Mono", monospace',
-  },
-  {
-    value: "JetBrains Mono",
-    label: "JetBrains Mono",
-    fallback:
-      '"JetBrains Mono", "SF Mono", Consolas, "Liberation Mono", monospace',
-  },
-  {
-    value: "Fira Code",
-    label: "Fira Code",
-    fallback: '"Fira Code", "SF Mono", Consolas, "Liberation Mono", monospace',
-  },
-  {
-    value: "Cascadia Code",
-    label: "Cascadia Code",
-    fallback:
-      '"Cascadia Code", "SF Mono", Consolas, "Liberation Mono", monospace',
-  },
-  {
-    value: "Source Code Pro",
-    label: "Source Code Pro",
-    fallback:
-      '"Source Code Pro", "SF Mono", Consolas, "Liberation Mono", monospace',
-  },
-  {
-    value: "SF Mono",
-    label: "SF Mono",
-    fallback: '"SF Mono", Consolas, "Liberation Mono", monospace',
-  },
-  {
-    value: "Consolas",
-    label: "Consolas",
-    fallback: 'Consolas, "Liberation Mono", monospace',
-  },
-  {
-    value: "Monaco",
-    label: "Monaco",
-    fallback: 'Monaco, "Liberation Mono", monospace',
-  },
-];
-
-export const CURSOR_STYLES = [
-  { value: "block", label: "Block" },
-  { value: "underline", label: "Underline" },
-  { value: "bar", label: "Bar" },
-] as const;
-
-export const BELL_STYLES = [
-  { value: "none", label: "None" },
-  { value: "sound", label: "Sound" },
-  { value: "visual", label: "Visual" },
-  { value: "both", label: "Both" },
-] as const;
-
-export const FAST_SCROLL_MODIFIERS = [
-  { value: "alt", label: "Alt" },
-  { value: "ctrl", label: "Ctrl" },
-  { value: "shift", label: "Shift" },
-] as const;
-
-export const DEFAULT_TERMINAL_CONFIG = {
-  cursorBlink: true,
-  cursorStyle: "bar" as const,
-  fontSize: 14,
-  fontFamily: "Caskaydia Cove Nerd Font Mono",
-  letterSpacing: 0,
-  lineHeight: 1.2,
-  theme: "termix",
-
-  scrollback: 10000,
-  bellStyle: "none" as const,
-  rightClickSelectsWord: false,
-  fastScrollModifier: "alt" as const,
-  fastScrollSensitivity: 5,
-  minimumContrastRatio: 1,
-
-  backspaceMode: "normal" as const,
-  agentForwarding: false,
-  environmentVariables: [] as { key: string; value: string }[],
-  startupSnippetId: null as number | null,
-  autoMosh: false,
-  moshCommand: "mosh-server new -s -l LANG=en_US.UTF-8",
-};
-
-export type TerminalConfigType = typeof DEFAULT_TERMINAL_CONFIG;

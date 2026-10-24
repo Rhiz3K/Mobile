@@ -86,7 +86,11 @@
               "./assets/fonts/CaskaydiaCoveNerdFontMono-Regular.ttf",
               "./assets/fonts/CaskaydiaCoveNerdFontMono-Bold.ttf",
               "./assets/fonts/CaskaydiaCoveNerdFontMono-Italic.ttf",
-              "./assets/fonts/CaskaydiaCoveNerdFontMono-BoldItalic.ttf"
+              "./assets/fonts/CaskaydiaCoveNerdFontMono-BoldItalic.ttf",
+              "./assets/fonts/JetBrainsMonoNerdFontMono-Regular.ttf",
+              "./assets/fonts/JetBrainsMonoNerdFontMono-Bold.ttf",
+              "./assets/fonts/FiraCodeNerdFontMono-Regular.ttf",
+              "./assets/fonts/FiraCodeNerdFontMono-Bold.ttf"
             ]
           },
           "android": {
@@ -111,6 +115,32 @@
                     "path": "./assets/fonts/CaskaydiaCoveNerdFontMono-BoldItalic.ttf",
                     "weight": 700,
                     "style": "italic"
+                  }
+                ]
+              },
+              {
+                "fontFamily": "JetBrainsMono NFM",
+                "fontDefinitions": [
+                  {
+                    "path": "./assets/fonts/JetBrainsMonoNerdFontMono-Regular.ttf",
+                    "weight": 400
+                  },
+                  {
+                    "path": "./assets/fonts/JetBrainsMonoNerdFontMono-Bold.ttf",
+                    "weight": 700
+                  }
+                ]
+              },
+              {
+                "fontFamily": "FiraCode Nerd Font Mono",
+                "fontDefinitions": [
+                  {
+                    "path": "./assets/fonts/FiraCodeNerdFontMono-Regular.ttf",
+                    "weight": 400
+                  },
+                  {
+                    "path": "./assets/fonts/FiraCodeNerdFontMono-Bold.ttf",
+                    "weight": 700
                   }
                 ]
               }

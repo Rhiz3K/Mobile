@@ -1,3 +1,4 @@
+import type { TerminalThemeColors } from "@/constants/terminal-themes";
 // ============================================================================
 // SSH HOST TYPES
 // ============================================================================
@@ -443,6 +444,15 @@ export interface TerminalConfig {
   autoMosh: boolean;
   moshCommand: string;
   sudoPasswordAutoFill: boolean;
+
+  /** Colors for the "custom" theme. */
+  customThemeColors: TerminalThemeColors | null;
+  /** Taps a link opens right away instead of asking first. */
+  linkClickBehavior: "default" | "confirm" | "direct";
+  /** Phone only: vibrate on bell and long press. */
+  haptics: boolean;
+  /** Phone only: Option on an iPad keyboard sends Alt instead of symbols. */
+  optionAsMeta: boolean;
 }
 
 // ============================================================================
