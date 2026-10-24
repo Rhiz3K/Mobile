@@ -2,6 +2,7 @@ import { forwardRef } from "react";
 import {
   Keyboard,
   Layers,
+  ScrollText,
   Search,
   SquareTerminal,
   Terminal as TerminalIcon,
@@ -27,6 +28,8 @@ const TerminalTab = forwardRef<TerminalHandle, SessionTabProps>(
       onTitle,
       onMenu,
       onShortcut,
+      onStatus,
+      onResumeData,
     },
     ref,
   ) => (
@@ -47,6 +50,10 @@ const TerminalTab = forwardRef<TerminalHandle, SessionTabProps>(
       onTitle={onTitle}
       onMenu={onMenu}
       onShortcut={onShortcut}
+      restored={session.restored}
+      resumeData={session.resumeData}
+      onStatus={onStatus}
+      onResumeData={onResumeData}
     />
   ),
 );
@@ -135,6 +142,14 @@ export const terminalFeature: FeatureDef = {
       order: 20,
       isAvailable: ({ session }) => session.type === "terminal",
       run: ({ handle }) => handle?.command?.("tmux.windows"),
+    },
+    {
+      id: "terminal.connectionLog",
+      label: "Connection log",
+      icon: ScrollText,
+      order: 25,
+      isAvailable: ({ session }) => session.type === "terminal",
+      run: ({ handle }) => handle?.command?.("connection.log"),
     },
     {
       id: "terminal.keyRows",

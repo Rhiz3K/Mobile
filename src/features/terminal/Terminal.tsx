@@ -11,14 +11,17 @@ import {
   View,
   Text,
   ActivityIndicator,
+  Platform,
   useWindowDimensions,
 } from "react-native";
+import Constants from "expo-constants";
 import { showToast } from "@/utils/toast";
 import { useTerminalCustomization } from "@/contexts/TerminalCustomizationContext";
 import { MOBILE_DEFAULT_TERMINAL_CONFIG } from "@/constants/terminal-config";
 import type { SSHHost, TerminalConfig } from "@/types";
 import type {
   StickyModifierState,
+  SessionTabStatus,
   TerminalInputHandle,
   TerminalKeyTarget,
 } from "@/core/features/types";
@@ -36,6 +39,11 @@ import { useTheme, useUiColors } from "@/contexts/ThemeContext";
 import { useClient } from "@/core/accounts";
 import { useSessionAccountId } from "@/core/accounts/session";
 import { useSessionRepositories } from "@/core/data/hooks";
+import { formatConnectionLog } from "@/core/sessions/log";
+import { sessionLifecycle } from "@/core/sessions/lifecycle";
+import { statusFromConnection } from "@/core/sessions/status";
+import { ConnectionBanner } from "./ConnectionBanner";
+import { ConnectionLogSheet } from "./ConnectionLogSheet";
 import {
   MAX_FONT_SIZE,
   MIN_FONT_SIZE,
@@ -62,6 +70,13 @@ import {
   selectWindowKeys,
   type TmuxWindow,
 } from "./tmux/tmux";
+import {
+  findScreen,
+  listScreensCommand,
+  parseScreens,
+  planScreen,
+  screenAttachLine,
+} from "./tmux/screen";
 import {
   TmuxPickerSheet,
   TmuxWindowsSheet,
@@ -105,6 +120,12 @@ interface TerminalProps {
   onTitle?: (title: string | null) => void;
   onMenu?: () => void;
   onShortcut?: (id: string) => void;
+  /** Brought back after the app was closed: connects when first shown. */
+  restored?: boolean;
+  /** Saved tmux or screen session to reattach to. */
+  resumeData?: Record<string, string> | null;
+  onStatus?: (status: SessionTabStatus) => void;
+  onResumeData?: (data: Record<string, string> | null) => void;
 }
 
 export type TerminalHandle = TerminalInputHandle;
@@ -131,6 +152,10 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
       onTitle,
       onMenu,
       onShortcut,
+      restored,
+      resumeData,
+      onStatus,
+      onResumeData,
     },
     ref,
   ) => {
@@ -272,25 +297,48 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
     );
 
     // Startup lines wait for the shell's first output, so they land at a prompt.
-    const startupPending = useRef(false);
-    const handlePostConnectionSetup = useCallback(() => {
-      startupPending.current = true;
-    }, []);
+    // After a reconnect the new shell first tries to get back to tmux or screen.
+    const startupPending = useRef<"fresh" | "resume" | null>(null);
+    const handlePostConnectionSetup = useCallback(
+      ({ resumed }: { resumed: boolean }) => {
+        startupPending.current = resumed ? "resume" : "fresh";
+      },
+      [],
+    );
     // tmux: sessions to pick from, and the one this tab attached to.
     const [tmuxPick, setTmuxPick] = useState<{
       sessions: PickSession[];
       relay: boolean;
     } | null>(null);
     const [tmuxWindows, setTmuxWindows] = useState<TmuxWindow[] | null>(null);
-    const tmuxSessionRef = useRef<string | null>(null);
+    const tmuxSessionRef = useRef<string | null>(resumeData?.tmux ?? null);
+    const screenSessionRef = useRef<string | null>(resumeData?.screen ?? null);
     const startupBase = useRef<StartupInput | null>(null);
+    const onResumeDataRef = useRef(onResumeData);
+    onResumeDataRef.current = onResumeData;
+    const rememberSession = useCallback(
+      (kind: "tmux" | "screen" | null, name: string | null) => {
+        tmuxSessionRef.current = kind === "tmux" ? name : null;
+        screenSessionRef.current = kind === "screen" ? name : null;
+        onResumeDataRef.current?.(kind && name ? { [kind]: name } : null);
+      },
+      [],
+    );
 
+    // Startup lines skip the typed input queue, which may wait on the user.
     const typeLines = useCallback((lines: StartupLine[]) => {
       let at = 0;
       for (const line of lines) {
-        setTimeout(() => connRef.current?.sendInput(`${line.text}\r`), at);
+        setTimeout(() => connRef.current?.sendNow(`${line.text}\r`), at);
         at += line.waitAfterMs ?? 100;
       }
+    }, []);
+
+    // A dim line written into the view only, never sent to the host.
+    const writeNote = useCallback((text: string) => {
+      const line = `\r\n\x1b[2m${text}\x1b[0m\r\n`;
+      if (XTERM_FALLBACK) xtermRef.current?.write(line);
+      else nativeRef.current?.write(line);
     }, []);
 
     const attachLocalTmux = useCallback(
@@ -305,7 +353,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
         const target = fresh
           ? newSessionName(String(hostRef.current.syncId ?? hostRef.current.id))
           : name;
-        tmuxSessionRef.current = target;
+        rememberSession("tmux", target);
         typeLines(
           startupLines({
             ...base,
@@ -313,8 +361,33 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
           }),
         );
       },
-      [typeLines],
+      [typeLines, rememberSession],
     );
+
+    /** No tmux on the host: GNU screen, when it has that. */
+    const attachLocalScreen = useCallback(async (): Promise<boolean> => {
+      const base = startupBase.current;
+      if (!base) return false;
+      const found = await connRef.current
+        ?.exec(listScreensCommand(), 10)
+        .catch(() => null);
+      if (!found || found.exitCode === 127) return false;
+      const plan = planScreen(
+        parseScreens(found.stdout),
+        newSessionName(String(hostRef.current.syncId ?? hostRef.current.id)),
+      );
+      rememberSession("screen", plan.target);
+      typeLines(
+        startupLines({
+          ...base,
+          tmux: {
+            line: screenAttachLine(plan.target, plan.create),
+            fresh: plan.create,
+          },
+        }),
+      );
+      return true;
+    }, [typeLines, rememberSession]);
 
     const runStartup = useCallback(async () => {
       const terminalConfig: Partial<TerminalConfig> = {
@@ -349,6 +422,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
           ?.exec(listSessionsCommand(), 10)
           .catch(() => null);
         if (found?.exitCode === 127) {
+          if (await attachLocalScreen()) return;
           showToast.info("tmux is not installed on this host");
         } else if (found) {
           const sessions = parseSessions(found.stdout);
@@ -368,8 +442,61 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
       host.sshOptions,
       repos,
       attachLocalTmux,
+      attachLocalScreen,
       typeLines,
     ]);
+
+    // After a reconnect: back into the same tmux or screen session when it
+    // is still there, else say the old shell is gone and start fresh.
+    const connectedBefore = useRef(false);
+    const restoredFirst = useRef(!!restored);
+    const resumeShell = useCallback(async () => {
+      const conn = connRef.current;
+      if (!conn) return;
+      const local = transportRef.current === "local";
+      const tmuxName = tmuxSessionRef.current;
+      const screenName = screenSessionRef.current;
+      if (local && tmuxName) {
+        const found = await conn
+          .exec(listSessionsCommand(), 10)
+          .catch(() => null);
+        if (
+          found?.exitCode === 0 &&
+          parseSessions(found.stdout).some((x) => x.name === tmuxName)
+        ) {
+          conn.sendNow(`${attachLine(tmuxName, false)}\r`);
+          writeNote(`Back in tmux session ${tmuxName}`);
+          restoredFirst.current = false;
+          setTimeout(() => connRef.current?.flushInput(), 800);
+          return;
+        }
+      }
+      if (local && screenName) {
+        const found = await conn
+          .exec(listScreensCommand(), 10)
+          .catch(() => null);
+        const match = found
+          ? findScreen(parseScreens(found.stdout), screenName)
+          : undefined;
+        if (found?.exitCode === 0 && match) {
+          conn.sendNow(`${screenAttachLine(match.id, false)}\r`);
+          writeNote(`Back in screen session ${match.name}`);
+          restoredFirst.current = false;
+          setTimeout(() => connRef.current?.flushInput(), 800);
+          return;
+        }
+      }
+      writeNote(
+        !local
+          ? "The server session ended. This is a new shell."
+          : restoredFirst.current
+            ? "Termix was closed, so the old shell ended. This is a new shell."
+            : "The connection dropped and the old shell ended. This is a new shell.",
+      );
+      restoredFirst.current = false;
+      rememberSession(null, null);
+      await runStartup();
+    }, [writeNote, rememberSession, runStartup]);
 
     const onTmuxPick = useCallback(
       (name: string | null) => {
@@ -389,14 +516,13 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
     // One pipe for the tab's life: reconnects and new views attach to it again.
     const [pipeId] = useState(() => `term-${++pipeSeq}`);
 
-    const { conn, state, log, switchTo, switchOrigin } = useHostConnection(
-      host,
-      hostConfig,
-      {
+    const { conn, state, log, pending, pendingHeld, switchTo, switchOrigin } =
+      useHostConnection(host, hostConfig, {
         type,
         origin,
         tabInstanceId,
         initialSessionId,
+        restored,
         pipeId: XTERM_FALLBACK ? undefined : pipeId,
         onSessionIdChange,
         onTransportResolved: (kind) => {
@@ -404,6 +530,8 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
           onTransportResolved?.(kind);
         },
         onConnected: ({ fromBackground, isReattach }) => {
+          const firstTime = !connectedBefore.current;
+          connectedBefore.current = true;
           if (XTERM_FALLBACK) {
             xtermRef.current?.notifyConnected(fromBackground, isReattach);
           } else if (
@@ -413,6 +541,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
             // The server sends the session's screen again.
             nativeRef.current?.write(CLEAR_FOR_REPLAY);
           }
+          if (!firstTime) return;
           if (client) {
             client.api.homepage
               .logActivity("terminal", hostConfig.id, hostConfig.name)
@@ -428,7 +557,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
           if (XTERM_FALLBACK) xtermRef.current?.write(data);
           else nativeRef.current?.write(data);
         },
-        onPostConnectionSetup: () => handlePostConnectionSetup(),
+        onPostConnectionSetup: (info) => handlePostConnectionSetup(info),
         onTmuxSessions: (sessions) =>
           setTmuxPick({
             relay: true,
@@ -440,12 +569,18 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
             })),
           }),
         onDisconnected: (hostName) => {
+          // The shell ended on purpose (exit, or the server ended it).
           showToast.warning(`Disconnected from ${hostName}`);
           onClose?.();
         },
-      },
-    );
+      });
     connRef.current = conn;
+
+    const onStatusRef = useRef(onStatus);
+    onStatusRef.current = onStatus;
+    useEffect(() => {
+      onStatusRef.current?.(statusFromConnection(state));
+    }, [state]);
 
     const isConnecting = state.status === "connecting";
     const isConnected = state.status === "connected";
@@ -454,13 +589,53 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
 
     const runStartupRef = useRef(runStartup);
     runStartupRef.current = runStartup;
+    const resumeShellRef = useRef(resumeShell);
+    resumeShellRef.current = resumeShell;
     useEffect(() => {
-      if (!hasReceivedData || !startupPending.current) return;
-      startupPending.current = false;
-      const timer = setTimeout(() => void runStartupRef.current(), 300);
+      const kind = startupPending.current;
+      if (!hasReceivedData || !kind) return;
+      startupPending.current = null;
+      const timer = setTimeout(
+        () =>
+          void (kind === "resume"
+            ? resumeShellRef.current()
+            : runStartupRef.current()),
+        300,
+      );
       return () => clearTimeout(timer);
     }, [hasReceivedData]);
     const failed = state.status === "failed" ? state : null;
+
+    // Once the shell showed output, the view stays up through reconnects.
+    const [everHadData, setEverHadData] = useState(false);
+    useEffect(() => {
+      if (hasReceivedData) setEverHadData(true);
+    }, [hasReceivedData]);
+    const showView = hasReceivedData || everHadData;
+
+    const [logText, setLogText] = useState<string | null>(null);
+    const openLog = useCallback(() => {
+      const c = connRef.current;
+      if (!c) return;
+      const net = sessionLifecycle.network;
+      setLogText(
+        formatConnectionLog(c.getSnapshot().log, {
+          appVersion: Constants.expoConfig?.version ?? "",
+          platform: `${Platform.OS} ${Platform.Version}`,
+          hostName: hostConfig.name || "host",
+          transport: transportRef.current,
+          state: c.state.status,
+          network: net
+            ? `${net.connected ? net.type : "offline"}${net.vpn ? " with VPN" : ""}`
+            : null,
+          lowPower: sessionLifecycle.isLowPower,
+          redact: [
+            { text: hostConfig.ip, as: "<address>" },
+            { text: hostConfig.username, as: "<user>" },
+          ],
+        }),
+      );
+    }, [hostConfig.name, hostConfig.ip, hostConfig.username]);
 
     // A new connection gets a fresh terminal view.
     const [viewKey, setViewKey] = useState(0);
@@ -472,18 +647,32 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
       }
       connectedOnce.current = false;
       sizeRef.current = null;
+      setEverHadData(false);
+      connectedBefore.current = false;
       setViewKey((k) => k + 1);
     }, [conn]);
 
+    // A restored tab that isn't shown waits, so a launch doesn't open them all at once.
+    const deferConnect = useRef(!!restored && !isVisible);
     const handleResize = useCallback((cols: number, rows: number) => {
       sizeRef.current = { cols, rows };
       if (!connectedOnce.current) {
+        if (deferConnect.current) return;
         connectedOnce.current = true;
         connRef.current?.connect(cols, rows);
       } else {
         connRef.current?.resize(cols, rows);
       }
     }, []);
+    useEffect(() => {
+      if (!isVisible || !deferConnect.current) return;
+      deferConnect.current = false;
+      const size = sizeRef.current;
+      if (size && !connectedOnce.current) {
+        connectedOnce.current = true;
+        connRef.current?.connect(size.cols, size.rows);
+      }
+    }, [isVisible]);
 
     const handleFontSize = useCallback(
       (size: number) => {
@@ -531,6 +720,10 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
           void openTmuxWindows();
           return true;
         }
+        if (id === "connection.log") {
+          openLog();
+          return true;
+        }
         if (XTERM_FALLBACK) return false;
         if (id === "search") {
           setSearchOpen(true);
@@ -538,7 +731,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
         }
         return false;
       },
-      [openTmuxWindows],
+      [openTmuxWindows, openLog],
     );
 
     const handleShortcut = useCallback(
@@ -666,7 +859,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
                 }}
               />
             ) : (
-              <View style={{ flex: 1, opacity: hasReceivedData ? 1 : 0 }}>
+              <View style={{ flex: 1, opacity: showView ? 1 : 0 }}>
                 <TerminalView
                   key={`native-${hostConfig.id}-${viewKey}`}
                   ref={nativeRef}
@@ -714,7 +907,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
           </View>
 
           {/* Spinner shown until terminal has rendered its first output */}
-          {!hasReceivedData && !failed && (
+          {!showView && !failed && (
             <View
               style={{
                 position: "absolute",
@@ -739,11 +932,14 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
                   letterSpacing: 0.3,
                 }}
               >
-                {state.status === "connecting" && state.retry > 0
+                {(state.status === "connecting" && state.retry > 0) ||
+                state.status === "reconnecting"
                   ? "Reconnecting..."
-                  : state.status === "prompt"
-                    ? "Waiting for you..."
-                    : "Connecting..."}
+                  : state.status === "offline"
+                    ? "Waiting for network..."
+                    : state.status === "prompt"
+                      ? "Waiting for you..."
+                      : "Connecting..."}
               </Text>
               <Text
                 style={{
@@ -779,13 +975,22 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
                 onClose={onClose}
               />
             </View>
+          ) : showView ? (
+            <ConnectionBanner
+              state={state}
+              pending={pending}
+              pendingHeld={pendingHeld}
+              onReconnectNow={() => conn.reconnectNow()}
+              onSend={() => conn.flushInput()}
+              onDiscard={() => conn.discardInput()}
+            />
           ) : (
+            // The log is kept after connecting, for Connection log in the tab menu.
             <ConnectionLog
               entries={log}
               isConnecting={isConnecting}
               isConnected={isConnected}
               hasConnectionError={false}
-              onClear={conn.clearLog}
             />
           )}
         </View>
@@ -813,6 +1018,8 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
           hostName={hostConfig.name || hostConfig.ip}
           onChoose={onFillChoice}
         />
+
+        <ConnectionLogSheet text={logText} onClose={() => setLogText(null)} />
 
         <ConnectionPrompts
           conn={conn}

@@ -8,7 +8,7 @@ import { shellQuote } from "../startup";
 
 const SEP = "|~|";
 // Where tmux lives on hosts whose non login PATH misses it, like Tmux Monitor.
-const PATH_PREFIX =
+export const PATH_PREFIX =
   'PATH=/opt/homebrew/bin:/usr/local/bin:/opt/bin:/usr/pkg/bin:"$PATH"';
 
 export interface TmuxSession {

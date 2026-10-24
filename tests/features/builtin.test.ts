@@ -129,6 +129,7 @@ test("terminal tabs get find, tmux, key rows, and a share link through the serve
   expect(r.sessionMenuItems(ctx({})).map((i) => i.id)).toEqual([
     "terminal.find",
     "terminal.tmuxWindows",
+    "terminal.connectionLog",
     "terminal.keyRows",
     "session-sharing.link",
   ]);
@@ -136,7 +137,11 @@ test("terminal tabs get find, tmux, key rows, and a share link through the serve
     r
       .sessionMenuItems(ctx({ transport: "local", handle: null }))
       .map((i) => i.id),
-  ).toEqual(["terminal.tmuxWindows", "terminal.keyRows"]);
+  ).toEqual([
+    "terminal.tmuxWindows",
+    "terminal.connectionLog",
+    "terminal.keyRows",
+  ]);
 });
 
 test("the terminal tab brings its own key row and keys panel", () => {

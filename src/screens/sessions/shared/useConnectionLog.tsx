@@ -116,7 +116,8 @@ export function ConnectionLog({
   isConnecting: boolean;
   isConnected: boolean;
   hasConnectionError: boolean;
-  onClear: () => void;
+  /** Clears the log once connected. Left out, the log is kept. */
+  onClear?: () => void;
 }) {
   const color = useThemeColor();
   const [expanded, setExpanded] = useState(false);
@@ -128,7 +129,7 @@ export function ConnectionLog({
   // Auto-clear when successfully connected.
   useEffect(() => {
     if (isConnected && !hasConnectionError && !isConnecting) {
-      onClear();
+      onClear?.();
     }
   }, [isConnected, hasConnectionError, isConnecting, onClear]);
 
