@@ -168,6 +168,24 @@ export interface QuickActionDef {
   run: (ctx: FeatureContext) => void;
 }
 
+/** Sticky key row modifier: armed for the next key, or locked until tapped again. */
+export type StickyModifierState = "inactive" | "armed" | "locked";
+
+/**
+ * A terminal that reads the keyboard itself. The key row sends named keys and text through it so
+ * its sticky Ctrl and Alt apply, and the app shows or hides the keyboard on it.
+ */
+export interface TerminalKeyTarget {
+  focus: () => void;
+  blur: () => void;
+  sendKey: (name: string, shift?: boolean) => void;
+  typeText: (text: string) => void;
+  paste: (text: string) => void;
+  toggleModifier: (name: "ctrl" | "alt") => void;
+  modifiers: () => { ctrl: StickyModifierState; alt: StickyModifierState };
+  subscribeModifiers: (listener: () => void) => () => void;
+}
+
 /** What a `terminal-input` tab exposes through its ref. */
 export interface TerminalInputHandle {
   sendInput: (data: string) => void;
@@ -177,6 +195,8 @@ export interface TerminalInputHandle {
   notifyForegrounded: () => void;
   scrollToBottom: () => void;
   isSelecting: () => boolean;
+  /** Set when the tab draws a native terminal that owns the keyboard. */
+  keyTarget?: () => TerminalKeyTarget | null;
 }
 
 /** A tab in the terminal keyboard toolbar. */

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useReducer } from "react";
 import {
   View,
   ScrollView,
@@ -14,6 +14,7 @@ import { KeyConfig } from "@/types/keyboard";
 import { useOrientation } from "@/utils/orientation";
 import { isRepeatingKey } from "@/constants/keyboard-repeat-config";
 import { useUiColors } from "@/contexts/ThemeContext";
+import { sendNativeKey } from "./nativeKeys";
 
 interface KeyboardBarProps {
   terminalRef: React.RefObject<TerminalHandle | null>;
@@ -42,6 +43,11 @@ export default function KeyboardBar({
   const [ctrlPressed, setCtrlPressed] = useState(false);
   const [altPressed, setAltPressed] = useState(false);
   const [shiftPressed, setShiftPressed] = useState(false);
+  // A native terminal keeps sticky Ctrl and Alt itself; the bar shows its state.
+  const keyTarget = terminalRef.current?.keyTarget?.() ?? null;
+  const [, refresh] = useReducer((n: number) => n + 1, 0);
+  useEffect(() => keyTarget?.subscribeModifiers(refresh), [keyTarget]);
+  const nativeMods = keyTarget?.modifiers();
 
   const sendKey = (key: string) => {
     terminalRef.current?.sendInput(key);
@@ -49,6 +55,11 @@ export default function KeyboardBar({
 
   const sendSpecialKey = (keyConfig: KeyConfig) => {
     const { value, id } = keyConfig;
+    if (id === "paste") {
+      handlePaste();
+      return;
+    }
+    if (keyTarget && sendNativeKey(keyTarget, keyConfig, shiftPressed)) return;
 
     switch (id) {
       case "escape":
@@ -87,13 +98,18 @@ export default function KeyboardBar({
   const handlePaste = async () => {
     try {
       const clipboardContent = await Clipboard.getStringAsync();
-      if (clipboardContent) {
-        sendKey(clipboardContent);
-      }
+      if (!clipboardContent) return;
+      // The native terminal brackets it and asks first when it could run commands.
+      if (keyTarget) keyTarget.paste(clipboardContent);
+      else sendKey(clipboardContent);
     } catch {}
   };
 
   const toggleModifier = (modifier: "ctrl" | "alt" | "shift") => {
+    if (keyTarget && modifier !== "shift") {
+      keyTarget.toggleModifier(modifier);
+      return;
+    }
     switch (modifier) {
       case "ctrl":
         setCtrlPressed(!ctrlPressed);
@@ -145,12 +161,20 @@ export default function KeyboardBar({
         isModifier={isModifier}
         isActive={
           isCtrl
-            ? ctrlPressed
+            ? nativeMods
+              ? nativeMods.ctrl !== "inactive"
+              : ctrlPressed
             : isAlt
-              ? altPressed
+              ? nativeMods
+                ? nativeMods.alt !== "inactive"
+                : altPressed
               : isShift
                 ? shiftPressed
                 : false
+        }
+        isLocked={
+          (isCtrl && nativeMods?.ctrl === "locked") ||
+          (isAlt && nativeMods?.alt === "locked")
         }
         keySize={config.settings.keySize}
         hapticFeedback={config.settings.hapticFeedback}

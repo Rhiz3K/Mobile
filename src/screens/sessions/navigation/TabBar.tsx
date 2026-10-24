@@ -25,10 +25,6 @@ import {
 import { useRouter } from "expo-router";
 import { useOrientation } from "@/utils/orientation";
 import { getTabBarHeight, getButtonSize } from "@/utils/responsive";
-import {
-  callImeInput,
-  type TerminalImeInputHandle,
-} from "@/modules/terminal-ime-input";
 import { useUiColors } from "@/contexts/ThemeContext";
 import { features } from "@/core/features";
 
@@ -44,7 +40,8 @@ interface TabBarProps {
   onAddSession?: () => void;
   onToggleKeyboard?: () => void;
   isCustomKeyboardVisible: boolean;
-  hiddenInputRef: React.RefObject<TerminalImeInputHandle | null>;
+  /** Shows or hides the keyboard on the active terminal. */
+  onKeyboard: (action: "focus" | "blur") => void;
   onHideKeyboard?: () => void;
   onShowKeyboard?: () => void;
   keyboardIntentionallyHiddenRef: React.MutableRefObject<boolean>;
@@ -60,7 +57,7 @@ export default function TabBar({
   onTabClose,
   onToggleKeyboard,
   isCustomKeyboardVisible,
-  hiddenInputRef,
+  onKeyboard,
   onHideKeyboard,
   onShowKeyboard,
   keyboardIntentionallyHiddenRef,
@@ -84,13 +81,13 @@ export default function TabBar({
     if (keyboardIntentionallyHiddenRef.current) {
       onShowKeyboard?.();
       setTimeout(() => {
-        callImeInput(hiddenInputRef, "focus");
+        onKeyboard("focus");
       }, 50);
     } else {
       onHideKeyboard?.();
-      // Keyboard.dismiss() only reaches RN text inputs; the native IME view
-      // keeps the keyboard up until it is blurred.
-      callImeInput(hiddenInputRef, "blur");
+      // Keyboard.dismiss() only reaches RN text inputs; the terminal keeps
+      // the keyboard up until it is blurred.
+      onKeyboard("blur");
       Keyboard.dismiss();
     }
   };

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { TouchableOpacity, Text } from "react-native";
+import { TouchableOpacity, Text, View } from "react-native";
 import * as Haptics from "expo-haptics";
 import { KeySize } from "@/types/keyboard";
 import {
@@ -15,6 +15,8 @@ interface KeyboardKeyProps {
   style?: any;
   textStyle?: any;
   isActive?: boolean;
+  /** A locked sticky modifier, drawn with a bar under the label. */
+  isLocked?: boolean;
   isModifier?: boolean;
   keySize?: KeySize;
   hapticFeedback?: boolean;
@@ -30,6 +32,7 @@ export default function KeyboardKey({
   style = {},
   textStyle = {},
   isActive = false,
+  isLocked = false,
   isModifier = false,
   keySize = "medium",
   hapticFeedback = false,
@@ -131,6 +134,10 @@ export default function KeyboardKey({
       onLongPress={onLongPress ? handleLongPress : undefined}
       activeOpacity={0.7}
       delayLongPress={500}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={isModifier ? { selected: isActive } : undefined}
+      accessibilityHint={isLocked ? "Locked" : undefined}
     >
       <Text
         className={`text-center font-medium ${getTextSizeClass()}`}
@@ -138,6 +145,18 @@ export default function KeyboardKey({
       >
         {label}
       </Text>
+      {isLocked ? (
+        <View
+          style={{
+            position: "absolute",
+            bottom: 2,
+            left: 6,
+            right: 6,
+            height: 2,
+            backgroundColor: ui.brand,
+          }}
+        />
+      ) : null}
     </TouchableOpacity>
   );
 }

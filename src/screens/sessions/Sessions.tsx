@@ -29,7 +29,10 @@ import BottomToolbar from "@/features/terminal/keyboard/BottomToolbar";
 import KeyboardBar from "@/features/terminal/keyboard/KeyboardBar";
 import { useOrientation } from "@/utils/orientation";
 import { getMaxKeyboardHeight, getTabBarHeight } from "@/utils/responsive";
-import { addKeyCommandListener } from "@/modules/hardware-keyboard";
+import {
+  addKeyCommandListener,
+  setHardwareKeyboardEnabled,
+} from "@/modules/hardware-keyboard";
 import TerminalImeInput, {
   callImeInput,
   type TerminalImeInputHandle,
@@ -43,6 +46,10 @@ import {
   translateSpecialKeyEvent,
 } from "@/features/terminal/keyboard/terminalInputMapping";
 import { useUiColors } from "@/contexts/ThemeContext";
+import { XTERM_FALLBACK } from "@/features/terminal/fallback";
+
+// The native terminal reads the keyboard itself; the hidden input is for the xterm fallback.
+const HIDDEN_INPUT = XTERM_FALLBACK;
 
 type ActiveModifiers = {
   ctrl: boolean;
@@ -133,6 +140,22 @@ export default function Sessions() {
     return activeSessionId ? tabRefs.current[activeSessionId] : null;
   }, [activeSessionId]);
 
+  // Timers fire after the tab changed, so they read the active tab from here.
+  const activeIdRef = useRef(activeSessionId);
+  activeIdRef.current = activeSessionId;
+
+  /** Shows or hides the keyboard on the active terminal. */
+  const keyboard = useCallback((action: "focus" | "blur" | "clear") => {
+    if (HIDDEN_INPUT) {
+      callImeInput(hiddenInputRef, action);
+      return;
+    }
+    const id = activeIdRef.current;
+    const target = id ? tabRefs.current[id]?.current?.keyTarget?.() : null;
+    if (action === "focus") target?.focus();
+    else if (action === "blur") target?.blur();
+  }, []);
+
   const dispatchCommittedText = useCallback(
     (text: string) => {
       const activeRef = getActiveTerminalRef();
@@ -183,7 +206,7 @@ export default function Sessions() {
     // Only the terminal session renders the hidden input, so skip the native
     // call when switching to any other session type.
     if (activeIsTerminal && !isCustomKeyboardVisible) {
-      callImeInput(hiddenInputRef, "clear");
+      keyboard("clear");
     }
     compositionActiveRef.current = false;
     lastSpecialKeyRef.current = null;
@@ -267,7 +290,7 @@ export default function Sessions() {
         !keyboardIntentionallyHiddenRef.current
       ) {
         const timeoutId = setTimeout(() => {
-          callImeInput(hiddenInputRef, "focus");
+          keyboard("focus");
         }, 500);
         return () => clearTimeout(timeoutId);
       }
@@ -300,7 +323,7 @@ export default function Sessions() {
           !keyboardIntentionallyHiddenRef.current
         ) {
           setTimeout(() => {
-            callImeInput(hiddenInputRef, "focus");
+            keyboard("focus");
           }, 500);
         }
       } else if (nextAppState === "background") {
@@ -331,6 +354,7 @@ export default function Sessions() {
           }
           if (isKeyboardVisible) {
             setKeyboardIntentionallyHidden(true);
+            keyboard("blur");
             Keyboard.dismiss();
             return true;
           }
@@ -366,7 +390,12 @@ export default function Sessions() {
   }, [keyboardHeight, setLastKeyboardHeight]);
 
   useEffect(() => {
-    if (!activeSessionId || !activeIsTerminal) return;
+    setHardwareKeyboardEnabled(HIDDEN_INPUT);
+    return () => setHardwareKeyboardEnabled(false);
+  }, []);
+
+  useEffect(() => {
+    if (!HIDDEN_INPUT || !activeSessionId || !activeIsTerminal) return;
 
     // Keyboard stays put while selecting. Hiding it resized the terminal and
     // made the text jump under the finger.
@@ -396,7 +425,7 @@ export default function Sessions() {
   ]);
 
   useEffect(() => {
-    if (Platform.OS !== "ios") return;
+    if (Platform.OS !== "ios" || !HIDDEN_INPUT) return;
     const sub = addKeyCommandListener((event) => {
       dispatchSpecialKey({
         key: event.input === "\t" ? "Tab" : event.input,
@@ -418,7 +447,7 @@ export default function Sessions() {
         !keyboardIntentionallyHiddenRef.current
       ) {
         setTimeout(() => {
-          callImeInput(hiddenInputRef, "focus");
+          keyboard("focus");
           const activeRef = activeSessionId
             ? tabRefs.current[activeSessionId]
             : null;
@@ -444,7 +473,7 @@ export default function Sessions() {
         features.sessionHas(session?.type, "terminal-input") &&
         !isCustomKeyboardVisible
       ) {
-        callImeInput(hiddenInputRef, "focus");
+        keyboard("focus");
       }
     }, 100);
   };
@@ -453,7 +482,7 @@ export default function Sessions() {
     removeSession(sessionId);
     setTimeout(() => {
       if (activeIsTerminal && !isCustomKeyboardVisible && sessions.length > 1) {
-        callImeInput(hiddenInputRef, "focus");
+        keyboard("focus");
       }
     }, 100);
   };
@@ -462,7 +491,7 @@ export default function Sessions() {
     setShowConnectionsPanel(false);
     if (activeIsTerminal && !isCustomKeyboardVisible) {
       setKeyboardIntentionallyHidden(false);
-      setTimeout(() => callImeInput(hiddenInputRef, "focus"), 100);
+      setTimeout(() => keyboard("focus"), 100);
     }
   }, [
     activeSession?.type,
@@ -482,7 +511,7 @@ export default function Sessions() {
       toggleCustomKeyboard();
       setKeyboardIntentionallyHidden(false);
       setTimeout(() => {
-        callImeInput(hiddenInputRef, "focus");
+        keyboard("focus");
       }, 50);
       setTimeout(() => {
         const activeRef = activeSessionId
@@ -499,7 +528,7 @@ export default function Sessions() {
       toggleCustomKeyboard();
       setKeyboardIntentionallyHidden(false);
       requestAnimationFrame(() => {
-        callImeInput(hiddenInputRef, "blur");
+        keyboard("blur");
       });
       setTimeout(() => {
         const activeRef = activeSessionId
@@ -522,7 +551,7 @@ export default function Sessions() {
       toggleCustomKeyboard();
       setKeyboardIntentionallyHidden(false);
       requestAnimationFrame(() => {
-        callImeInput(hiddenInputRef, "blur");
+        keyboard("blur");
       });
       setTimeout(() => {
         const activeRef = activeSessionId
@@ -727,7 +756,7 @@ export default function Sessions() {
           onAddSession={handleAddSession}
           onToggleKeyboard={handleToggleKeyboard}
           isCustomKeyboardVisible={isCustomKeyboardVisible}
-          hiddenInputRef={hiddenInputRef}
+          onKeyboard={keyboard}
           onHideKeyboard={() => setKeyboardIntentionallyHidden(true)}
           onShowKeyboard={() => setKeyboardIntentionallyHidden(false)}
           keyboardIntentionallyHiddenRef={keyboardIntentionallyHiddenRef}
@@ -735,7 +764,7 @@ export default function Sessions() {
           onShowConnections={() => {
             setKeyboardIntentionallyHidden(true);
             Keyboard.dismiss();
-            callImeInput(hiddenInputRef, "blur");
+            keyboard("blur");
             setShowConnectionsPanel(true);
           }}
           hasBackgroundSessions={backgroundTabRecords.some(
@@ -775,60 +804,65 @@ export default function Sessions() {
         </View>
       )}
 
-      {sessions.length > 0 && !isCustomKeyboardVisible && activeIsTerminal && (
-        <TerminalImeInput
-          ref={hiddenInputRef}
-          style={{
-            position: "absolute",
-            bottom: -1000,
-            left: -1000,
-            width: 1,
-            height: 1,
-            opacity: 0,
-            zIndex: -1,
-          }}
-          pointerEvents="box-none"
-          onCommitText={({ nativeEvent }) => {
-            dispatchCommittedText(nativeEvent.text);
-          }}
-          onSpecialKey={({ nativeEvent }) => {
-            dispatchSpecialKey(nativeEvent);
-          }}
-          onCompositionStateChange={({ nativeEvent }) => {
-            compositionActiveRef.current = nativeEvent.active;
-            if (nativeEvent.active) {
-              lastSpecialKeyRef.current = null;
-            }
-          }}
-          onImeFocus={() => {
-            setKeyboardIntentionallyHidden(false);
-          }}
-          onImeBlur={() => {
-            const activeRef = activeSessionId
-              ? tabRefs.current[activeSessionId]
-              : null;
-            const isDialogOpen = activeRef?.current?.isDialogOpen?.() || false;
-            const isCurrentlySelecting =
-              activeRef?.current?.isSelecting?.() || false;
+      {HIDDEN_INPUT &&
+        sessions.length > 0 &&
+        !isCustomKeyboardVisible &&
+        activeIsTerminal && (
+          <TerminalImeInput
+            ref={hiddenInputRef}
+            style={{
+              position: "absolute",
+              bottom: -1000,
+              left: -1000,
+              width: 1,
+              height: 1,
+              opacity: 0,
+              zIndex: -1,
+            }}
+            pointerEvents="box-none"
+            onCommitText={({ nativeEvent }) => {
+              dispatchCommittedText(nativeEvent.text);
+            }}
+            onSpecialKey={({ nativeEvent }) => {
+              dispatchSpecialKey(nativeEvent);
+            }}
+            onCompositionStateChange={({ nativeEvent }) => {
+              compositionActiveRef.current = nativeEvent.active;
+              if (nativeEvent.active) {
+                lastSpecialKeyRef.current = null;
+              }
+            }}
+            onImeFocus={() => {
+              setKeyboardIntentionallyHidden(false);
+            }}
+            onImeBlur={() => {
+              const activeRef = activeSessionId
+                ? tabRefs.current[activeSessionId]
+                : null;
+              const isDialogOpen =
+                activeRef?.current?.isDialogOpen?.() || false;
+              const isCurrentlySelecting =
+                activeRef?.current?.isSelecting?.() || false;
 
-            if (
-              !keyboardIntentionallyHiddenRef.current &&
-              !isCustomKeyboardVisible &&
-              activeIsTerminal &&
-              !isDialogOpen &&
-              !isCurrentlySelecting &&
-              !isSelectingRef.current
-            ) {
-              requestAnimationFrame(() => {
-                const stillNotSelecting = !activeRef?.current?.isSelecting?.();
-                if (stillNotSelecting) {
-                  callImeInput(hiddenInputRef, "focus");
-                }
-              });
-            }
-          }}
-        />
-      )}
+              if (
+                !keyboardIntentionallyHiddenRef.current &&
+                !isCustomKeyboardVisible &&
+                activeIsTerminal &&
+                !isDialogOpen &&
+                !isCurrentlySelecting &&
+                !isSelectingRef.current
+              ) {
+                requestAnimationFrame(() => {
+                  const stillNotSelecting =
+                    !activeRef?.current?.isSelecting?.();
+                  if (stillNotSelecting) {
+                    keyboard("focus");
+                  }
+                });
+              }
+            }}
+          />
+        )}
     </View>
   );
 }

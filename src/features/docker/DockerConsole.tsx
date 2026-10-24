@@ -1,17 +1,30 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadXtermAssets } from "@/features/terminal/loadXtermAssets";
-import { View, ActivityIndicator, Pressable } from "react-native";
+import {
+  View,
+  ActivityIndicator,
+  Pressable,
+  useWindowDimensions,
+} from "react-native";
 import { WebView } from "react-native-webview";
 import { RotateCcw } from "lucide-react-native";
 import { Text } from "@/ui";
-import { useThemeColor } from "@/contexts/ThemeContext";
+import { useTheme, useThemeColor } from "@/contexts/ThemeContext";
+import { useTerminalCustomization } from "@/contexts/TerminalCustomizationContext";
+import { MOBILE_DEFAULT_TERMINAL_CONFIG } from "@/constants/terminal-config";
+import { XTERM_FALLBACK } from "@/features/terminal/fallback";
+import { resolveTerminalSettings } from "@/features/terminal/settings";
+import {
+  TerminalView,
+  type TerminalViewApi,
+} from "@/features/terminal/TerminalView";
 import type { SSHHost, DockerContainer } from "@/types";
 import { useSessionClient } from "@/core/accounts/session";
 
 /**
- * Interactive `docker exec` console. Renders a minimal xterm.js inside a WebView
- * (same approach as the SSH Terminal) and bridges it to the backend docker
- * console WebSocket (port 30009). Connect → input/resize/output round-trip.
+ * Interactive `docker exec` console on the native terminal view (xterm in a
+ * WebView under the fallback flag), bridged to the backend docker console
+ * WebSocket. Connect, then input, resize and output go both ways.
  *
  * Kept deliberately small: this is a shell into a container, not the full
  * terminal experience (no command history / snippets), so it skips the heavier
@@ -29,6 +42,21 @@ export function DockerConsole({
   const client = useSessionClient();
   const color = useThemeColor();
   const webViewRef = useRef<WebView>(null);
+  const terminalRef = useRef<TerminalViewApi>(null);
+  const sizeRef = useRef({ cols: 80, rows: 24 });
+  const { resolvedTheme } = useTheme();
+  const { fontScale } = useWindowDimensions();
+  const { config } = useTerminalCustomization();
+  const settings = useMemo(
+    () =>
+      resolveTerminalSettings(
+        { ...MOBILE_DEFAULT_TERMINAL_CONFIG, ...config },
+        undefined,
+        resolvedTheme,
+        fontScale,
+      ),
+    [config, resolvedTheme, fontScale],
+  );
   const wsRef = useRef<WebSocket | null>(null);
   const [status, setStatus] = useState<
     "connecting" | "connected" | "error" | "closed"
@@ -76,8 +104,8 @@ export function DockerConsole({
             enableDocker: true,
           },
           containerId: container.id,
-          cols: 80,
-          rows: 24,
+          cols: sizeRef.current.cols,
+          rows: sizeRef.current.rows,
         },
       });
     };
@@ -86,12 +114,16 @@ export function DockerConsole({
       try {
         const msg = JSON.parse(event.data as string);
         if (msg.type === "output") {
-          // Feed raw output into xterm in the WebView.
-          webViewRef.current?.injectJavaScript(
-            `window.__write(${JSON.stringify(msg.data)}); true;`,
-          );
+          if (XTERM_FALLBACK) {
+            webViewRef.current?.injectJavaScript(
+              `window.__write(${JSON.stringify(msg.data)}); true;`,
+            );
+          } else {
+            terminalRef.current?.write(msg.data);
+          }
         } else if (msg.type === "connected") {
           setStatus("connected");
+          send({ type: "resize", data: sizeRef.current });
         } else if (msg.type === "error") {
           setStatus("error");
           setErrorMessage(msg.message || "Console error");
@@ -112,6 +144,7 @@ export function DockerConsole({
   }, [host.id, host.ip, host.syncId, container.id, send]);
 
   useEffect(() => {
+    if (!XTERM_FALLBACK) return;
     let cancelled = false;
     loadXtermAssets(false)
       .then((assets) => {
@@ -155,22 +188,35 @@ export function DockerConsole({
 
   const reconnect = () => setWebViewKey((k) => k + 1);
 
-  if (!isVisible || !consoleHtml) return null;
+  if (!isVisible || (XTERM_FALLBACK && !consoleHtml)) return null;
 
   return (
     <View className="flex-1 bg-black">
-      <WebView
-        key={webViewKey}
-        ref={webViewRef}
-        source={{ html: consoleHtml }}
-        onMessage={onWebViewMessage}
-        originWhitelist={["*"]}
-        javaScriptEnabled
-        domStorageEnabled
-        keyboardDisplayRequiresUserAction={false}
-        hideKeyboardAccessoryView
-        style={{ flex: 1, backgroundColor: "#000" }}
-      />
+      {XTERM_FALLBACK ? (
+        <WebView
+          key={webViewKey}
+          ref={webViewRef}
+          source={{ html: consoleHtml ?? "" }}
+          onMessage={onWebViewMessage}
+          originWhitelist={["*"]}
+          javaScriptEnabled
+          domStorageEnabled
+          keyboardDisplayRequiresUserAction={false}
+          hideKeyboardAccessoryView
+          style={{ flex: 1, backgroundColor: "#000" }}
+        />
+      ) : (
+        <TerminalView
+          key={webViewKey}
+          ref={terminalRef}
+          settings={settings}
+          onInput={(data) => send({ type: "input", data })}
+          onResize={(cols, rows) => {
+            sizeRef.current = { cols, rows };
+            send({ type: "resize", data: { cols, rows } });
+          }}
+        />
+      )}
       {status !== "connected" ? (
         <View className="absolute inset-0 items-center justify-center gap-3 bg-black/80">
           {status === "connecting" ? (
