@@ -37,6 +37,7 @@ import { useClient } from "@/core/accounts";
 import { useSessionAccountId } from "@/core/accounts/session";
 import { useSessionRepositories } from "@/core/data/hooks";
 import { resolveTerminalSettings } from "./settings";
+import { findStartupSnippet, startupLines } from "./startup";
 import {
   TerminalView,
   type ModifierState,
@@ -154,55 +155,46 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
       [recordCommandInput],
     );
 
-    const handlePostConnectionSetup = useCallback(async () => {
+    // Startup lines wait for the shell's first output, so they land at a prompt.
+    const startupPending = useRef(false);
+    const handlePostConnectionSetup = useCallback(() => {
+      startupPending.current = true;
+    }, []);
+    const runStartup = useCallback(async () => {
       const terminalConfig: Partial<TerminalConfig> = {
         ...MOBILE_DEFAULT_TERMINAL_CONFIG,
         ...config,
         ...hostConfig.terminalConfig,
       };
-
-      setTimeout(async () => {
-        if (terminalConfig.environmentVariables?.length) {
-          terminalConfig.environmentVariables.forEach((envVar, index) => {
-            setTimeout(
-              () => {
-                connRef.current?.sendInput(
-                  `export ${envVar.key}="${envVar.value}"\n`,
-                );
-              },
-              100 * (index + 1),
-            );
-          });
-        }
-
-        if (terminalConfig.startupSnippetId) {
-          const snippetDelay =
-            100 * (terminalConfig.environmentVariables?.length || 0) + 200;
-          setTimeout(async () => {
-            try {
-              const snippets = await repos.snippets.list();
-              const snippet = snippets.find(
-                (s: any) => s.id === terminalConfig.startupSnippetId,
-              );
-              if (snippet) {
-                connRef.current?.sendInput(`${snippet.content}\n`);
-              }
-            } catch (err) {
-              console.warn("Failed to execute startup snippet:", err);
-            }
-          }, snippetDelay);
-        }
-
-        if (terminalConfig.autoMosh && terminalConfig.moshCommand) {
-          const moshDelay =
-            100 * (terminalConfig.environmentVariables?.length || 0) +
-            (terminalConfig.startupSnippetId ? 400 : 200);
-          setTimeout(() => {
-            connRef.current?.sendInput(`${terminalConfig.moshCommand!}\n`);
-          }, moshDelay);
-        }
-      }, 500);
-    }, [config, hostConfig.terminalConfig, repos]);
+      let snippet = null;
+      if (terminalConfig.startupSnippetId != null) {
+        snippet = findStartupSnippet(
+          await repos.snippets.list().catch(() => []),
+          terminalConfig.startupSnippetId,
+        );
+      }
+      const lines = startupLines({
+        transport: transportRef.current,
+        sshOptions: host.sshOptions,
+        legacyEnv: terminalConfig.environmentVariables,
+        snippet,
+        host: {
+          ip: hostConfig.ip,
+          username: hostConfig.username,
+          port: hostConfig.port,
+          name: hostConfig.name,
+        },
+        mosh: terminalConfig.autoMosh ? terminalConfig.moshCommand : null,
+      });
+      lines.forEach((line, i) => {
+        setTimeout(
+          () =>
+            connRef.current?.sendInput(`${line}
+`),
+          i * 100,
+        );
+      });
+    }, [config, hostConfig, host.sshOptions, repos]);
 
     // One pipe for the tab's life: reconnects and new views attach to it again.
     const [pipeId] = useState(() => `term-${++pipeSeq}`);
@@ -258,6 +250,15 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
     const isConnected = state.status === "connected";
     const hasReceivedData = isConnected && state.hasData;
     const isDialogOpen = state.status === "prompt";
+
+    const runStartupRef = useRef(runStartup);
+    runStartupRef.current = runStartup;
+    useEffect(() => {
+      if (!hasReceivedData || !startupPending.current) return;
+      startupPending.current = false;
+      const timer = setTimeout(() => void runStartupRef.current(), 300);
+      return () => clearTimeout(timer);
+    }, [hasReceivedData]);
     const failed = state.status === "failed" ? state : null;
 
     // A new connection gets a fresh terminal view.

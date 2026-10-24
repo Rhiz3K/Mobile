@@ -40,6 +40,7 @@
 - Option sends Alt on iPad hardware keyboards when you turn it on, and Cmd+. sends Escape
 - A Terminal tab in the host editor for the theme, font, cursor, bell, scrollback, startup snippet, keepalive, environment variables and terminal behavior of one host
 - A sudo password field in the host editor
+- The startup snippet fills in $HOST, $USER, $PORT and $NAME and runs once the shell shows its prompt
 
 ### Changed
 
@@ -61,6 +62,7 @@
 
 - A reverse proxy asking you to sign in again no longer signs you out of Termix
 - Terminal settings saved on a host in Termix 2.9 and newer are now used on the phone
+- A host's environment variables and startup snippet from Termix 2.9 and newer now apply in the terminal
 - The first letter typed in the terminal is no longer a capital (#93)
 - Copying text no longer freezes the terminal on Android (#101)
 - Japanese, Chinese and Korean keyboards and voice typing now work in the terminal
