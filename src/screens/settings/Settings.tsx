@@ -17,6 +17,7 @@ import {
   LayoutGrid,
   Trash2,
   RefreshCw,
+  Blocks,
 } from "lucide-react-native";
 import { useAppContext } from "@/contexts/AppContext";
 import { useTerminalSessions } from "@/contexts/TerminalSessionsContext";
@@ -323,6 +324,16 @@ export default function Settings() {
                 Sync and proxy
               </Button>
             ) : null}
+
+            <Button
+              variant="muted"
+              onPress={() =>
+                router.push("/tabs/settings/FeatureSupport" as any)
+              }
+              icon={<Blocks size={15} color={color("foreground")} />}
+            >
+              What works where
+            </Button>
 
             <Button
               variant="muted"

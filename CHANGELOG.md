@@ -110,6 +110,7 @@
 - Telnet hosts connect straight from the phone, with no Termix server needed, and open in the terminal with its key rows and find
 - RDP and VNC hosts connect straight from the phone, with no Termix server needed, through jump hosts and proxies too. Touch and trackpad modes, held mouse buttons, pinch zoom, two finger scroll, hardware keyboards and clipboard paste work, and RDP follows the screen when you rotate. The server's remote desktop view is still used when the host connects through the server
 - A refused RDP or VNC login from the phone asks for the login again right away
+- Settings, What works where lists every feature and plugin, and says if it works on the phone, needs the server, or is off or missing on your server
 
 ### Changed
 
