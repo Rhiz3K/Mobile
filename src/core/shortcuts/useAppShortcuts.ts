@@ -32,7 +32,7 @@ export function runShortcut(
 export function useAppShortcuts() {
   const router = useRouter();
   useEffect(() => {
-    if (Platform.OS !== "ios") return;
+    if (Platform.OS !== "ios" && Platform.OS !== "android") return;
     setAppShortcuts(nativeShortcuts());
     const sub = addAppShortcutListener((id) => {
       runShortcut(id, (href) => router.navigate(href as never));

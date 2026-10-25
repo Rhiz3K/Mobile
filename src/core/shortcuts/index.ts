@@ -13,82 +13,109 @@ export type AppShortcutId =
   | "goTools"
   | "goSettings";
 
-type Def = {
-  id: AppShortcutId;
-  label: string;
-  section: "Go to" | "App";
+type Combo = {
   input: string;
   modifiers: AppShortcutDef["modifiers"];
   /** Shown in the shortcut sheet. */
   keys: string;
 };
 
+type Def = {
+  id: AppShortcutId;
+  label: string;
+  section: "Go to" | "App";
+  ios: Combo;
+  android: Combo;
+};
+
+const cmd = (input: string, keys: string): Combo => ({
+  input,
+  modifiers: ["cmd"],
+  keys,
+});
+const cmdOpt = (input: string, keys: string): Combo => ({
+  input,
+  modifiers: ["cmd", "alt"],
+  keys,
+});
+const ctrlShift = (input: string, keys: string): Combo => ({
+  input,
+  modifiers: ["ctrl", "shift"],
+  keys,
+});
+const ctrlAlt = (input: string, keys: string): Combo => ({
+  input,
+  modifiers: ["ctrl", "alt"],
+  keys,
+});
+
+// Android keeps off the keys the terminal sends to the shell, so every
+// combo there has Shift or Alt next to Ctrl.
 export const APP_SHORTCUTS: Def[] = [
   {
     id: "palette",
     label: "Search and commands",
     section: "App",
-    input: "k",
-    modifiers: ["cmd"],
-    keys: "Cmd K",
+    ios: cmd("k", "Cmd K"),
+    android: ctrlShift("k", "Ctrl Shift K"),
   },
   {
     id: "newHost",
     label: "Add host",
     section: "App",
-    input: "n",
-    modifiers: ["cmd"],
-    keys: "Cmd N",
+    ios: cmd("n", "Cmd N"),
+    android: ctrlShift("n", "Ctrl Shift N"),
   },
   {
     id: "shortcuts",
     label: "Keyboard shortcuts",
     section: "App",
-    input: "/",
-    modifiers: ["cmd"],
-    keys: "Cmd /",
+    ios: cmd("/", "Cmd /"),
+    android: ctrlShift("/", "Ctrl Shift /"),
   },
   {
     id: "goHome",
     label: "Home",
     section: "Go to",
-    input: "1",
-    modifiers: ["cmd", "alt"],
-    keys: "Cmd Opt 1",
+    ios: cmdOpt("1", "Cmd Opt 1"),
+    android: ctrlAlt("1", "Ctrl Alt 1"),
   },
   {
     id: "goHosts",
     label: "Hosts",
     section: "Go to",
-    input: "2",
-    modifiers: ["cmd", "alt"],
-    keys: "Cmd Opt 2",
+    ios: cmdOpt("2", "Cmd Opt 2"),
+    android: ctrlAlt("2", "Ctrl Alt 2"),
   },
   {
     id: "goSessions",
     label: "Sessions",
     section: "Go to",
-    input: "3",
-    modifiers: ["cmd", "alt"],
-    keys: "Cmd Opt 3",
+    ios: cmdOpt("3", "Cmd Opt 3"),
+    android: ctrlAlt("3", "Ctrl Alt 3"),
   },
   {
     id: "goTools",
     label: "Tools",
     section: "Go to",
-    input: "4",
-    modifiers: ["cmd", "alt"],
-    keys: "Cmd Opt 4",
+    ios: cmdOpt("4", "Cmd Opt 4"),
+    android: ctrlAlt("4", "Ctrl Alt 4"),
   },
   {
     id: "goSettings",
     label: "Settings",
     section: "Go to",
-    input: ",",
-    modifiers: ["cmd"],
-    keys: "Cmd ,",
+    ios: cmd(",", "Cmd ,"),
+    android: ctrlShift(",", "Ctrl Shift ,"),
   },
 ];
+
+/** The combo for a platform, or null where app shortcuts are not captured. */
+export function comboFor(def: Def, os: string): Combo | null {
+  if (os === "ios") return def.ios;
+  if (os === "android") return def.android;
+  return null;
+}
 
 /** The route each shortcut opens. */
 export const SHORTCUT_ROUTES: Partial<Record<AppShortcutId, string>> = {
@@ -101,13 +128,20 @@ export const SHORTCUT_ROUTES: Partial<Record<AppShortcutId, string>> = {
 };
 
 /** What the native side registers. */
-export function nativeShortcuts(): AppShortcutDef[] {
-  return APP_SHORTCUTS.map((s) => ({
-    id: s.id,
-    input: s.input,
-    modifiers: s.modifiers,
-    title: s.label,
-  }));
+export function nativeShortcuts(os: string = Platform.OS): AppShortcutDef[] {
+  return APP_SHORTCUTS.flatMap((s) => {
+    const combo = comboFor(s, os);
+    return combo
+      ? [
+          {
+            id: s.id,
+            input: combo.input,
+            modifiers: combo.modifiers,
+            title: s.label,
+          },
+        ]
+      : [];
+  });
 }
 
 export type ShortcutSection = {
@@ -115,22 +149,17 @@ export type ShortcutSection = {
   rows: { keys: string; label: string }[];
 };
 
-/**
- * Everything the sheet lists. Only iPadOS takes app wide shortcuts for now,
- * so other platforms list the terminal ones.
- */
+/** Everything the sheet lists for a platform. */
 export function shortcutSections(os: string = Platform.OS): ShortcutSection[] {
   const sections: ShortcutSection[] = [];
-  if (os === "ios") {
-    for (const title of ["App", "Go to"] as const) {
-      sections.push({
-        title,
-        rows: APP_SHORTCUTS.filter((s) => s.section === title).map((s) => ({
-          keys: s.keys,
-          label: s.label,
-        })),
-      });
-    }
+  for (const title of ["App", "Go to"] as const) {
+    const rows = APP_SHORTCUTS.filter((s) => s.section === title).flatMap(
+      (s) => {
+        const combo = comboFor(s, os);
+        return combo ? [{ keys: combo.keys, label: s.label }] : [];
+      },
+    );
+    if (rows.length > 0) sections.push({ title, rows });
   }
   sections.push({ title: "Terminal", rows: shortcutHelp(os) });
   return sections;

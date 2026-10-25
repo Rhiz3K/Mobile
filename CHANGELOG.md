@@ -148,9 +148,9 @@
 - A sidebar instead of the bottom bar on tablets and wide windows, with the host list beside open sessions on large screens
 - The app follows window size changes on iPad (resizable windows) and on Android tablets, foldables and desktop mode without dropping sessions
 - A compact key row when the window is short, like a phone held sideways
-- App wide keyboard shortcuts on iPad (Cmd K, Cmd /, Cmd Opt 1 to 4, Cmd ,) with a shortcut sheet in Settings, Keyboard
+- App wide keyboard shortcuts on iPad (Cmd K, Cmd /, Cmd Opt 1 to 4, Cmd ,) and on Android (Ctrl Shift K, /, N, comma and Ctrl Alt 1 to 4) with a shortcut sheet in Settings, Keyboard
 - Hover highlights and right click menus for mouse and trackpad
-- Home screen widgets work with no server, show hosts and snippets from this device and follow the app theme on iOS
+- Home screen widgets work with no server, show hosts and snippets from this device and follow the app theme
 
 ### Changed
 
