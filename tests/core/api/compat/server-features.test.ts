@@ -1,5 +1,8 @@
 import { AccountClient } from "@/core/api/AccountClient";
-import { activePlugins } from "@/core/api/compat/server-features";
+import {
+  activePlugins,
+  parseServerPlugins,
+} from "@/core/api/compat/server-features";
 import { accountStorage } from "@/core/storage/kv";
 import { resetStorage } from "../../../helpers/http";
 
@@ -41,9 +44,38 @@ test("cached lists survive a JSON round trip", () => {
     },
   ]);
   expect(activePlugins(JSON.parse(JSON.stringify(plugins)))).toEqual([
-    { id: "remote-desktop", protocols: ["rdp"] },
+    { id: "remote-desktop", active: true, protocols: ["rdp"] },
   ]);
   expect(activePlugins("nope")).toBeNull();
+});
+
+test("the full list keeps plugins that are off, with name and mobile info", () => {
+  const all = parseServerPlugins([
+    {
+      id: "databases",
+      name: "Databases",
+      enabled: false,
+      state: "disabled",
+      contributes: { mobile: { mode: "webview", views: ["databases"] } },
+    },
+    { id: "docker", enabled: true, state: "active" },
+  ])!;
+  expect(all).toEqual([
+    {
+      id: "databases",
+      name: "Databases",
+      active: false,
+      mobile: { mode: "webview", views: ["databases"] },
+    },
+    { id: "docker", active: true },
+  ]);
+  // The cached copy reads back the same.
+  expect(parseServerPlugins(JSON.parse(JSON.stringify(all)))).toEqual(all);
+});
+
+test("the plugin list loads from the old cache key of earlier builds", async () => {
+  const c = await client("plugin", [{ id: "ssh-terminal" }]);
+  expect(c.serverPlugins).toEqual([{ id: "ssh-terminal", active: true }]);
 });
 
 test("older servers and an unknown plugin list keep everything on", async () => {

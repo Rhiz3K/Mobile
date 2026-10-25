@@ -145,6 +145,7 @@ TelnetTab.displayName = "TelnetTab";
  */
 export const remoteDesktopFeature: FeatureDef = {
   id: "remote-desktop",
+  plugins: ["remote-desktop"],
   title: "Remote Desktop",
   source: "native",
   availableOn: ["local", "server"],
@@ -189,6 +190,7 @@ function protocolFeature(
 ): FeatureDef {
   return {
     id: `remote-desktop.${protocol}`,
+    plugins: [PLUGIN],
     title: opts.label,
     source: "native",
     requires: { plugin: PLUGIN, protocol },

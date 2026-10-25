@@ -47,6 +47,7 @@ MetricsTab.displayName = "MetricsTab";
 
 export const hostMetricsFeature: FeatureDef = {
   id: "host-metrics",
+  plugins: ["host-metrics"],
   title: "Host Metrics",
   source: "native",
   // Sampled over the phone's SSH, or read from the server's plugin.

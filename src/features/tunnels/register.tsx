@@ -27,6 +27,7 @@ TunnelsTab.displayName = "TunnelsTab";
 
 export const tunnelsFeature: FeatureDef = {
   id: "tunnels",
+  plugins: ["tunnels"],
   title: "Tunnels",
   source: "native",
   availableOn: ["local", "server"],

@@ -28,6 +28,7 @@ async function wakeViaServer(host: SSHHost, ctx: FeatureContext) {
 
 export const wakeOnLanFeature: FeatureDef = {
   id: "wake-on-lan",
+  plugins: ["wake-on-lan"],
   title: "Wake on LAN",
   source: "native",
   requires: { plugin: "wake-on-lan" },

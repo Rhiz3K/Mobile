@@ -10,6 +10,7 @@ function ServicesTab({ session, isVisible }: SessionTabProps) {
 
 export const servicesFeature: FeatureDef = {
   id: "service-manager",
+  plugins: ["service-manager"],
   title: "Services",
   source: "native",
   // Over the phone's SSH, or the server's Service Manager when that is the way in.

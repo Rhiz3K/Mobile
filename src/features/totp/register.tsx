@@ -3,6 +3,7 @@ import type { FeatureDef } from "@/core/features/types";
 
 export const totpFeature: FeatureDef = {
   id: "totp",
+  plugins: ["totp"],
   title: "Two-Factor Authentication",
   source: "native",
   requires: { plugin: "totp" },

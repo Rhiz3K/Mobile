@@ -7,6 +7,7 @@ import { isSshActive } from "@/utils/hosts";
 // works on This device and on a server with its own copy.
 export const hostTransferFeature: FeatureDef = {
   id: "host-transfer",
+  plugins: ["import-export"],
   title: "Import and export",
   source: "native",
   availableOn: ["local", "server"],

@@ -385,6 +385,11 @@ export interface FeatureDef {
   source: FeatureSource;
   /** Server plugin behind a webview feature. */
   pluginId?: string;
+  /**
+   * Server plugins this feature stands in for, so Settings can say what each
+   * plugin does in the app.
+   */
+  plugins?: string[];
   /** Needed on linked servers. Unset means always there. */
   requires?: FeatureRequirement;
   /** Which accounts can use it. Defaults to linked servers only. */

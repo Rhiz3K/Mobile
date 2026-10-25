@@ -10,6 +10,7 @@ function DockerTab({ session, isVisible }: SessionTabProps) {
 
 export const dockerFeature: FeatureDef = {
   id: "docker",
+  plugins: ["docker"],
   title: "Docker",
   source: "native",
   // Runs over the phone's SSH, or the server's Docker plugin when that is the way in.

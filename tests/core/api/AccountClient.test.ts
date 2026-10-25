@@ -110,6 +110,30 @@ test("the cached generation and plugin list load before the network", async () =
   expect(again.isPluginEnabled("tunnels")).toBe(false);
 });
 
+test("the server's plugins that are off are kept for Settings, not for features", async () => {
+  fakeServer((req) =>
+    req.url.endsWith("/plugins")
+      ? {
+          data: [
+            { id: "docker", enabled: true, state: "active" },
+            { id: "tunnels", enabled: false, state: "disabled" },
+          ],
+        }
+      : { data: {} },
+  );
+  const first = client();
+  await first.refreshServerApi();
+  expect(first.serverPlugins?.map((p) => [p.id, p.active])).toEqual([
+    ["docker", true],
+    ["tunnels", false],
+  ]);
+  expect(first.supports({ plugin: "tunnels" })).toBe(false);
+  const again = client();
+  await again.load();
+  expect(again.serverPlugins).toEqual(first.serverPlugins);
+  expect(again.enabledPlugins?.map((p) => p.id)).toEqual(["docker"]);
+});
+
 test("socket URLs follow the server generation", async () => {
   fakeServer(() => ({ data: {} }));
   const c = client("a", "https://termix.example/ssh");

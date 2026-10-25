@@ -13,6 +13,7 @@ export function canShare(ctx: SessionMenuContext): boolean {
 
 export const sessionSharingFeature: FeatureDef = {
   id: "session-sharing",
+  plugins: ["session-sharing"],
   title: "Session sharing",
   source: "native",
   requires: { plugin: "session-sharing", pluginApiOnly: true },

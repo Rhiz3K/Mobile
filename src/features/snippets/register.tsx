@@ -4,6 +4,7 @@ import SnippetsBar from "./SnippetsBar";
 
 export const snippetsFeature: FeatureDef = {
   id: "snippets",
+  plugins: ["snippets"],
   title: "Snippets",
   source: "native",
   requires: { plugin: "snippets" },

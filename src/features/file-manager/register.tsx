@@ -43,6 +43,7 @@ const filesOn = (host: Parameters<typeof isSshHost>[0]) =>
 
 export const fileManagerFeature: FeatureDef = {
   id: "file-manager",
+  plugins: ["file-manager"],
   title: "File Manager",
   source: "native",
   availableOn: ["local", "server"],

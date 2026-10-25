@@ -23,7 +23,7 @@ import {
   toWebSocketBase,
 } from "@/core/api/compat/api-compat";
 import {
-  activePlugins,
+  parseServerPlugins,
   type ServerPlugin,
 } from "@/core/api/compat/server-features";
 import { handleApiError } from "@/core/api/errors";
@@ -86,7 +86,12 @@ export const SECRET_KEYS = [
   "clientCert",
   "proxyCookies",
 ];
-const DATA_KEYS = ["apiGeneration", "enabledPlugins", "hostOrigins"];
+const DATA_KEYS = [
+  "apiGeneration",
+  "serverPlugins",
+  "enabledPlugins",
+  "hostOrigins",
+];
 
 /**
  * Everything needed to talk to one Termix server as one user: base URLs,
@@ -99,7 +104,10 @@ export class AccountClient implements HttpOwner {
   readonly storage: AccountStorage;
 
   apiGeneration: ApiGeneration = "legacy";
+  /** Plugins that are on and running. Null when unknown. */
   enabledPlugins: ServerPlugin[] | null = null;
+  /** Every plugin the server lists, on or off. Null when unknown. */
+  serverPlugins: ServerPlugin[] | null = null;
 
   /** Axios instances per area. Legacy servers may move some of them. */
   http!: {
@@ -133,16 +141,26 @@ export class AccountClient implements HttpOwner {
   load(): Promise<void> {
     this.loaded ??= (async () => {
       const { data, secrets } = this.storage;
-      const [token, headers, basic, cert, cookies, generation, plugins] =
-        await Promise.all([
-          secrets.get("session"),
-          secrets.getJson<ProxyHeader[]>("customHeaders"),
-          secrets.getJson<BasicAuth>("basicAuth"),
-          secrets.getJson<ClientCert>("clientCert"),
-          secrets.getJson<NetCookie[]>("proxyCookies"),
-          data.get("apiGeneration"),
-          data.getJson<unknown>("enabledPlugins"),
-        ]);
+      const [
+        token,
+        headers,
+        basic,
+        cert,
+        cookies,
+        generation,
+        plugins,
+        oldPlugins,
+      ] = await Promise.all([
+        secrets.get("session"),
+        secrets.getJson<ProxyHeader[]>("customHeaders"),
+        secrets.getJson<BasicAuth>("basicAuth"),
+        secrets.getJson<ClientCert>("clientCert"),
+        secrets.getJson<NetCookie[]>("proxyCookies"),
+        data.get("apiGeneration"),
+        data.getJson<unknown>("serverPlugins"),
+        // Builds before 2.0 kept only the plugins that were on.
+        data.getJson<unknown>("enabledPlugins"),
+      ]);
       this.sessionToken = token;
       this.customHeaders = Array.isArray(headers) ? headers : [];
       this.basic = basic;
@@ -154,8 +172,11 @@ export class AccountClient implements HttpOwner {
       if (generation === "plugin" || generation === "legacy") {
         this.apiGeneration = generation;
       }
-      this.enabledPlugins =
-        this.apiGeneration === "plugin" ? activePlugins(plugins) : null;
+      this.applyPlugins(
+        this.apiGeneration === "plugin"
+          ? parseServerPlugins(plugins ?? oldPlugins)
+          : null,
+      );
       this.buildHttp();
     })();
     return this.loaded;
@@ -523,8 +544,13 @@ export class AccountClient implements HttpOwner {
     return this.enabledPlugins.some((p) => p.id === pluginId);
   }
 
-  private setEnabledPlugins(next: ServerPlugin[] | null): void {
-    this.enabledPlugins = next;
+  private applyPlugins(all: ServerPlugin[] | null): void {
+    this.serverPlugins = all;
+    this.enabledPlugins = all ? all.filter((p) => p.active) : null;
+  }
+
+  private setServerPlugins(next: ServerPlugin[] | null): void {
+    this.applyPlugins(next);
     this.emit();
   }
 
@@ -592,17 +618,17 @@ export class AccountClient implements HttpOwner {
   /** Loads which plugins are on. Needs a signed in user. */
   async refreshEnabledPlugins(): Promise<void> {
     if (this.apiGeneration !== "plugin") {
-      this.setEnabledPlugins(null);
+      this.setServerPlugins(null);
       return;
     }
     try {
       const res = await this.http.auth.get("/plugins");
-      const list = activePlugins(
+      const list = parseServerPlugins(
         Array.isArray(res.data) ? res.data : res.data?.plugins,
       );
       if (list) {
-        this.setEnabledPlugins(list);
-        await this.storage.data.setJson("enabledPlugins", list).catch(() => {});
+        this.setServerPlugins(list);
+        await this.storage.data.setJson("serverPlugins", list).catch(() => {});
       }
     } catch {
       // Keep whatever we had; features stay visible rather than vanishing.
@@ -619,7 +645,7 @@ export class AccountClient implements HttpOwner {
     if (this.apiGeneration === "plugin") {
       await this.refreshEnabledPlugins();
     } else {
-      this.setEnabledPlugins(null);
+      this.setServerPlugins(null);
       await this.detectLegacyBases();
     }
   }

@@ -61,6 +61,7 @@ TerminalTab.displayName = "TerminalTab";
 
 export const terminalFeature: FeatureDef = {
   id: "terminal",
+  plugins: ["ssh-terminal"],
   title: "Terminal",
   source: "native",
   requires: { plugin: "ssh-terminal" },

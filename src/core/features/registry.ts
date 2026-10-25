@@ -73,6 +73,13 @@ export class FeatureRegistry {
     return [...this.defs.values()];
   }
 
+  /** Features that stand in for a server plugin, on or off. */
+  forPlugin(pluginId: string): FeatureDef[] {
+    return this.all().filter(
+      (def) => def.plugins?.includes(pluginId) || def.pluginId === pluginId,
+    );
+  }
+
   available(ctx: FeatureContext): FeatureDef[] {
     return this.all().filter((def) => isFeatureAvailable(def, ctx));
   }
