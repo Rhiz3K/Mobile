@@ -223,7 +223,9 @@ export function parseCallback(url: string): CallbackResult | null {
       // A broken pair is skipped.
     }
   }
-  if (params.error) return { kind: "error", message: params.error };
+  if (params.error) {
+    return { kind: "error", message: callbackErrorText(params.error) };
+  }
   if (params.second_factor === "1") {
     if (!params.temp_token)
       return { kind: "error", message: "The server did not send a token." };
@@ -238,6 +240,23 @@ export function parseCallback(url: string): CallbackResult | null {
   }
   if (params.token) return { kind: "token", token: params.token };
   return { kind: "error", message: "The server did not send a token." };
+}
+
+const CALLBACK_ERRORS: Record<string, string> = {
+  no_token:
+    "The page signed you in but sent no session back. Update the server to Termix 26.10.6 or newer.",
+  user_not_allowed: "This account isn't allowed to sign in here.",
+  user_not_found: "No Termix account matches that sign in.",
+};
+
+/** Plain words for an error code the server put on the callback. */
+export function callbackErrorText(code: string): string {
+  return CALLBACK_ERRORS[code] ?? code;
+}
+
+/** The browser closed without coming back to the app. */
+export function browserCanceled(type: string): boolean {
+  return type === "cancel" || type === "dismiss";
 }
 
 /** Factors the app can answer itself; the rest go through the browser. */

@@ -19,8 +19,11 @@ export type SignInOption =
       /** A server before 2.9, which only has /users/oidc/authorize. */
       legacy?: boolean;
     }
-  /** Passkeys and security keys, signed in on the server's own page. */
-  | { kind: "browser" };
+  /**
+   * The server's own page in the system browser, for anything the app can't
+   * do itself. `passkey` when the server lists passkey sign in.
+   */
+  | { kind: "browser"; passkey?: boolean };
 
 export interface ServerSignIn {
   /** Answers JSON like Termix. False when nothing answered at all. */
@@ -56,13 +59,14 @@ function labelFor(id: string): string {
 /** Turns the server's method list into the options the screen shows. */
 export function optionsFromMethods(methods: PublicMethod[]): SignInOption[] {
   const out: SignInOption[] = [];
+  let passkey = false;
   for (const method of methods) {
     const instances = method.instances?.length ? method.instances : null;
     if (method.id === "password") {
       out.push({ kind: "password" });
     } else if (method.id === "passkey") {
       // Passkeys belong to the server's address, so they run on its page.
-      continue;
+      passkey = true;
     } else if (method.kind === "redirect") {
       for (const instance of instances ?? [null]) {
         out.push({
@@ -85,7 +89,7 @@ export function optionsFromMethods(methods: PublicMethod[]): SignInOption[] {
     }
   }
   // The server's own page handles passkeys and anything the app can't.
-  out.push({ kind: "browser" });
+  out.push(passkey ? { kind: "browser", passkey: true } : { kind: "browser" });
   return out;
 }
 

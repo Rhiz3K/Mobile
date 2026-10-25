@@ -54,10 +54,33 @@ test("every sign in the server lists gets a way in", async () => {
   expect(onRedirect).toHaveBeenCalledWith(
     expect.objectContaining({ instanceId: "k" }),
   );
-  await fireEvent.press(screen.getByText("Passkey or security key"));
+  await fireEvent.press(screen.getByText("Sign in in the browser"));
   expect(onBrowser).toHaveBeenCalled();
   await fireEvent.press(screen.getByText("Make an account"));
   expect(onSignup).toHaveBeenCalled();
+});
+
+test("a server with passkeys gets its own passkey button", async () => {
+  const onBrowser = jest.fn();
+  await render(
+    <SignInStep
+      client={client}
+      signIn={{
+        ...signIn,
+        options: [{ kind: "password" }, { kind: "browser", passkey: true }],
+      }}
+      onResult={jest.fn()}
+      onRedirect={jest.fn()}
+      onBrowser={onBrowser}
+      onSignup={jest.fn()}
+      onReset={jest.fn()}
+    />,
+  );
+  expect(screen.queryByText("Sign in in the browser")).toBeNull();
+  await fireEvent.press(
+    screen.getByText("Sign in with a passkey or security key"),
+  );
+  expect(onBrowser).toHaveBeenCalled();
 });
 
 test("a provider set to start on its own opens right away", async () => {

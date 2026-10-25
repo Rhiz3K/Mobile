@@ -2,7 +2,9 @@ import type { AccountClient } from "@/core/api/AccountClient";
 import { checkServerAddress } from "@/core/accounts/link/address";
 import {
   APP_CALLBACK_URL,
+  browserCanceled,
   browserSignInUrl,
+  callbackErrorText,
   finishLoginAnswer,
   parseCallback,
   redirectStartUrl,
@@ -112,8 +114,24 @@ test("the method list becomes forms, one button per provider and the browser", (
       autoStart: true,
     },
     { kind: "redirect", methodId: "oidc", instanceId: "k", label: "Keycloak" },
+    { kind: "browser", passkey: true },
+  ]);
+});
+
+test("without passkeys on the server the browser option is a plain one", () => {
+  expect(optionsFromMethods([{ id: "password", kind: "form" }])).toEqual([
+    { kind: "password" },
     { kind: "browser" },
   ]);
+});
+
+test("callback errors and a closed browser read in plain words", () => {
+  expect(callbackErrorText("no_token")).toMatch(/26.10.6/);
+  expect(callbackErrorText("user_not_allowed")).toMatch(/isn't allowed/);
+  expect(callbackErrorText("Some other text")).toBe("Some other text");
+  expect(browserCanceled("cancel")).toBe(true);
+  expect(browserCanceled("dismiss")).toBe(true);
+  expect(browserCanceled("success")).toBe(false);
 });
 
 test("a 2.9+ server is read from its method list", async () => {

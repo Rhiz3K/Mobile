@@ -49,7 +49,7 @@
 - The first time you link a server, merge This device's hosts into it or start with only the server's data. The choice says how many hosts, logins and snippets the phone has
 - Unlink a server and keep a copy of your own hosts, logins and snippets on This device, or delete them from the phone
 - Pick what syncs for each server, and see changes the server kept over yours with a button to keep yours
-- Sign in through the browser, which works with passkeys and security keys (needs Termix 26.10.6 or newer)
+- Sign in with a passkey or security key (Face ID, fingerprint, NFC or USB keys) through the browser when your server has passkeys on, and say when the sign in was canceled or turned down (needs Termix 26.10.6 or newer) (#83)
 - A welcome screen on a new install: use the app with no server, link a server, or import hosts and backups. Each choice says what it does
 - Link a server by its name alone: https is added, and the address is checked before anything is saved
 - Sign in with every login your server lists: password, LDAP, each SSO provider, TOTP and backup codes, and passkeys or security keys in the browser

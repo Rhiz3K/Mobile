@@ -22,6 +22,7 @@ import type { AccountClient } from "@/core/api/AccountClient";
 import { consumeFreshWebSession } from "@/core/api/webSession";
 import {
   APP_CALLBACK_URL,
+  browserCanceled,
   browserSignInUrl,
   parseCallback,
   redirectStartUrl,
@@ -167,6 +168,15 @@ export function BrowserStep({
         );
         if (result.type === "success" && result.url) {
           await handleCallback(result.url);
+        } else if (browserCanceled(result.type)) {
+          // On Android the callback can arrive as a link just after this.
+          setTimeout(() => {
+            if (started.current) return;
+            toast.info(
+              "Sign in canceled",
+              "Open the browser again when you are ready.",
+            );
+          }, 800);
         }
       } catch {
         toast.error("Could not open the sign in browser");

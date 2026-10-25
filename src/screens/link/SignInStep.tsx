@@ -29,6 +29,7 @@ export function splitOptions(options: SignInOption[]) {
       (o): o is RedirectOption => o.kind === "redirect",
     ),
     browser: options.some((o) => o.kind === "browser"),
+    passkey: options.some((o) => o.kind === "browser" && o.passkey),
   };
 }
 
@@ -50,7 +51,7 @@ export function SignInStep({
   onReset: () => void;
 }) {
   const color = useThemeColor();
-  const { forms, redirects, browser } = useMemo(
+  const { forms, redirects, browser, passkey } = useMemo(
     () => splitOptions(signIn.options),
     [signIn.options],
   );
@@ -181,19 +182,35 @@ export function SignInStep({
         </View>
       ) : null}
 
-      {browser ? (
+      {passkey ? (
+        <View className="gap-1">
+          <Button
+            variant="muted"
+            size="lg"
+            onPress={onBrowser}
+            icon={<Fingerprint size={16} color={color("foreground")} />}
+          >
+            Sign in with a passkey or security key
+          </Button>
+          <Text className="text-center text-[10px] text-muted-foreground">
+            Opens your server&apos;s sign in page in the browser. Face ID,
+            fingerprint, NFC and USB keys all work there. Needs Termix 26.10.6
+            or newer.
+          </Text>
+        </View>
+      ) : browser ? (
         <View className="gap-1">
           <Button
             variant="ghost"
             size="lg"
             onPress={onBrowser}
-            icon={<Fingerprint size={16} color={color("foreground")} />}
+            icon={<Globe size={16} color={color("foreground")} />}
           >
-            Passkey or security key
+            Sign in in the browser
           </Button>
           <Text className="text-center text-[10px] text-muted-foreground">
-            Opens your server&apos;s sign in page in the browser. Needs Termix
-            26.10.6 or newer.
+            Opens your server&apos;s sign in page, for anything the app
+            can&apos;t do here. Needs Termix 26.10.6 or newer.
           </Text>
         </View>
       ) : null}
