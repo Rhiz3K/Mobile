@@ -65,6 +65,7 @@ export interface TermixNetNative {
   removeClientCert(accountId: string): Promise<void>;
   hasClientCert(accountId: string): Promise<boolean>;
   readWebCookies(url: string): Promise<NetCookie[]>;
+  readJarCookies?(url: string): Promise<NetCookie[]>;
   setCookies(url: string, cookies: NetCookie[]): Promise<void>;
   clearCookie(url: string, name: string): Promise<void>;
   clearWebCookies(url: string): Promise<void>;
@@ -137,6 +138,12 @@ export async function hasClientCert(accountId: string): Promise<boolean> {
 
 export async function readWebCookies(url: string): Promise<NetCookie[]> {
   return (await native?.readWebCookies(url)) ?? [];
+}
+
+/** Cookies the app's own requests hold now, renewed ones included. */
+export async function readJarCookies(url: string): Promise<NetCookie[]> {
+  if (!native?.readJarCookies) return [];
+  return (await native.readJarCookies(url).catch(() => [])) ?? [];
 }
 
 export async function setCookies(

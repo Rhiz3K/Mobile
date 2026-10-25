@@ -41,6 +41,7 @@ import { loadUiPrefs } from "@/core/ui-prefs";
 import { registerBuiltInFeatures } from "@/features";
 import { usePluginFrameFeatures } from "@/features/plugin-webview/register";
 import { AccountSwitcher } from "@/screens/accounts/AccountSwitcher";
+import { ProxyGateHost } from "@/screens/accounts/ProxyGateHost";
 import { ShortcutSheet } from "@/screens/shortcuts/ShortcutSheet";
 import { useAppShortcuts } from "@/core/shortcuts/useAppShortcuts";
 import { CommandPalette } from "@/screens/palette/CommandPalette";
@@ -108,6 +109,7 @@ function RootLayoutContent() {
       <CommandPalette />
       <ShortcutSheet />
       <AccountSwitcher />
+      <ProxyGateHost />
       <AppLockGate />
       <AnalyticsHost hold={welcomeVisible || authFlowVisible} />
       {welcomeVisible ? (

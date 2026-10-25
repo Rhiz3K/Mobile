@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { WebView } from "react-native-webview";
 import type { AccountClient } from "@/core/api/AccountClient";
@@ -55,6 +55,11 @@ export function ProxySignIn({
   const color = useThemeColor();
   const [saving, setSaving] = useState(false);
   const handled = useRef(false);
+
+  // Each open is a new sign in, also after one that went through.
+  useEffect(() => {
+    if (open) handled.current = false;
+  }, [open]);
 
   const onMessage = async (message: string) => {
     if (message !== "PROXY_OK" || handled.current || !client) return;

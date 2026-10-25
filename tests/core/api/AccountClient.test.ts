@@ -210,6 +210,48 @@ test("proxy cookies never keep a jwt cookie and go back in the jar on load", asy
   ]);
 });
 
+test("load never puts an old proxy cookie over a renewed one", async () => {
+  const net = fakeNet();
+  const c = client();
+  await c.setProxyCookies([
+    { name: "authelia_session", value: "old", expires: 9e12 },
+  ]);
+  net.cookies.clear();
+  net.jarCookies = [{ name: "authelia_session", value: "renewed" }];
+  const again = client();
+  await again.load();
+  expect(net.cookies.size).toBe(0);
+  expect(again.proxyCookies()).toEqual([
+    { name: "authelia_session", value: "renewed", expires: 9e12 },
+  ]);
+  const third = client();
+  await third.load();
+  expect(third.proxyCookies()[0].value).toBe("renewed");
+});
+
+test("only cookies the jar lost go back in", async () => {
+  const net = fakeNet();
+  net.jarCookies = [{ name: "kept", value: "1" }];
+  const c = client();
+  await c.setProxyCookies([
+    { name: "kept", value: "1" },
+    { name: "lost", value: "2" },
+  ]);
+  expect(net.cookies.get("https://termix.example")).toEqual([
+    { name: "lost", value: "2" },
+  ]);
+});
+
+test("says when a saved proxy cookie ran out", async () => {
+  fakeNet();
+  const c = client();
+  await c.setProxyCookies([
+    { name: "CF_Authorization", value: "a", expires: 50 },
+  ]);
+  expect(c.proxyCookiesExpired(49)).toBe(false);
+  expect(c.proxyCookiesExpired(50)).toBe(true);
+});
+
 test("a new token clears the login cookie the server would read first", async () => {
   const net = fakeNet();
   const c = client();

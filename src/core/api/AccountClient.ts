@@ -10,6 +10,7 @@ import {
   nativeRequest,
   NativeSocket,
   needsNativeRequests,
+  readJarCookies,
   removeClientCert,
   setCookies,
   type NetCookie,
@@ -36,6 +37,11 @@ import {
 } from "@/core/api/http";
 import { createModules, type ApiModules } from "@/core/api/modules";
 import { nativeAdapter, toFetchResponse } from "@/core/api/native-adapter";
+import {
+  hasExpiredCookie,
+  mergeJarCookies,
+  missingFromJar,
+} from "@/core/api/proxy-cookies";
 import { toBase64, utf8Encode } from "@/core/db/bytes";
 import { systemLogger } from "@/core/log/logger";
 import type { AccountStorage } from "@/core/storage/kv";
@@ -167,8 +173,9 @@ export class AccountClient implements HttpOwner {
       // Older builds saved the certificate file itself here; it never worked.
       this.cert = cert && !("pfx" in cert) ? cert : null;
       this.cookies = Array.isArray(cookies) ? cookies : [];
-      // Session cookies are gone after a restart, so put them back.
-      await setCookies(this.rootBase(), this.cookies).catch(() => {});
+      // Session cookies are gone after a restart, so put them back, but never
+      // over a newer value the proxy set meanwhile.
+      await this.syncCookieJar().catch(() => {});
       if (generation === "plugin" || generation === "legacy") {
         this.apiGeneration = generation;
       }
@@ -328,11 +335,33 @@ export class AccountClient implements HttpOwner {
     this.cookies = cookies.filter((c) => c.name && c.name !== "jwt");
     if (this.cookies.length) {
       await this.storage.secrets.setJson("proxyCookies", this.cookies);
-      await setCookies(this.rootBase(), this.cookies);
+      await this.syncCookieJar();
     } else {
       await this.storage.secrets.remove("proxyCookies").catch(() => {});
     }
     this.emit();
+  }
+
+  /**
+   * Puts back saved cookies the jar lost and saves values the proxy renewed.
+   * Run on start and when the app goes to the background.
+   */
+  async syncCookieJar(): Promise<void> {
+    if (!this.cookies.length) return;
+    const root = this.rootBase();
+    const jar = await readJarCookies(root);
+    const missing = missingFromJar(this.cookies, jar);
+    if (missing.length) await setCookies(root, missing);
+    const renewed = mergeJarCookies(this.cookies, jar);
+    if (renewed) {
+      this.cookies = renewed;
+      await this.storage.secrets.setJson("proxyCookies", renewed);
+    }
+  }
+
+  /** True when a saved proxy cookie ran out, so the proxy will ask again. */
+  proxyCookiesExpired(now = Date.now()): boolean {
+    return hasExpiredCookie(this.cookies, now);
   }
 
   /** True when requests must go through the module to send the certificate. */

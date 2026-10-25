@@ -111,6 +111,12 @@ public class TermixNetModule: Module {
       }
     }
 
+    // The jar the app's requests use, with any value a proxy renewed.
+    AsyncFunction("readJarCookies") { (url: String) -> [[String: Any]] in
+      guard let target = URL(string: url) else { return [] }
+      return (HTTPCookieStorage.shared.cookies(for: target) ?? []).map(NetCookies.describe)
+    }
+
     // Puts cookies in the jar every request and socket here reads from.
     AsyncFunction("setCookies") { (url: String, cookies: [NetCookie]) in
       guard let host = URL(string: url)?.host else { return }
