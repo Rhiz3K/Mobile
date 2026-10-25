@@ -36,14 +36,15 @@ Try Termix at [demo.termix.site](https://demo.termix.site/). Any username and pa
 
 - SSH terminal: several sessions in tabs you can rename, drag and swipe between, key rows with a tmux row that you can change per host, snippets with variables and folders that can run on many hosts at once, history with search and suggestions, find, sudo password fill, tmux and screen attach, share links, hardware keyboard shortcuts, dictation and VoiceOver. Tabs reconnect on their own and come back after the app was closed. On Android sessions keep running in the background with a notification; on iOS they reconnect when you come back.
 - File manager: browse, edit and move files over SFTP from the phone or through your server. Download and upload with pause and resume, share files in from other apps, edit code with syntax highlighting, and keep a files panel beside the terminal.
-- Home: live cards for your pinned hosts with metrics, Docker and failed services.
+- Home: open sessions, quick connect, recent hosts and live cards for your pinned hosts with metrics, Docker and failed services.
+- Navigation: one tap on a host opens its terminal, hold it for more. A Tools tab for files, snippets, tunnels, Docker, metrics and services, search across hosts, snippets, actions and settings, and split view on tablets.
 - Host metrics: CPU, memory, disk, network, uptime and processes from the phone, plus ports, firewall rules and login history through your server, with history up to a week and server alerts on the hosts screen.
 - SSH tunnels: create, start and stop tunnels, set up per host in the host editor.
 - Docker: containers, logs, stats, start, stop, restart, a shell in a container and compose stacks, from the phone or through your server.
 - Services: systemd and OpenRC services with start, stop and restart, and the journal with live follow. Asks for the sudo password when a change needs root.
 - Remote desktop: RDP, VNC and Telnet.
 - Home screen widgets on iOS and Android: open a host, run a snippet or check metrics without opening the app.
-- Hosts: folders, saved credentials and keys, host defaults, import and export (Termix files and SSH config), QR sharing, Quick Connect and Wake-on-LAN.
+- Hosts: folders with drag to reorder, select many at once, saved credentials and keys, host defaults, import and export (Termix files and SSH config), QR sharing, Quick Connect and Wake-on-LAN.
 - Accounts: link more than one Termix server and switch between them. Open tabs keep running.
 - Sync: each linked server keeps its own encrypted copy on the phone, synced both ways and in the background, so its hosts work offline too. Pick what syncs, merge This device's hosts in on first link, and keep a copy when you unlink. Needs the Sync plugin on the server.
 - Reverse proxies: extra headers, Cloudflare service tokens, basic auth, client certificates and proxy sign in pages (Cloudflare Access, Authelia, Authentik).

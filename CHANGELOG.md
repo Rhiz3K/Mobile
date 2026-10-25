@@ -4,7 +4,16 @@
 
 ### Added
 
-- Home tab with live cards for your pinned hosts: metrics, Docker and failed services
+- Home shows your open sessions, quick connect, the hosts you opened last and your pinned hosts with live cards for metrics, Docker and failed services
+- A Tools tab for files, snippets, tunnels, Docker, metrics and services: pick a tool, then the host
+- Search hosts, snippets, actions and settings from the search button at the top of Home, Hosts and Tools
+- Home and Hosts say when your server can't be reached, and the hosts on the phone keep working
+- Drag hosts to reorder them inside a folder, in the same order as Termix on the web
+- Select many hosts to pin, unpin, move to a folder, open or delete them at once
+- Active host filters show under the filter box, and a tap removes one
+- Split view on tablets: put two tabs side by side from the tab menu and drag the divider to resize
+- Close all tabs from the tab menu or the connections list
+- The Sessions tab shows how many tabs are open and when one needs attention
 - Docker on the phone with no server: containers, logs, stats, start, stop, restart, remove and a shell in a container, with sudo when your user can't reach Docker
 - See Docker compose stacks, their services and compose files, read only
 - Host metrics on the phone with no server: CPU, memory, disk, network, uptime and processes
@@ -24,7 +33,7 @@
 - Wake a host from the phone with Wake-on-LAN, also on This device with no server
 - See if hosts are online from the phone when no server reports it
 - Themed app icon on Android 13 and newer
-- Link more than one Termix server and switch between them from Settings or the Hosts screen
+- Link more than one Termix server and switch between them from Settings or the top of Home and Hosts
 - Open tabs keep running when you switch to another server
 - Hosts, logins and snippets on This device are saved on the phone in an encrypted database
 - Export your local data to a backup file locked with a passphrase, and restore it later
@@ -113,13 +122,17 @@
 - Settings, Plugins lists the plugins on your server with their version, whether they are on, and if they show in the app, in a web view or not at all. Everything lists every feature and plugin and says if it works on the phone or needs the server
 - A plugin made for a newer or older version of the app says to update the app or the plugin, instead of opening a broken screen
 - Server plugins with no phone version, like Homepage, Alerts and Proxmox, open inside the app with the same screens as the web app
-- Plugin screens about a host open from the host's menu as a tab; the others are listed on Home under From your server and in Settings, Plugins
+- Plugin screens about a host open from the host's menu as a tab; the others are listed on Home and Tools under From your server and in Settings, Plugins
 - Plugin screens follow the app's theme, work behind proxies and client certificates, and only reach their own plugin on your server
 - An open tab of a plugin an admin turned off says so, and comes back when the plugin is on again
 
 ### Changed
 
 - The app opens on Home
+- Tap a host to open its terminal. Hold it for everything else, like files, Docker, pin or edit
+- The bottom bar has Home, Hosts, Sessions, Tools and Settings, and the account switcher is at the top of Home and Hosts
+- Snippets moved from Settings to Tools, and logins, Tailscale devices and refresh moved into the Hosts menu
+- The default host order is the order you set, then name
 - Docker and host metrics only go through the server when the host connects through it, and the cards and screens stop asking the host while the app is in the background
 - The file list scrolls smoothly in folders with thousands of files and remembers where you were in each folder
 - Your server sign in is now kept in the phone's secure storage
