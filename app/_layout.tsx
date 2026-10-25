@@ -12,6 +12,7 @@ import {
 import { AppLockProvider, useAppLock } from "@/contexts/AppLockContext";
 import { LockScreen } from "@/components/LockScreen";
 import LinkFlow from "@/screens/link/LinkFlow";
+import Welcome from "@/screens/onboarding/Welcome";
 import { View, Text, ActivityIndicator, TouchableOpacity } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -37,7 +38,8 @@ registerBuiltInFeatures();
 function RootLayoutContent() {
   const {
     authFlowVisible,
-    openAuthFlow,
+    welcomeVisible,
+    finishWelcome,
     showUpdateScreen,
     isLoading,
     setIsLoading,
@@ -56,10 +58,7 @@ function RootLayoutContent() {
           Initializing…
         </Text>
         <TouchableOpacity
-          onPress={() => {
-            setIsLoading(false);
-            openAuthFlow("server");
-          }}
+          onPress={() => setIsLoading(false)}
           className="mt-6 border border-border bg-card px-6 py-3"
         >
           <Text
@@ -92,6 +91,11 @@ function RootLayoutContent() {
       <CommandPalette />
       <AccountSwitcher />
       <AppLockGate />
+      {welcomeVisible ? (
+        <View className="absolute inset-0 bg-background">
+          <Welcome onDone={finishWelcome} />
+        </View>
+      ) : null}
       {authFlowVisible ? (
         <View className="absolute inset-0 bg-background">
           <LinkFlow />

@@ -20,7 +20,8 @@ import { DEVICE_ONLY } from "@/core/storage/kv";
  * AsyncStorage.
  */
 
-const ENABLED_KEY = "appLockEnabled";
+export const APP_LOCK_ENABLED_KEY = "appLockEnabled";
+const ENABLED_KEY = APP_LOCK_ENABLED_KEY;
 const PIN_KEY = "appLockPin"; // SecureStore
 const LOCK_DELAY_MS = 15_000; // re-lock if backgrounded longer than this
 

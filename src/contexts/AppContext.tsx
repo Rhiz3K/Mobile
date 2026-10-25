@@ -25,7 +25,20 @@ import {
 import type { AccountClient } from "@/core/api/AccountClient";
 import { refreshPluginLists } from "@/core/plugins/refresh";
 import { getLatestGitHubRelease, isNewerVersion } from "@/core/updates";
-import { linkAccount, sync, SyncError, type LinkOutcome } from "@/core/sync";
+import {
+  linkAccount,
+  sync,
+  SyncError,
+  thisDeviceHasData,
+  type LinkOutcome,
+} from "@/core/sync";
+import {
+  alreadySetUp,
+  markOnboardingDone,
+  onboardingDone,
+  shouldWelcome,
+} from "@/core/onboarding";
+import { APP_LOCK_ENABLED_KEY } from "@/contexts/AppLockContext";
 import { updateBackgroundSync } from "@/core/sync/background";
 
 interface Server {
@@ -60,6 +73,11 @@ interface AppContextType {
   accountSwitcherVisible: boolean;
   openAccountSwitcher: () => void;
   closeAccountSwitcher: () => void;
+
+  /** The welcome screen of a new install. */
+  welcomeVisible: boolean;
+  /** Closes the welcome screen for good, then does what was picked. */
+  finishWelcome: (choice: "standalone" | "link" | "import") => void;
 
   /** Auth flow overlay control. */
   authFlowVisible: boolean;
@@ -189,6 +207,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [showUpdateScreen, setShowUpdateScreen] = useState<boolean>(false);
 
   const [authFlowVisible, setAuthFlowVisible] = useState(false);
+  const [welcomeVisible, setWelcomeVisible] = useState(false);
   const [accountSwitcherVisible, setAccountSwitcherVisible] = useState(false);
   const openAccountSwitcher = useCallback(
     () => setAccountSwitcherVisible(true),
@@ -237,10 +256,17 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
           setAuthenticatedState(await validateSession(current, client));
           // A configured but signed out server lands on the empty state shell;
           // the user opens the auth flow themselves.
-        } else if (accounts.list().length === 1) {
-          // Brand new install: guide the user, but the flow is dismissible.
-          openAuthFlow("server");
         }
+        // A brand new install gets the welcome screen, once.
+        const state = {
+          done: await onboardingDone(),
+          hasServers: accounts.list().length > 1,
+          hasLocalData: await thisDeviceHasData(),
+          appLockOn:
+            (await AsyncStorage.getItem(APP_LOCK_ENABLED_KEY)) === "true",
+        };
+        if (shouldWelcome(state)) setWelcomeVisible(true);
+        else if (alreadySetUp(state)) void markOnboardingDone();
         // After the check above, so its request never races the token swap.
         void upgradeLogins();
       } catch {
@@ -251,7 +277,16 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     };
 
     initializeApp();
-  }, [openAuthFlow]);
+  }, []);
+
+  const finishWelcome = useCallback(
+    (choice: "standalone" | "link" | "import") => {
+      void markOnboardingDone();
+      setWelcomeVisible(false);
+      if (choice === "link") openAuthFlow("server");
+    },
+    [openAuthFlow],
+  );
 
   // Switching accounts re-checks the new one. Open sessions keep running.
   const firstActive = useRef(true);
@@ -388,6 +423,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         accountSwitcherVisible,
         openAccountSwitcher,
         closeAccountSwitcher,
+        welcomeVisible,
+        finishWelcome,
         authFlowVisible,
         authFlowInitialStep,
         openAuthFlow,

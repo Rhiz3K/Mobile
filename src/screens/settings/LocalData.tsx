@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import * as DocumentPicker from "expo-document-picker";
 import * as Sharing from "expo-sharing";
 import { File, Paths } from "expo-file-system";
 import { ArrowLeft } from "lucide-react-native";
@@ -13,11 +12,9 @@ import { toUserMessage } from "@/core/errors";
 import { Button, PromptSheet, SettingRow, Text, useConfirm } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { toast } from "@/utils/toast";
+import { useRestoreBackup } from "./RestoreBackup";
 
-type Step =
-  | { kind: "export" }
-  | { kind: "export-again"; passphrase: string }
-  | { kind: "import"; content: string };
+type Step = { kind: "export" } | { kind: "export-again"; passphrase: string };
 
 function formatSize(bytes: number | null): string {
   if (bytes == null) return "Unknown";
@@ -92,41 +89,11 @@ export default function LocalData() {
     }
   };
 
-  const pickBackup = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        copyToCacheDirectory: true,
-      });
-      if (result.canceled || !result.assets?.[0]) return;
-      const picked = new File(result.assets[0].uri);
-      const content = await picked.text();
-      try {
-        picked.delete();
-      } catch {}
-      const ok = await confirm({
-        title: "Replace local data?",
-        description: `Everything saved on this phone for ${accountLabel(account)} is replaced with the backup.`,
-        confirmLabel: "Continue",
-      });
-      if (ok) setStep({ kind: "import", content });
-    } catch {
-      toast.error("Could not read that file");
-    }
-  };
-
-  const importBackup = async (content: string, passphrase: string) => {
-    setBusy(true);
-    try {
-      await localStores.importBackup(account.id, content, passphrase);
-      setStep(null);
-      toast.success("Backup restored");
-      void load();
-    } catch (error) {
-      toast.error(toUserMessage(error, "Could not restore the backup"));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const restore = useRestoreBackup({
+    accountId: account.id,
+    accountName: accountLabel(account),
+    onDone: () => void load(),
+  });
 
   const deleteAll = async () => {
     const ok = await confirm({
@@ -207,7 +174,7 @@ export default function LocalData() {
             <Button onPress={() => setStep({ kind: "export" })}>
               Export backup
             </Button>
-            <Button variant="muted" onPress={pickBackup}>
+            <Button variant="muted" onPress={() => void restore.start()}>
               Import backup
             </Button>
           </View>
@@ -249,20 +216,7 @@ export default function LocalData() {
         onSubmit={(passphrase) => void exportBackup(passphrase)}
         onCancel={() => setStep(null)}
       />
-      <PromptSheet
-        visible={step?.kind === "import"}
-        title="Backup passphrase"
-        description="The passphrase used when the backup was made."
-        placeholder="Passphrase"
-        confirmLabel="Restore"
-        secureTextEntry
-        loading={busy}
-        onSubmit={(passphrase) => {
-          if (step?.kind === "import")
-            void importBackup(step.content, passphrase);
-        }}
-        onCancel={() => setStep(null)}
-      />
+      {restore.sheet}
     </View>
   );
 }
