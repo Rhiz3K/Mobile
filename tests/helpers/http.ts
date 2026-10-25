@@ -14,7 +14,14 @@ export interface SeenRequest {
 }
 
 type Reply =
-  { status?: number; data?: unknown; headers?: Record<string, string> } | Error;
+  | {
+      status?: number;
+      data?: unknown;
+      headers?: Record<string, string>;
+      /** Where the request ended up after redirects. */
+      responseURL?: string;
+    }
+  | Error;
 type Handler = (req: SeenRequest) => Reply | Promise<Reply>;
 
 /** Routes every axios request in the test through `handler`. */
@@ -40,13 +47,14 @@ export function fakeServer(handler: Handler) {
       statusText: String(status),
       headers: reply.headers ?? {},
       config,
+      request: { responseURL: reply.responseURL ?? url },
     };
     if (status >= 400) {
       throw new axios.AxiosError(
         `HTTP ${status}`,
         "ERR_BAD_RESPONSE",
         config,
-        null,
+        response.request,
         response,
       );
     }

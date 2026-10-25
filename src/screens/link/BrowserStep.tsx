@@ -28,6 +28,7 @@ import {
   type SecondFactorStep,
 } from "@/core/accounts/link/login";
 import type { SignInOption } from "@/core/accounts/link/methods";
+import { ProxySignIn } from "@/screens/accounts/ProxySignIn";
 import { TOKEN_HANDOFF_SCRIPT } from "./webview-handoff";
 
 /** How this step signs in. */
@@ -67,6 +68,8 @@ export function BrowserStep({
   const [finishing, setFinishing] = useState(false);
   const [incognito, setIncognito] = useState(false);
   const [webViewKey, setWebViewKey] = useState(() => String(Date.now()));
+  const [proxyOpen, setProxyOpen] = useState(false);
+  const pendingToken = useRef<string | null>(null);
   // Refs, since the auth session result and the link listener can both fire.
   const started = useRef(false);
   const inited = useRef(false);
@@ -97,6 +100,14 @@ export function BrowserStep({
               return;
             }
           } catch (e: any) {
+            // Signed in, but the proxy only let the browser through. Keep the
+            // session and sign in to the proxy here too.
+            if (e?.code === "PROXY_LOGIN") {
+              pendingToken.current = token;
+              started.current = false;
+              setProxyOpen(true);
+              return;
+            }
             if (e?.response?.status === 401 || e?.status === 401) {
               await client.clearToken();
               toast.error(
@@ -380,6 +391,16 @@ export function BrowserStep({
           <ActivityIndicator size="large" color={accent} />
         </View>
       )}
+      <ProxySignIn
+        client={client}
+        open={proxyOpen}
+        onClose={() => setProxyOpen(false)}
+        onDone={() => {
+          const token = pendingToken.current;
+          pendingToken.current = null;
+          if (token) void finish(token);
+        }}
+      />
     </View>
   );
 }

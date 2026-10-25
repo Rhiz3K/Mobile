@@ -1,5 +1,6 @@
 import { AccountClient } from "@/core/api/AccountClient";
 import { ApiError } from "@/core/api/errors";
+import { leftServer } from "@/core/api/http";
 import { accountStorage } from "@/core/storage/kv";
 import { fakeServer, resetStorage } from "../../helpers/http";
 import { clearFakeNet, fakeNet } from "../../helpers/net";
@@ -208,6 +209,32 @@ test("proxy cookies never keep a jwt cookie and go back in the jar on load", asy
   expect(net.cookies.get("https://termix.example")).toEqual([
     { name: "CF_Authorization", value: "cf" },
   ]);
+});
+
+test("a redirect to a proxy login page asks for the proxy, not a new session", async () => {
+  fakeServer(() => ({
+    data: "<!doctype html><title>Sign in</title>",
+    responseURL: "https://team.cloudflareaccess.com/cdn-cgi/access/login",
+  }));
+  const c = client();
+  await c.setToken("tok");
+  const lost = jest.fn();
+  c.onAuthLost(lost);
+  await expect(c.api.auth.getUserInfo()).rejects.toMatchObject({
+    code: "PROXY_LOGIN",
+  });
+  expect(lost).not.toHaveBeenCalled();
+  expect(c.token()).toBe("tok");
+});
+
+test("only a redirect to another host counts as leaving the server", () => {
+  const config = { baseURL: "https://termix.example", url: "/users/me" };
+  expect(leftServer(config, "https://termix.example/login")).toBe(false);
+  expect(leftServer(config, "https://auth.example/login")).toBe(true);
+  expect(leftServer(config, undefined)).toBe(false);
+  expect(
+    leftServer({ url: "https://termix.example/x" }, "https://sso.example/"),
+  ).toBe(true);
 });
 
 test("load never puts an old proxy cookie over a renewed one", async () => {
