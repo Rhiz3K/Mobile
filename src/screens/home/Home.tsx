@@ -1,17 +1,43 @@
 import { useCallback, useState } from "react";
-import { ScrollView, Pressable, View } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
-import { ChevronRight, Pin } from "lucide-react-native";
+import {
+  ChevronRight,
+  Clock,
+  Plus,
+  Server,
+  SquareTerminal,
+  Zap,
+} from "lucide-react-native";
 import { Screen } from "@/components/Screen";
+import { useAppContext } from "@/contexts/AppContext";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { useTerminalSessions } from "@/contexts/TerminalSessionsContext";
+import { displayTitle } from "@/contexts/session-tabs";
 import { useAccounts } from "@/core/accounts";
 import { useLiveList, useRepositories } from "@/core/data/hooks";
-import { useDashboardCards, useQuickActions } from "@/core/features/hooks";
+import { features } from "@/core/features/registry";
+import {
+  useCapability,
+  useDashboardCards,
+  useQuickActions,
+} from "@/core/features/hooks";
+import { useRecentHosts } from "@/core/hosts/recent";
+import { useSessionStatuses } from "@/core/sessions/status";
 import { HostActionSheet } from "@/screens/hosts/HostActionSheet";
+import { QuickConnect } from "@/screens/hosts/QuickConnect";
+import { useOpenHost } from "@/screens/hosts/useOpenHost";
+import {
+  statusLabel,
+  TabStatusMark,
+} from "@/screens/sessions/navigation/TabStatusMark";
+import { AccountButton, SearchButton } from "@/screens/shell/AppHeader";
 import type { SSHHost } from "@/types";
 import { Button, EmptyState, ListRow, Text } from "@/ui";
 import { isSshHost } from "@/utils/hosts";
+import { ServerReachBanner } from "./ServerReachBanner";
+
+const RECENT_SHOWN = 5;
 
 /** Pinned hosts, newest name order, SSH first since only they have cards. */
 export function pinnedHosts(hosts: SSHHost[]): SSHHost[] {
@@ -24,16 +50,36 @@ export function pinnedHosts(hosts: SSHHost[]): SSHHost[] {
     );
 }
 
-/** Live cards for the hosts you pinned. */
+function SectionTitle({ children }: { children: string }) {
+  return (
+    <Text
+      weight="medium"
+      className="mb-1.5 px-1 text-[11px] uppercase tracking-wider text-muted-foreground"
+    >
+      {children}
+    </Text>
+  );
+}
+
+/** Open sessions, quick connect, pinned hosts with live cards, recent hosts. */
 export default function Home() {
   const repos = useRepositories();
   const { active: account } = useAccounts();
+  const { openAuthFlow } = useAppContext();
   const router = useRouter();
   const color = useThemeColor();
+  const openHost = useOpenHost();
   const [focused, setFocused] = useState(true);
   const [sheetHost, setSheetHost] = useState<SSHHost | null>(null);
+  const [quickOpen, setQuickOpen] = useState(false);
+  const canQuickConnect = useCapability("host.quickConnect");
   const hosts = useLiveList(repos.hosts, () => repos.hosts.list(), [repos]);
   const pinned = pinnedHosts(hosts.data);
+  const recent = useRecentHosts(account.id, hosts.data)
+    .filter((h) => !h.pin)
+    .slice(0, RECENT_SHOWN);
+  const quick = useQuickActions();
+  const muted = color("muted-foreground") ?? "#888";
 
   // Cards only poll while Home is the screen in front.
   useFocusEffect(
@@ -44,38 +90,120 @@ export default function Home() {
   );
 
   const toHosts = () => router.push("/(tabs)/hosts");
-  const quick = useQuickActions();
+  const tap = (host: SSHHost) =>
+    void openHost(host).then((opened) => !opened && setSheetHost(host));
+  const noHosts = !hosts.loading && hosts.data.length === 0;
 
   return (
-    <Screen title="Home">
-      <QuickActions {...quick} />
-      {pinned.length === 0 && !hosts.loading ? (
-        <EmptyState
-          icon={Pin}
-          title="Pin a host to see it here"
-          hint="Pinned hosts show their metrics, Docker and services at a glance. Pin one from its editor."
-          action={
-            <Button size="sm" onPress={toHosts}>
-              Go to hosts
-            </Button>
-          }
-        />
-      ) : (
-        <ScrollView
-          contentContainerStyle={{ padding: 12, gap: 16, paddingBottom: 120 }}
-        >
-          {pinned.map((host) => (
-            <HostSection
-              key={`${account.id}:${host.id}`}
-              host={host}
-              accountId={account.id}
-              active={focused}
-              onOpen={() => setSheetHost(host)}
-              chevron={color("muted-foreground") ?? "#888"}
+    <Screen titleNode={<AccountButton />} headerRight={<SearchButton />}>
+      <ScrollView
+        contentContainerStyle={{ padding: 12, gap: 16, paddingBottom: 48 }}
+      >
+        <ServerReachBanner />
+        <OpenSessions />
+
+        {canQuickConnect ? (
+          <View className="border border-border">
+            <ListRow
+              title="Quick connect"
+              icon={<Zap size={16} color={muted} />}
+              meta={
+                <Text className="text-meta text-muted-foreground">
+                  user@host:port, without saving
+                </Text>
+              }
+              trailing={<ChevronRight size={16} color={muted} />}
+              onPress={() => setQuickOpen(true)}
             />
-          ))}
-        </ScrollView>
-      )}
+          </View>
+        ) : null}
+
+        <QuickActions {...quick} />
+
+        {noHosts ? (
+          <EmptyState
+            icon={Server}
+            title="Add your first host"
+            hint="Hosts you open show up here, and pinned hosts show live cards."
+            action={
+              <View className="items-center gap-2">
+                <Button
+                  size="sm"
+                  onPress={() =>
+                    router.navigate("/(tabs)/hosts?action=new" as never)
+                  }
+                  icon={<Plus size={15} color={color("accent-brand")} />}
+                >
+                  Add host
+                </Button>
+                {account.kind === "local" ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onPress={() => openAuthFlow("server")}
+                  >
+                    Link a server
+                  </Button>
+                ) : null}
+              </View>
+            }
+          />
+        ) : null}
+
+        {pinned.length > 0 ? (
+          <View className="gap-4">
+            <SectionTitle>Pinned</SectionTitle>
+            {pinned.map((host) => (
+              <HostSection
+                key={`${account.id}:${host.id}`}
+                host={host}
+                accountId={account.id}
+                active={focused}
+                onOpen={() => tap(host)}
+                onMore={() => setSheetHost(host)}
+                chevron={muted}
+              />
+            ))}
+          </View>
+        ) : null}
+
+        {recent.length > 0 ? (
+          <View>
+            <SectionTitle>Recent</SectionTitle>
+            <View className="border border-border">
+              {recent.map((host, index) => (
+                <ListRow
+                  key={host.id}
+                  index={index}
+                  title={host.name || host.ip}
+                  icon={<Clock size={16} color={muted} />}
+                  meta={
+                    <Text className="text-meta text-muted-foreground">
+                      {host.username ? `${host.username}@` : ""}
+                      {host.ip}
+                    </Text>
+                  }
+                  onPress={() => tap(host)}
+                  onLongPress={() => setSheetHost(host)}
+                />
+              ))}
+            </View>
+          </View>
+        ) : null}
+
+        {!noHosts && pinned.length === 0 && !hosts.loading ? (
+          <EmptyState
+            icon={Server}
+            title="Pin a host to see it here"
+            hint="Pinned hosts show their metrics, Docker and services at a glance. Hold a host to pin it."
+            action={
+              <Button size="sm" onPress={toHosts}>
+                Go to hosts
+              </Button>
+            }
+          />
+        ) : null}
+      </ScrollView>
       <HostActionSheet
         host={sheetHost}
         status="unknown"
@@ -85,22 +213,61 @@ export default function Home() {
         onClone={toHosts}
         onDelete={toHosts}
       />
+      <QuickConnect visible={quickOpen} onClose={() => setQuickOpen(false)} />
     </Screen>
   );
 }
 
-/** Screens from features and server plugins, above the pinned hosts. */
+/** Cards for the tabs that are open, to jump back in. */
+function OpenSessions() {
+  const color = useThemeColor();
+  const router = useRouter();
+  const { sessions, activeSessionId, setActiveSession } = useTerminalSessions();
+  const statuses = useSessionStatuses();
+  if (sessions.length === 0) return null;
+  const muted = color("muted-foreground") ?? "#888";
+
+  return (
+    <View>
+      <SectionTitle>Open sessions</SectionTitle>
+      <View className="border border-border">
+        {sessions.map((session, index) => {
+          const Icon =
+            features.sessionTab(session.type)?.icon ?? SquareTerminal;
+          const state = statuses[session.id]?.state;
+          return (
+            <ListRow
+              key={session.id}
+              index={index}
+              selected={session.id === activeSessionId}
+              title={displayTitle(session)}
+              icon={<Icon size={16} color={muted} />}
+              meta={
+                <Text className="text-meta text-muted-foreground">
+                  {statusLabel(state) ??
+                    (state === "connected" ? "Connected" : session.host.ip)}
+                </Text>
+              }
+              trailing={<TabStatusMark state={state} />}
+              onPress={() => {
+                setActiveSession(session.id);
+                router.navigate("/(tabs)/sessions" as never);
+              }}
+            />
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+/** Screens from features and server plugins. */
 function QuickActions({ ctx, actions }: ReturnType<typeof useQuickActions>) {
   const color = useThemeColor();
   if (actions.length === 0) return null;
   return (
-    <View className="px-3 pt-3">
-      <Text
-        weight="medium"
-        className="mb-1.5 px-1 text-[11px] uppercase tracking-wider text-muted-foreground"
-      >
-        From your server
-      </Text>
+    <View>
+      <SectionTitle>From your server</SectionTitle>
       <View className="border border-border">
         {actions.map((action, index) => {
           const Icon = action.icon;
@@ -124,12 +291,14 @@ function HostSection({
   accountId,
   active,
   onOpen,
+  onMore,
   chevron,
 }: {
   host: SSHHost;
   accountId: string;
   active: boolean;
   onOpen: () => void;
+  onMore: () => void;
   chevron: string;
 }) {
   const cards = useDashboardCards(host);
@@ -138,6 +307,9 @@ function HostSection({
     <View className="gap-2">
       <Pressable
         onPress={onOpen}
+        onLongPress={onMore}
+        accessibilityRole="button"
+        accessibilityHint="Opens the terminal. Hold for more."
         className="flex-row items-center gap-2 active:opacity-70"
       >
         <View className="min-w-0 flex-1">
@@ -157,7 +329,7 @@ function HostSection({
       </Pressable>
       {cards.length === 0 ? (
         <Text className="text-[11px] text-muted-foreground">
-          Turn on Docker or Services for this host, or open it to connect.
+          Turn on Docker or Services for this host, or tap it to connect.
         </Text>
       ) : (
         cards.map((card) => {
