@@ -20,6 +20,7 @@ import type {
   TransportKind,
 } from "@/core/transport";
 import { checkOpen, features } from "@/core/features";
+import { recordRecent } from "@/core/hosts/recent";
 import { asServerHost, isSynced, serverHostId } from "@/core/sync";
 import { isSshHost } from "@/utils/hosts";
 import { useLocalStoreState } from "@/core/data/hooks";
@@ -536,6 +537,7 @@ export const TerminalSessionsProvider: React.FC<
           if (!opts?.quiet) toast.error(check.blocked.reason);
           return check.blocked;
         }
+        void recordRecent(accountId, host);
         // Server features act on the server's host, by the server's id.
         const sessionHost =
           features.serverOnly(type) && isSynced(accountId)
