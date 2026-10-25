@@ -83,6 +83,20 @@ export interface WidgetSummary {
   unknown: number;
 }
 
+/** App theme colors as #rrggbb, so widgets match the theme the user picked. */
+export interface WidgetPalette {
+  id: string;
+  isDark: boolean;
+  background: string;
+  surface: string;
+  card: string;
+  raised: string;
+  border: string;
+  text: string;
+  textSecondary: string;
+  textTertiary: string;
+}
+
 export interface WidgetSnapshot {
   version: number;
   /** Epoch millis the snapshot was produced. Widgets show relative freshness. */
@@ -95,6 +109,8 @@ export interface WidgetSnapshot {
   summary: WidgetSummary;
   hosts: WidgetHostEntry[];
   snippets: WidgetSnippetEntry[];
+  /** Null until the app has published one. Widgets then keep their dark look. */
+  theme: WidgetPalette | null;
 }
 
 /** Preferences that shape what the widgets are allowed to display. */

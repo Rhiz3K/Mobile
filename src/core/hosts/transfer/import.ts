@@ -113,6 +113,8 @@ export function rowToDraft(
     overrideCredentialUsername: row.overrideCredentialUsername,
     sudoPassword: row.sudoPassword,
     notes: row.notes ?? "",
+    color: row.color ?? null,
+    icon: row.icon ?? null,
     jumpHosts: jumpIds.map((hostId) => ({ hostId })),
     forceKeyboardInteractive: row.forceKeyboardInteractive,
     sshOptions: row.sshOptions,

@@ -7,6 +7,7 @@ import { isSshHost } from "@/utils/hosts";
 import { CompanionFiles, FILES_TAB_TYPE } from "./CompanionFiles";
 import { FileManager, type FileManagerHandle } from "./FileManager";
 import { getFileSettings, updateFileSettings } from "./settings";
+import { filesHostSection } from "./host-section";
 
 const FilesTab = forwardRef<FileManagerHandle, SessionTabProps>(
   ({ session, isVisible, onClose }, ref) => {
@@ -111,8 +112,10 @@ export const fileManagerFeature: FeatureDef = {
       label: "File Manager",
       group: "feature",
       order: 20,
+      defaultOn: true,
     },
   ],
+  hostEditorSections: [filesHostSection],
   hostBadges: [
     {
       label: "FILES",
@@ -136,7 +139,9 @@ export const fileManagerFeature: FeatureDef = {
       icon: Folder,
       order: 45,
       href: "/tabs/settings/FileSettings",
+      section: "terminal",
+      description: "File manager and transfers",
+      keywords: ["sftp", "files", "transfer", "download"],
     },
   ],
-  capabilities: ["files.defaultPath"],
 };

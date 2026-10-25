@@ -30,6 +30,8 @@ import {
   EmptyState,
   FakeSwitch,
   SettingRow,
+  ContextMenu,
+  isSecondaryClick,
 } from "@/ui";
 import { useTerminalCustomization } from "@/contexts/TerminalCustomizationContext";
 import { toast } from "@/utils/toast";
@@ -65,6 +67,10 @@ export default function Snippets() {
   const [unknownTargets, setUnknownTargets] = useState<number[]>([]);
   const [targetsOpen, setTargetsOpen] = useState(false);
   const [runTarget, setRunTarget] = useState<Snippet | null>(null);
+  const [menu, setMenu] = useState<{
+    snippet: Snippet;
+    at: { x: number; y: number };
+  } | null>(null);
   const [transferOpen, setTransferOpen] = useState(false);
 
   const [snippets, setSnippets] = useState<Snippet[]>([]);
@@ -358,7 +364,13 @@ export default function Snippets() {
   const renderSnippet = (snippet: Snippet, index: number, list: Snippet[]) => (
     <View
       key={snippet.id}
-      className="flex-row items-center gap-2 border-b border-border px-4 py-3"
+      className="flex-row items-center gap-2 border-b border-border px-4 py-3 hover:bg-muted/20"
+      onPointerDown={(e) => {
+        const n = e.nativeEvent;
+        if (isSecondaryClick(n)) {
+          setMenu({ snippet, at: { x: n.pageX ?? 0, y: n.pageY ?? 0 } });
+        }
+      }}
     >
       <FileText size={14} color={color("muted-foreground")} />
       <Pressable
@@ -695,6 +707,41 @@ export default function Snippets() {
         onClose={() => setTargetsOpen(false)}
       />
       <RunOnHostsSheet snippet={runTarget} onClose={() => setRunTarget(null)} />
+      <ContextMenu
+        at={menu?.at ?? null}
+        onClose={() => setMenu(null)}
+        items={
+          menu
+            ? [
+                {
+                  id: "copy",
+                  label: "Copy",
+                  onPress: () => handleCopy(menu.snippet),
+                },
+                {
+                  id: "edit",
+                  label: "Edit",
+                  onPress: () => openEdit(menu.snippet),
+                },
+                ...(!menu.snippet.isNote && hostList.length > 0
+                  ? [
+                      {
+                        id: "run",
+                        label: "Run on hosts",
+                        onPress: () => setRunTarget(menu.snippet),
+                      },
+                    ]
+                  : []),
+                {
+                  id: "delete",
+                  label: "Delete",
+                  destructive: true,
+                  onPress: () => setDeleteTarget(menu.snippet),
+                },
+              ]
+            : []
+        }
+      />
       <SnippetTransferSheet
         visible={transferOpen}
         onClose={() => setTransferOpen(false)}

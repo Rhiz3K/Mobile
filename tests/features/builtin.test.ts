@@ -18,7 +18,8 @@ const legacyServer = {
 
 test("built in features register without clashes", () => {
   const r = registry();
-  expect(r.all()).toHaveLength(BUILT_IN_FEATURES.length);
+  // Plus the plugin host fields feature, which needs the registry.
+  expect(r.all()).toHaveLength(BUILT_IN_FEATURES.length + 1);
   const ids = BUILT_IN_FEATURES.map((f) => f.id);
   expect(new Set(ids).size).toBe(ids.length);
 });
@@ -129,7 +130,7 @@ test("host actions keep the old order", () => {
   ]);
 });
 
-test("host editor switches and tabs keep the old order", () => {
+test("host editor switches keep the old order and features add sections", () => {
   const toggles = registry().hostToggles(legacyServer);
   expect(
     toggles.filter((t) => t.group === "protocol").map((t) => t.key),
@@ -143,12 +144,20 @@ test("host editor switches and tabs keep the old order", () => {
     "enableDocker",
     "enableServices",
   ]);
-  const tabs = toggles
-    .filter((t) => t.formTab)
-    .map((t) => t.formTab!)
-    .sort((a, b) => a.order - b.order)
-    .map((t) => t.id);
-  expect(tabs).toEqual(["terminal", "tunnels", "rdp", "vnc", "telnet"]);
+  const sections = registry()
+    .hostEditorSections(legacyServer)
+    .map((s) => `${s.group}:${s.id}:${s.toggle ?? ""}`);
+  expect(sections).toEqual(
+    expect.arrayContaining([
+      "ssh:terminal:enableTerminal",
+      "ssh:tunnels:enableTunnel",
+      "ssh:files:enableFileManager",
+      "protocol:rdp:enableRdp",
+      "protocol:vnc:enableVnc",
+      "protocol:telnet:enableTelnet",
+      "host:wake-on-lan:",
+    ]),
+  );
 });
 
 test("Tailscale discovery is off on older servers", () => {

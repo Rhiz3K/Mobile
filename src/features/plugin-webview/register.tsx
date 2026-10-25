@@ -14,10 +14,11 @@ import {
 import { PluginSessionTab } from "./PluginSessionTab";
 import { pluginIcon } from "./PluginIcon";
 import { frameTabType } from "./shell";
+import { windowInfo } from "@/utils/window-class";
 
 function device(): "phone" | "tablet" {
   const { width, height } = Dimensions.get("window");
-  return Math.min(width, height) >= 600 ? "tablet" : "phone";
+  return windowInfo(width, height).canSplit ? "tablet" : "phone";
 }
 
 function sessionTab(plugin: FramePlugin, view: FrameView) {

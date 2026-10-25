@@ -98,12 +98,17 @@ export const terminalFeature: FeatureDef = {
       label: "Terminal",
       group: "feature",
       order: 10,
-      formTab: {
-        id: "terminal",
-        label: "Terminal",
-        order: 0,
-        editor: hostTerminalEditor,
-      },
+      defaultOn: true,
+    },
+  ],
+  hostEditorSections: [
+    {
+      id: "terminal",
+      label: "Terminal",
+      group: "ssh",
+      order: 10,
+      toggle: "enableTerminal",
+      editor: hostTerminalEditor,
     },
   ],
   hostBadges: [

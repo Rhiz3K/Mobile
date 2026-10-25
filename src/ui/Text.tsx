@@ -4,6 +4,8 @@ import {
   type TextProps as RNTextProps,
 } from "react-native";
 import { MONO_FONT, MONO_FONT_BOLD, MONO_FONT_MEDIUM } from "@/constants/fonts";
+import { textScale, useUiPrefs } from "@/core/ui-prefs";
+import { scaledTextStyle } from "./text-scale";
 
 export type TextWeight = "regular" | "medium" | "bold";
 
@@ -36,10 +38,17 @@ export function Text({
   style,
   ...props
 }: ThemedTextProps) {
+  const { textSize } = useUiPrefs();
+  const scaled = scaledTextStyle(className, textScale(textSize));
   return (
     <RNText
       className={`text-foreground ${className ?? ""}`}
-      style={[{ fontFamily: FONT_BY_WEIGHT[weight] }, FONT_PADDING, style]}
+      style={[
+        { fontFamily: FONT_BY_WEIGHT[weight] },
+        FONT_PADDING,
+        scaled,
+        style,
+      ]}
       {...props}
     />
   );

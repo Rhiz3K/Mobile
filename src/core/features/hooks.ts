@@ -64,6 +64,11 @@ export function useHostToggles() {
   return useMemo(() => features.hostToggles(ctx), [ctx]);
 }
 
+export function useHostEditorSections() {
+  const ctx = useFeatureContext();
+  return useMemo(() => features.hostEditorSections(ctx), [ctx]);
+}
+
 export function useHostBadges() {
   const ctx = useFeatureContext();
   return useMemo(() => features.hostBadges(ctx), [ctx]);

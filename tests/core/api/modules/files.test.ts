@@ -1,6 +1,7 @@
 import { AccountClient } from "@/core/api/AccountClient";
 import { accountStorage } from "@/core/storage/kv";
 import { resetStorage } from "../../../helpers/http";
+import { clearFakeNet, fakeNet } from "../../../helpers/net";
 
 beforeEach(resetStorage);
 
@@ -87,4 +88,80 @@ test("a failed stream throws the server's message", async () => {
   await expect(c.api.files.downloadStream("sid", "/d", 0)).rejects.toThrow(
     "Cannot download directories",
   );
+});
+
+describe("with a client certificate on iOS", () => {
+  afterEach(clearFakeNet);
+
+  async function certClient() {
+    const net = fakeNet({ nativeRequests: true });
+    const c = await client();
+    await c.setClientCert({ base64: "AAAA", passphrase: "pw", name: null });
+    global.fetch = jest.fn(() => {
+      throw new Error("fetch can't send the certificate");
+    }) as any;
+    return { net, c };
+  }
+
+  test("downloads stream through the native module as bytes", async () => {
+    const { net, c } = await certClient();
+    const pending = c.api.files.downloadStream("sid", "/a", 5);
+    const [id, request] = (net.startStream as jest.Mock).mock.calls[0];
+    expect(request).toMatchObject({ method: "POST", binary: true });
+    expect(request.headers.Range).toBe("bytes=5-");
+    net.emit("onStream", {
+      id,
+      type: "response",
+      status: 206,
+      headers: { "content-length": "3" },
+    });
+    const res = await pending;
+    expect(res.status).toBe(206);
+    expect(res.headers.get("Content-Length")).toBe("3");
+    const reader = res.body!.getReader();
+    net.emit("onStream", { id, type: "data", chunk: "AQID" });
+    net.emit("onStream", { id, type: "end" });
+    expect(await reader.read()).toEqual({
+      done: false,
+      value: new Uint8Array([1, 2, 3]),
+    });
+    expect((await reader.read()).done).toBe(true);
+  });
+
+  test("a failed download still reads the server's error", async () => {
+    const { net, c } = await certClient();
+    const pending = c.api.files.downloadStream("sid", "/a", 0);
+    const [id] = (net.startStream as jest.Mock).mock.calls[0];
+    net.emit("onStream", { id, type: "response", status: 404, headers: {} });
+    net.emit("onStream", {
+      id,
+      type: "data",
+      chunk: Buffer.from('{"error":"gone"}').toString("base64"),
+    });
+    net.emit("onStream", { id, type: "end" });
+    await expect(pending).rejects.toThrow("gone");
+  });
+
+  test("upload chunks go as base64 through the native module", async () => {
+    const { net, c } = await certClient();
+    net.reply = () => ({
+      status: 200,
+      headers: {},
+      body: JSON.stringify({ nextOffset: 3, complete: true }),
+      url: "",
+    });
+    const next = await c.api.files.uploadChunk(
+      "sid",
+      "/srv",
+      "a",
+      0,
+      3,
+      new Uint8Array([1, 2, 3]),
+    );
+    expect(next).toEqual({ nextOffset: 3, complete: true });
+    expect(net.requests[0]).toMatchObject({
+      method: "POST",
+      bodyBase64: "AQID",
+    });
+  });
 });

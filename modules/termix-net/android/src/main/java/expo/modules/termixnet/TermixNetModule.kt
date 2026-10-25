@@ -11,6 +11,10 @@ import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
 class TermixNetModule : Module() {
   private val context
@@ -64,27 +68,23 @@ class TermixNetModule : Module() {
     }
 
     // The web view and React Native share this jar on Android.
-    AsyncFunction("readWebCookies") { url: String ->
-      val manager = CookieManager.getInstance()
-      manager.flush()
-      val raw = manager.getCookie(url) ?: return@AsyncFunction emptyList<Map<String, String>>()
-      raw.split(";").mapNotNull { part ->
-        val index = part.indexOf('=')
-        if (index <= 0) {
-          null
-        } else {
-          mapOf("name" to part.substring(0, index).trim(), "value" to part.substring(index + 1).trim())
-        }
-      }
-    }
+    AsyncFunction("readWebCookies") { url: String -> readCookies(url) }
 
+    AsyncFunction("readJarCookies") { url: String -> readCookies(url) }
+
+    // Keeps expiry, so a persistent proxy cookie stays one after a restart.
     AsyncFunction("setCookies") { url: String, cookies: List<Map<String, Any?>> ->
       val manager = CookieManager.getInstance()
       for (cookie in cookies) {
         val name = cookie["name"] as? String ?: continue
         val value = cookie["value"] as? String ?: ""
         val path = cookie["path"] as? String ?: "/"
-        manager.setCookie(url, "$name=$value; Path=$path")
+        val parts = mutableListOf("$name=$value", "Path=$path")
+        (cookie["domain"] as? String)?.takeIf { it.startsWith(".") }?.let { parts.add("Domain=$it") }
+        (cookie["expires"] as? Number)?.let { parts.add("Expires=${httpDate(it.toLong())}") }
+        if (cookie["secure"] == true) parts.add("Secure")
+        if (cookie["httpOnly"] == true) parts.add("HttpOnly")
+        manager.setCookie(url, parts.joinToString("; "))
       }
       manager.flush()
     }
@@ -105,5 +105,25 @@ class TermixNetModule : Module() {
       manager.flush()
       null
     }
+  }
+
+  private fun readCookies(url: String): List<Map<String, String>> {
+    val manager = CookieManager.getInstance()
+    manager.flush()
+    val raw = manager.getCookie(url) ?: return emptyList()
+    return raw.split(";").mapNotNull { part ->
+      val index = part.indexOf('=')
+      if (index <= 0) {
+        null
+      } else {
+        mapOf("name" to part.substring(0, index).trim(), "value" to part.substring(index + 1).trim())
+      }
+    }
+  }
+
+  private fun httpDate(ms: Long): String {
+    val format = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss 'GMT'", Locale.US)
+    format.timeZone = TimeZone.getTimeZone("GMT")
+    return format.format(Date(ms))
   }
 }

@@ -17,7 +17,11 @@ export interface NetRequest {
   method?: string;
   headers?: Record<string, string>;
   body?: string | null;
+  /** A binary body, base64. Wins over `body`. */
+  bodyBase64?: string | null;
   timeoutMs?: number;
+  /** Streams only: send chunks as base64 instead of text. */
+  binary?: boolean;
 }
 
 export interface NetResponse {
@@ -65,6 +69,7 @@ export interface TermixNetNative {
   removeClientCert(accountId: string): Promise<void>;
   hasClientCert(accountId: string): Promise<boolean>;
   readWebCookies(url: string): Promise<NetCookie[]>;
+  readJarCookies?(url: string): Promise<NetCookie[]>;
   setCookies(url: string, cookies: NetCookie[]): Promise<void>;
   clearCookie(url: string, name: string): Promise<void>;
   clearWebCookies(url: string): Promise<void>;
@@ -139,6 +144,12 @@ export async function readWebCookies(url: string): Promise<NetCookie[]> {
   return (await native?.readWebCookies(url)) ?? [];
 }
 
+/** Cookies the app's own requests hold now, renewed ones included. */
+export async function readJarCookies(url: string): Promise<NetCookie[]> {
+  if (!native?.readJarCookies) return [];
+  return (await native.readJarCookies(url).catch(() => [])) ?? [];
+}
+
 export async function setCookies(
   url: string,
   cookies: NetCookie[],
@@ -162,7 +173,9 @@ export function nativeRequest(request: NetRequest): Promise<NetResponse> {
     method: request.method ?? "GET",
     headers: request.headers ?? {},
     body: request.body ?? null,
+    bodyBase64: request.bodyBase64 ?? null,
     timeoutMs: request.timeoutMs ?? 30000,
+    binary: false,
   });
 }
 
@@ -242,7 +255,9 @@ export function nativeStream(
     method: request.method ?? "GET",
     headers: request.headers ?? {},
     body: request.body ?? null,
+    bodyBase64: request.bodyBase64 ?? null,
     timeoutMs: 0,
+    binary: request.binary ?? false,
   });
   return () => {
     if (!streams.delete(id)) return;

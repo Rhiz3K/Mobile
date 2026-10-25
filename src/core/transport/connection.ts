@@ -1,3 +1,4 @@
+import { recordConnect } from "@/core/analytics/usage";
 import type { ConnectionLogEntry, ConnectionLogPayload } from "@/types";
 import {
   fromRelayMessage,
@@ -277,8 +278,22 @@ export class HostConnection {
   }
 
   private dispatch(event: ConnectionEvent) {
-    const state = reduceConnection(this.snapshot.state, event);
-    if (state !== this.snapshot.state) this.set({ ...this.snapshot, state });
+    const prev = this.snapshot.state;
+    const state = reduceConnection(prev, event);
+    if (state === prev) return;
+    this.set({ ...this.snapshot, state });
+    this.countResult(prev, state);
+  }
+
+  /** Feeds the usage counts: how a connect ended, as a class only. */
+  private countResult(prev: ConnectionStatus, next: ConnectionStatus) {
+    if (next.status === "connected" && prev.status !== "reconnecting") {
+      void recordConnect(next.origin, "ok").catch(() => {});
+    } else if (next.status === "failed" && next.failure.origin) {
+      void recordConnect(next.failure.origin, next.failure.stage).catch(
+        () => {},
+      );
+    }
   }
 
   log(payload: ConnectionLogPayload) {

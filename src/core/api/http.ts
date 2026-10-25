@@ -39,6 +39,22 @@ export function isHtmlPayload(data: unknown): boolean {
   return typeof data === "string" && /^\s*<(!doctype|html)/i.test(data);
 }
 
+/** True when a redirect took the request to another host. */
+export function leftServer(
+  config: { baseURL?: string; url?: string },
+  responseURL: unknown,
+): boolean {
+  if (typeof responseURL !== "string" || !responseURL) return false;
+  const asked = /^https?:\/\//i.test(config.url ?? "")
+    ? config.url!
+    : `${config.baseURL ?? ""}${config.url ?? ""}`;
+  try {
+    return new URL(responseURL).host !== new URL(asked).host;
+  } catch {
+    return false;
+  }
+}
+
 function loggerFor(serviceName: string) {
   const name = serviceName.toLowerCase();
   if (name.includes("ssh")) return sshLogger;
@@ -132,6 +148,22 @@ export function createHttp(
 
   instance.interceptors.response.use(
     (response) => {
+      // A login proxy (Cloudflare Access, Authelia) sends requests without
+      // its cookie to its own login page. That is a sign in, not a page.
+      if (
+        isHtmlPayload(response.data) &&
+        leftServer(response.config, response.request?.responseURL)
+      ) {
+        return Promise.reject(
+          new AxiosError(
+            "The proxy wants you to sign in",
+            "ERR_BAD_RESPONSE",
+            response.config,
+            response.request,
+            { ...response, status: 401 },
+          ),
+        );
+      }
       // Routes a server no longer has fall through to its web UI and answer
       // 200 with index.html. Treat that as a missing endpoint, not data.
       if (isHtmlPayload(response.data)) {

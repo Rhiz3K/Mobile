@@ -243,16 +243,6 @@ test("an empty file still makes the remote file", async () => {
   );
 });
 
-test("streams through a client certificate on iOS say they can't", async () => {
-  const { backend } = setup(true);
-  await expect(backend.download("/r/a", "/l/a")).rejects.toThrow(
-    /client certificate/,
-  );
-  await expect(backend.upload("/l/a", "/r", "a")).rejects.toThrow(
-    /client certificate/,
-  );
-});
-
 test("binary reads come back as null text", async () => {
   const { files, backend } = setup();
   files.readSSHFile.mockResolvedValueOnce({

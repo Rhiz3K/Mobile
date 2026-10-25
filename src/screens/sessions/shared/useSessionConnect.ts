@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 import { SSHHost, SessionAuthOverrides } from "@/types";
 import { getCurrentUserId } from "@/utils/user";
+import { useActiveAccount, useClient } from "@/core/accounts";
+import { useSessionAccountId } from "@/core/accounts/session";
 import { useConnectionLog } from "./useConnectionLog";
 import { extractConnectionLogs } from "@/core/api/errors";
 import { fromRelayMessage, type ConnectFailure } from "@/core/transport";
@@ -50,6 +52,10 @@ export function useSessionConnect(
   onConnected: (sessionId: string) => void | Promise<void>,
   options?: { keepAliveMs?: number; autoConnect?: boolean },
 ) {
+  // The tab's own server, so a second linked server gets its own user.
+  const sessionAccount = useSessionAccountId();
+  const activeAccount = useActiveAccount().id;
+  const client = useClient(sessionAccount ?? activeAccount);
   const log = useConnectionLog();
   const [state, setState] = useState<SessionConnectState>("idle");
   const [errorMessage, setErrorMessage] = useState<string>("");
@@ -106,7 +112,7 @@ export function useSessionConnect(
       setErrorMessage("");
       overridesRef.current = overrides;
       try {
-        const userId = (await getCurrentUserId()) || undefined;
+        const userId = (await getCurrentUserId(client)) || undefined;
         const sessionId =
           sessionIdRef.current ||
           `${transport.prefix}-${host.id}-${Date.now()}`;
@@ -184,7 +190,7 @@ export function useSessionConnect(
         }
       }
     },
-    [host, transport, log, markConnected],
+    [host, transport, log, markConnected, client],
   );
 
   const connect = useCallback(() => {

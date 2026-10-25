@@ -22,6 +22,7 @@ import { NativeRemoteDesktop } from "./native/NativeRemoteDesktop";
 import { useRemoteRoute } from "./route";
 import { RemoteDesktop, type RemoteDesktopProtocol } from "./RemoteDesktop";
 import { REMOTE_DESKTOP_TAB, TELNET_TAB, telnetTabFor } from "./telnet";
+import { protocolSection } from "./host-sections";
 
 const PLUGIN = "remote-desktop";
 const PROTOCOLS: RemoteDesktopProtocol[] = ["rdp", "vnc", "telnet"];
@@ -215,9 +216,9 @@ function protocolFeature(
         description: opts.description,
         group: "protocol",
         order: 10 + opts.order,
-        formTab: { id: protocol, label: opts.label, order: 20 + opts.order },
       },
     ],
+    hostEditorSections: [protocolSection(protocol)],
     hostBadges: [
       {
         label: opts.badge,

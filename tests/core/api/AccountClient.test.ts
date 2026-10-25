@@ -1,5 +1,6 @@
 import { AccountClient } from "@/core/api/AccountClient";
 import { ApiError } from "@/core/api/errors";
+import { leftServer } from "@/core/api/http";
 import { accountStorage } from "@/core/storage/kv";
 import { fakeServer, resetStorage } from "../../helpers/http";
 import { clearFakeNet, fakeNet } from "../../helpers/net";
@@ -210,6 +211,74 @@ test("proxy cookies never keep a jwt cookie and go back in the jar on load", asy
   ]);
 });
 
+test("a redirect to a proxy login page asks for the proxy, not a new session", async () => {
+  fakeServer(() => ({
+    data: "<!doctype html><title>Sign in</title>",
+    responseURL: "https://team.cloudflareaccess.com/cdn-cgi/access/login",
+  }));
+  const c = client();
+  await c.setToken("tok");
+  const lost = jest.fn();
+  c.onAuthLost(lost);
+  await expect(c.api.auth.getUserInfo()).rejects.toMatchObject({
+    code: "PROXY_LOGIN",
+  });
+  expect(lost).not.toHaveBeenCalled();
+  expect(c.token()).toBe("tok");
+});
+
+test("only a redirect to another host counts as leaving the server", () => {
+  const config = { baseURL: "https://termix.example", url: "/users/me" };
+  expect(leftServer(config, "https://termix.example/login")).toBe(false);
+  expect(leftServer(config, "https://auth.example/login")).toBe(true);
+  expect(leftServer(config, undefined)).toBe(false);
+  expect(
+    leftServer({ url: "https://termix.example/x" }, "https://sso.example/"),
+  ).toBe(true);
+});
+
+test("load never puts an old proxy cookie over a renewed one", async () => {
+  const net = fakeNet();
+  const c = client();
+  await c.setProxyCookies([
+    { name: "authelia_session", value: "old", expires: 9e12 },
+  ]);
+  net.cookies.clear();
+  net.jarCookies = [{ name: "authelia_session", value: "renewed" }];
+  const again = client();
+  await again.load();
+  expect(net.cookies.size).toBe(0);
+  expect(again.proxyCookies()).toEqual([
+    { name: "authelia_session", value: "renewed", expires: 9e12 },
+  ]);
+  const third = client();
+  await third.load();
+  expect(third.proxyCookies()[0].value).toBe("renewed");
+});
+
+test("only cookies the jar lost go back in", async () => {
+  const net = fakeNet();
+  net.jarCookies = [{ name: "kept", value: "1" }];
+  const c = client();
+  await c.setProxyCookies([
+    { name: "kept", value: "1" },
+    { name: "lost", value: "2" },
+  ]);
+  expect(net.cookies.get("https://termix.example")).toEqual([
+    { name: "lost", value: "2" },
+  ]);
+});
+
+test("says when a saved proxy cookie ran out", async () => {
+  fakeNet();
+  const c = client();
+  await c.setProxyCookies([
+    { name: "CF_Authorization", value: "a", expires: 50 },
+  ]);
+  expect(c.proxyCookiesExpired(49)).toBe(false);
+  expect(c.proxyCookiesExpired(50)).toBe(true);
+});
+
 test("a new token clears the login cookie the server would read first", async () => {
   const net = fakeNet();
   const c = client();
@@ -236,6 +305,21 @@ test("on iOS with a certificate, requests go through the native module", async (
   expect(me.username).toBe("luke");
   expect(net.requests[0].url).toBe("https://termix.example/users/me");
   expect(net.requests[0].headers.Authorization).toBe("Bearer tok");
+});
+
+test("on iOS with a certificate, relay sockets use the native socket", async () => {
+  const net = fakeNet({ nativeRequests: true });
+  const c = client();
+  await c.setProxy({ customHeaders: [{ name: "X-Proxy", value: "1" }] });
+  await c.setClientCert({ base64: "AAAA", passphrase: "pw", name: null });
+  c.openSocket("wss://termix.example/plugin-ws/core/ssh-relay", [
+    "termix.jwt.t",
+  ]);
+  const [, url, protocols, headers] = (net.openSocket as jest.Mock).mock
+    .calls[0];
+  expect(url).toBe("wss://termix.example/plugin-ws/core/ssh-relay");
+  expect(protocols).toEqual(["termix.jwt.t"]);
+  expect(headers["X-Proxy"]).toBe("1");
 });
 
 test("wipe removes every saved secret and the certificate", async () => {

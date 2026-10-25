@@ -29,6 +29,13 @@
       "when": 1792873748633,
       "tag": "0003_metric_samples",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1792945659960,
+      "tag": "0004_outgoing_timeslip",
+      "breakpoints": true
     }
   ]
 }

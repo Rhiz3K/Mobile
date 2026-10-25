@@ -14,7 +14,7 @@ import { useKeyboard } from "@/contexts/KeyboardContext";
 import { useTerminalSessions } from "@/contexts/TerminalSessionsContext";
 import { useSessionStatuses, type SessionState } from "@/core/sessions/status";
 import { useOrientation } from "@/utils/orientation";
-import { aiOrigin } from "@/features/ai/navigation";
+import { focusedTabName } from "@/features/ai/navigation";
 
 type Icon = (props: { color: string; size: number }) => React.ReactNode;
 
@@ -56,9 +56,7 @@ export function BottomBar({ state, navigation }: BottomTabBarProps) {
   const { isKeyboardVisible } = useKeyboard();
   const activeRoute = state.routes[state.index];
   const onAi = activeRoute?.name === "ai";
-  const origin = aiOrigin(
-    (activeRoute?.params as { from?: unknown } | undefined)?.from,
-  );
+  const focusedName = focusedTabName(state);
 
   const accent = color("accent-brand") ?? "#f59145";
   const muted = color("muted-foreground") ?? "#a4a4a4";
@@ -78,8 +76,7 @@ export function BottomBar({ state, navigation }: BottomTabBarProps) {
       {state.routes.map((route, index) => {
         const tab = TABS.find((t) => t.name === route.name);
         if (!tab) return null;
-        const focused =
-          state.index === index || (onAi && route.name === origin);
+        const focused = route.name === focusedName;
         const tint = focused ? accent : muted;
         const count = route.name === "sessions" ? sessions.length : 0;
 

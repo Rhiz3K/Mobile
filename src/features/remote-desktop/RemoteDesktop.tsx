@@ -36,6 +36,11 @@ import type { SessionTabStatus } from "@/core/features/types";
 import { sessionLifecycle } from "@/core/sessions/lifecycle";
 import { shouldAutoReconnect, tunnelWatchScript } from "./resume";
 import {
+  needsSocketBridge,
+  SOCKET_SHIM_SCRIPT,
+  SocketBridge,
+} from "./tunnel-bridge";
+import {
   KEY_STRIP_HEIGHT,
   RdpSignInSheet,
   RemoteKeyStrip,
@@ -103,6 +108,18 @@ export function RemoteDesktop({
 
   const webViewRef = useRef<WebView>(null);
   const inputRef = useRef<TextInput>(null);
+
+  // Behind a client certificate or proxy the socket goes through the app.
+  const bridged = needsSocketBridge(client);
+  const bridgeRef = useRef<SocketBridge | null>(null);
+  if (bridged && !bridgeRef.current) {
+    bridgeRef.current = new SocketBridge(client, (event) =>
+      webViewRef.current?.injectJavaScript(
+        `window.__termixWs && window.__termixWs(${JSON.stringify(event)}); true;`,
+      ),
+    );
+  }
+  useEffect(() => () => bridgeRef.current?.closeAll(), []);
 
   const [connectionState, setConnectionState] =
     useState<ConnectionState>("idle");
@@ -233,6 +250,7 @@ export function RemoteDesktop({
     (event: any) => {
       try {
         const payload = JSON.parse(event.nativeEvent.data);
+        if (bridgeRef.current?.handle(payload)) return;
         if (payload.type === "state") {
           if (payload.state === "connected") {
             wasLive.current = true;
@@ -325,6 +343,7 @@ export function RemoteDesktop({
     }
   </style>
   <script>${guacamoleJs}</script>
+  ${bridged ? `<script>${SOCKET_SHIM_SCRIPT}</script>` : ""}
 </head>
 <body>
   <div id="display"></div>
@@ -617,11 +636,12 @@ ${VIEWPORT_SCRIPT}
   </script>
 </body>
 </html>`;
-  }, [webSocketUrl, guacamoleJs]);
+  }, [webSocketUrl, guacamoleJs, bridged]);
 
   // ── Reconnect ─────────────────────────────────────────────────────────────
 
   const reconnect = useCallback(() => {
+    bridgeRef.current?.closeAll();
     setWebSocketUrl(null);
     setZoomLevel(1.0);
     setWebViewKey((k) => k + 1);

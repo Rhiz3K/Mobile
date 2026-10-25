@@ -216,6 +216,11 @@ export function buildPluginHostSettings(
   if (Object.keys(terminal.snippets).length > 0) {
     out.snippets = terminal.snippets;
   }
+  const patch = data.pluginSettingsPatch as
+    Record<string, Record<string, unknown>> | undefined;
+  for (const [pluginId, values] of Object.entries(patch ?? {})) {
+    out[pluginId] = { ...out[pluginId], ...values };
+  }
   return out;
 }
 

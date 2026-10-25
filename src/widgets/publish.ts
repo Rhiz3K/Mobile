@@ -10,6 +10,7 @@
  * problem can never break a refresh elsewhere in the app.
  */
 
+import { Appearance } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   clearWidgetSnapshot,
@@ -17,7 +18,13 @@ import {
   reloadWidgets,
   setWidgetSnapshotJson,
 } from "@/modules/termix-widgets";
-import { DEFAULT_ACCENT, STORAGE_KEYS } from "@/constants/theme";
+import {
+  DEFAULT_ACCENT,
+  DEFAULT_THEME,
+  STORAGE_KEYS,
+  THEMES,
+  type ThemeId,
+} from "@/constants/theme";
 import { systemLogger } from "@/core/log/logger";
 import type { SSHHost, ServerStatus, Snippet } from "@/types";
 import {
@@ -27,7 +34,8 @@ import {
   type WidgetMetricsEntry,
 } from "./snapshot";
 import { loadWidgetPreferences } from "./preferences";
-import type { WidgetSnapshot } from "./types";
+import { widgetPalette } from "./palette";
+import type { WidgetPalette, WidgetSnapshot } from "./types";
 
 /**
  * Minimum gap between writes that carry the same content. Widget hosts wake a
@@ -70,7 +78,8 @@ let writeChain: Promise<void> = Promise.resolve();
 /** What the Hosts screen reports on every refresh. */
 export interface HostSnapshotInput {
   hosts: SSHHost[];
-  statuses: Record<number, ServerStatus>;
+  /** Left out by callers that only know the list. The last statuses stay. */
+  statuses?: Record<number, ServerStatus>;
   metrics?: Record<number, WidgetMetricsEntry>;
   /** Optional: the Hosts screen fetches snippets alongside hosts. */
   snippets?: Snippet[];
@@ -87,6 +96,18 @@ async function resolveAccent(): Promise<string> {
     // fall through to the default
   }
   return DEFAULT_ACCENT;
+}
+
+/** The colors of the theme the user picked, from the same storage the app reads. */
+async function resolvePalette(): Promise<WidgetPalette> {
+  let theme: ThemeId = DEFAULT_THEME;
+  try {
+    const stored = await AsyncStorage.getItem(STORAGE_KEYS.theme);
+    if (stored && THEMES.includes(stored as ThemeId)) theme = stored as ThemeId;
+  } catch {
+    // fall through to the default
+  }
+  return widgetPalette(theme, Appearance.getColorScheme());
 }
 
 /** Queues work so snapshots are written strictly in call order. */
@@ -112,6 +133,7 @@ async function write(snapshot: WidgetSnapshot, force: boolean): Promise<void> {
 async function rebuild(force: boolean): Promise<void> {
   const preferences = await loadWidgetPreferences();
   const accent = await resolveAccent();
+  const palette = await resolvePalette();
   const snapshot = buildWidgetSnapshot({
     hosts: source.hosts,
     snippets: source.snippets,
@@ -121,6 +143,7 @@ async function rebuild(force: boolean): Promise<void> {
     accent,
     serverUrl: source.serverUrl,
     authenticated: source.authenticated,
+    palette,
   });
   await write(snapshot, force);
 }
@@ -146,8 +169,8 @@ export async function publishHostSnapshot(
       source = {
         ...source,
         hosts: input.hosts,
-        statuses: input.statuses,
-        metrics: input.metrics ?? {},
+        statuses: input.statuses ?? source.statuses,
+        metrics: input.metrics ?? source.metrics,
         // Only replace snippets when the caller actually fetched them.
         snippets: input.snippets ?? source.snippets,
         serverUrl: input.serverUrl ?? source.serverUrl,
@@ -215,7 +238,10 @@ export async function publishSignedOutSnapshot(): Promise<void> {
       source = EMPTY_SOURCE;
       sourcePopulated = false;
       const accent = await resolveAccent();
-      await write(buildSignedOutSnapshot(accent), true);
+      await write(
+        buildSignedOutSnapshot(accent, Date.now(), await resolvePalette()),
+        true,
+      );
     } catch (error) {
       logFailure("[widgets] failed to clear snapshot", error);
     }

@@ -76,7 +76,8 @@
             "gradle": "8.13.1"
           },
           "ios": {
-            "deploymentTarget": "16.4"
+            "deploymentTarget": "16.4",
+            "enableSceneSupport": true
           }
         }
       ],
@@ -84,6 +85,7 @@
       "./plugins/withNetworkSecurityConfig.js",
       "./plugins/withAndroidLocalNetworkSsl.js",
       "./plugins/withTermixWidgets.js",
+      "./plugins/withLargeScreen.js",
       "./plugins/withPodDeploymentTarget.js",
       "./plugins/withNotificationIcon.js",
       "./plugins/withTermixSsh.js",
@@ -189,7 +191,8 @@
             "multipleShareMimeTypes": ["*/*"]
           }
         }
-      ]
+      ],
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true,

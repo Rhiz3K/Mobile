@@ -24,7 +24,7 @@ import {
 } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { toast } from "@/utils/toast";
-import { api } from "@/core/accounts";
+import { apiOf, useActiveClient } from "@/core/accounts";
 import type { ApiKey } from "@/core/api/types";
 
 function formatDate(iso: string | null): string {
@@ -46,6 +46,7 @@ function getUserId(u: UserInfo): string {
 }
 
 export default function ApiKeys() {
+  const client = useActiveClient();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const confirm = useConfirm();
@@ -70,8 +71,8 @@ export default function ApiKeys() {
   const load = useCallback(async () => {
     try {
       const [keysRes, usersRes] = await Promise.all([
-        api().apiKeys.getApiKeys(),
-        api().users.getUserList(),
+        apiOf(client).apiKeys.getApiKeys(),
+        apiOf(client).users.getUserList(),
       ]);
       setKeys(keysRes?.apiKeys ?? []);
       const userList = usersRes?.users ?? [];
@@ -82,7 +83,7 @@ export default function ApiKeys() {
     } catch {
       toast.error("Failed to load API keys");
     }
-  }, []);
+  }, [client]);
 
   useEffect(() => {
     load().finally(() => setLoading(false));
@@ -135,7 +136,7 @@ export default function ApiKeys() {
     if (!keyName.trim() || !keyUserId) return;
     setCreateBusy(true);
     try {
-      const res = await api().apiKeys.createApiKey(
+      const res = await apiOf(client).apiKeys.createApiKey(
         keyName.trim(),
         keyUserId,
         buildExpiresAt(),
@@ -166,7 +167,7 @@ export default function ApiKeys() {
     });
     if (!ok) return;
     try {
-      await api().apiKeys.deleteApiKey(keyId);
+      await apiOf(client).apiKeys.deleteApiKey(keyId);
       setKeys((prev) => prev.filter((k) => k.id !== keyId));
       toast.success("API key deleted");
     } catch {

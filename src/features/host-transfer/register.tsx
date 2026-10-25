@@ -18,6 +18,9 @@ export const hostTransferFeature: FeatureDef = {
       icon: ArrowDownUp,
       order: 43,
       href: "/tabs/settings/HostTransfer",
+      section: "backup",
+      description: "Move hosts in or out with a file or QR code",
+      keywords: ["import", "export", "qr", "ssh config"],
     },
   ],
   hostActions: [

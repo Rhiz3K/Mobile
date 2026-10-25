@@ -221,3 +221,19 @@ test("a picked Vault profile is saved, and left alone when not picked", () => {
   });
   expect(buildPluginHostSettings({}).vault).toBeUndefined();
 });
+
+test("plugin fields the editor changed are merged into that plugin", () => {
+  const { buildPluginHostSettings } = require("@/core/api/compat/api-compat");
+  const out = buildPluginHostSettings({
+    enableDocker: true,
+    pluginSettingsPatch: {
+      docker: { containerRuntime: "podman" },
+      databases: { enableDatabases: true },
+    },
+  });
+  expect(out.docker).toEqual({
+    enableDocker: true,
+    containerRuntime: "podman",
+  });
+  expect(out.databases).toEqual({ enableDatabases: true });
+});

@@ -47,16 +47,6 @@ export function fromRelayEntry(dir: string, raw: any): FileEntry {
   };
 }
 
-// expo/fetch can't present a client certificate on iOS yet.
-function checkStreams(client: AccountClient) {
-  if (client.usesNativeNetwork()) {
-    throw new AppError(
-      "Downloads and uploads through this server don't work with a client certificate on iOS yet. Connect the host from the phone instead.",
-      "UNSUPPORTED_ENDPOINT",
-    );
-  }
-}
-
 function isTrashConflict(error: unknown) {
   return error instanceof AppError && error.status === 409;
 }
@@ -187,7 +177,6 @@ export function createRelayBackend(
     },
 
     async download(remote, localPath, options = {}) {
-      checkStreams(client);
       const offset = options.offset ?? 0;
       const res = await files.downloadStream(
         sessionId(),
@@ -222,7 +211,6 @@ export function createRelayBackend(
     },
 
     async upload(localPath, remoteDir, name, options = {}) {
-      checkStreams(client);
       const reader = openReader(localPath, options.offset ?? 0);
       let offset = options.offset ?? 0;
       try {

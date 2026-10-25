@@ -13,7 +13,7 @@ import {
 import { Text, Button, Sheet, useConfirm } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { toast } from "@/utils/toast";
-import { api } from "@/core/accounts";
+import { apiOf, useActiveClient } from "@/core/accounts";
 
 interface Session {
   id: string;
@@ -53,6 +53,7 @@ function formatDate(iso: string): string {
 }
 
 export default function ActiveSessions() {
+  const client = useActiveClient();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const confirm = useConfirm();
@@ -68,15 +69,15 @@ export default function ActiveSessions() {
   const load = useCallback(async () => {
     try {
       const [sessRes, userRes] = await Promise.all([
-        api().users.getSessions(),
-        api().auth.getUserInfo(),
+        apiOf(client).users.getSessions(),
+        apiOf(client).auth.getUserInfo(),
       ]);
       setSessions(sessRes?.sessions ?? []);
       setUserId(userRes?.userId ?? null);
     } catch {
       toast.error("Failed to load sessions");
     }
-  }, []);
+  }, [client]);
 
   useEffect(() => {
     load().finally(() => setLoading(false));
@@ -84,7 +85,7 @@ export default function ActiveSessions() {
 
   const handleRevoke = async (sessionId: string) => {
     try {
-      await api().users.revokeSession(sessionId);
+      await apiOf(client).users.revokeSession(sessionId);
       setSessions((prev) => prev.filter((s) => s.id !== sessionId));
       toast.success("Session revoked");
     } catch {
@@ -96,7 +97,7 @@ export default function ActiveSessions() {
     if (!userId) return;
     setRevokeAllBusy(true);
     try {
-      await api().users.revokeAllUserSessions(userId);
+      await apiOf(client).users.revokeAllUserSessions(userId);
       setSessions([]);
       setRevokeAllDialog(false);
       toast.success("All sessions revoked");

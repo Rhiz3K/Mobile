@@ -9,7 +9,6 @@ import {
   View,
   Keyboard,
   Platform,
-  Dimensions,
   BackHandler,
   AppState,
   LayoutAnimation,
@@ -39,10 +38,12 @@ import { Screen } from "@/components/Screen";
 import { Text } from "@/ui";
 import TabBar from "@/screens/sessions/navigation/TabBar";
 import { SessionMenu } from "@/screens/sessions/SessionMenu";
+import { keyBarHeight } from "@/features/terminal/keys/compact";
+import { shellLayout } from "@/screens/shell/layout";
+import { HostsPane } from "@/screens/sessions/HostsPane";
 import { CompanionPane } from "@/screens/sessions/CompanionPane";
 import { TabSwipeEdge } from "@/screens/sessions/TabSwipeEdge";
 import {
-  canSplit,
   clampRatio,
   partnerAfterActivate,
   splitPartner,
@@ -52,7 +53,7 @@ import type {
   SessionMenuContext,
   SessionMenuItemDef,
 } from "@/core/features/types";
-import { useOrientation } from "@/utils/orientation";
+import { useWindowInfo } from "@/utils/window-class";
 import { getMaxKeyboardHeight, getTabBarHeight } from "@/utils/responsive";
 import {
   addKeyCommandListener,
@@ -78,6 +79,8 @@ const HIDDEN_INPUT = XTERM_FALLBACK;
 
 // The key row keeps its own sticky modifiers now; typed text gets none.
 const NO_MODIFIERS = { ctrl: false, alt: false, shift: false };
+// Stands in until a new tab's ref exists
+const NO_TERMINAL: React.RefObject<TerminalHandle | null> = { current: null };
 
 export default function Sessions() {
   const ui = useUiColors();
@@ -85,7 +88,8 @@ export default function Sessions() {
   // Tabs swap to a note when their plugin is turned off, and back.
   useRegistryVersion();
   const router = useRouter();
-  const { height, isLandscape } = useOrientation();
+  const win = useWindowInfo();
+  const { height, isLandscape } = win;
   const isIPad = Platform.OS === "ios" && Platform.isPad;
   const {
     sessions,
@@ -120,9 +124,6 @@ export default function Sessions() {
   const hiddenInputRef = useRef<TerminalImeInputHandle | null>(null);
   // Tab handles by session id. Tabs with "terminal-input" hand out a TerminalHandle.
   const tabRefs = useRef<Record<string, React.RefObject<any>>>({});
-  const [screenDimensions, setScreenDimensions] = useState(
-    Dimensions.get("window"),
-  );
   const [customKeyboardInitialTab, setCustomKeyboardInitialTab] =
     useState<string>("keyboard");
   const compositionActiveRef = useRef(false);
@@ -148,7 +149,7 @@ export default function Sessions() {
   const SESSION_TAB_BAR_HEIGHT = getTabBarHeight(isLandscape) + 2;
   const CUSTOM_KEYBOARD_TAB_HEIGHT = 36;
 
-  const KEYBOARD_BAR_HEIGHT = isLandscape ? 48 : 52;
+  const KEYBOARD_BAR_HEIGHT = keyBarHeight(isLandscape, win.isShort);
   // When the system keyboard is dismissed the keyboard bar reserves the
   // home-indicator safe area below its keys. The TabBar floats directly on top
   // of the bar, so it must be lifted by the keys' height PLUS that same
@@ -327,8 +328,7 @@ export default function Sessions() {
   }, [sessions]);
 
   // Panels beside a tab (tablets), by session id.
-  const isTablet =
-    Math.min(screenDimensions.width, screenDimensions.height) >= 600;
+  const isTablet = win.canSplit;
   const [companionFor, setCompanionFor] = useState<Record<string, string>>({});
   const companionsOf = useCallback((session: TerminalSession | undefined) => {
     if (!session) return [];
@@ -379,7 +379,7 @@ export default function Sessions() {
   const [splitWith, setSplitWith] = useState<string | null>(null);
   const [splitRatio, setSplitRatio] = useState(0.5);
   const [stageWidth, setStageWidth] = useState(0);
-  const splitOk = canSplit(screenDimensions.width, screenDimensions.height);
+  const splitOk = win.canSplit;
   const partnerId = splitOk
     ? splitPartner(
         sessions.map((s) => s.id),
@@ -478,19 +478,14 @@ export default function Sessions() {
   }, [sessions.length, isKeyboardVisible, showConnectionsPanel]);
 
   useEffect(() => {
-    const subscription = Dimensions.addEventListener("change", ({ window }) => {
-      setScreenDimensions(window);
-
-      setTimeout(() => {
-        const activeRef = activeSessionId
-          ? tabRefs.current[activeSessionId]
-          : null;
-        activeRef?.current?.fit();
-      }, 300);
-    });
-
-    return () => subscription?.remove();
-  }, [activeSessionId]);
+    const timer = setTimeout(() => {
+      const activeRef = activeSessionId
+        ? tabRefs.current[activeSessionId]
+        : null;
+      activeRef?.current?.fit();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [activeSessionId, win.width, win.height]);
 
   useEffect(() => {
     if (keyboardHeight > 0) {
@@ -528,7 +523,8 @@ export default function Sessions() {
   }, [
     keyboardHeight,
     activeSessionId,
-    screenDimensions,
+    win.width,
+    win.height,
     isCustomKeyboardVisible,
     customKeyboardHeight,
   ]);
@@ -721,6 +717,8 @@ export default function Sessions() {
     [openPanel],
   );
 
+  const showHostsPane = shellLayout(win, sessions.length).hostsPane;
+
   const activeTerminalBgColor =
     activeIsTerminal && activeSessionId
       ? terminalBackgroundColors[activeSessionId] || ui.terminal
@@ -753,454 +751,461 @@ export default function Sessions() {
         onMenu={() => setMenuFor(session.id)}
         onShortcut={handleShortcut}
         onBackgroundColorChange={(color) => {
-          setTerminalBackgroundColors((prev) => ({
-            ...prev,
-            [session.id]: color,
-          }));
+          setTerminalBackgroundColors((prev) =>
+            prev[session.id] === color
+              ? prev
+              : { ...prev, [session.id]: color },
+          );
         }}
       />
     );
   };
 
   return (
-    <View
-      className="flex-1"
-      style={{
-        paddingTop: insets.top,
-        backgroundColor: activeIsTerminal
-          ? activeTerminalBgColor
-          : ui.background,
-      }}
-    >
+    <View className="flex-1 flex-row">
+      {showHostsPane ? <HostsPane /> : null}
       <View
+        className="flex-1"
         style={{
-          flex: 1,
-          marginBottom: getBottomMargin(activeSession?.type),
+          paddingTop: insets.top,
+          backgroundColor: activeIsTerminal
+            ? activeTerminalBgColor
+            : ui.background,
         }}
       >
-        {(() => {
-          const leftWidth = Math.round(stageWidth * splitRatio);
-          // Each tab keeps its own wrapper, so starting or ending a split never remounts it.
-          const paneStyle = (id: string) => {
-            const shown = id === activeSessionId || id === partnerId;
-            if (!partnerId || !shown) {
-              return [StyleSheet.absoluteFill, { zIndex: shown ? 1 : 0 }];
-            }
-            const order = sessions.findIndex((s) => s.id === id);
-            const other = sessions.findIndex(
-              (s) => s.id === (id === partnerId ? activeSessionId : partnerId),
-            );
-            const left = order < other;
-            return [
-              {
-                position: "absolute" as const,
-                top: 0,
-                bottom: 0,
-                zIndex: 1,
-                left: left ? 0 : leftWidth + 3,
-                width: left ? leftWidth - 3 : stageWidth - leftWidth - 3,
-              },
-            ];
-          };
-          const tabs = (
-            <View
-              style={{ flex: 1 }}
-              onLayout={(e) => setStageWidth(e.nativeEvent.layout.width)}
-            >
-              {sessions.map((session) => {
-                const shown =
-                  session.id === activeSessionId || session.id === partnerId;
-                return (
-                  <View
-                    key={session.id}
-                    style={paneStyle(session.id)}
-                    pointerEvents={shown ? "auto" : "none"}
-                    onTouchStart={
-                      session.id === partnerId
-                        ? () => handleTabPress(session.id)
-                        : undefined
-                    }
-                  >
-                    <SessionAccountProvider accountId={session.accountId}>
-                      {renderSession(session)}
-                    </SessionAccountProvider>
-                  </View>
-                );
-              })}
-              {partnerId ? (
-                <View
-                  {...dividerPan.panHandlers}
-                  accessibilityRole="adjustable"
-                  accessibilityLabel="Resize split view"
-                  hitSlop={{ left: 8, right: 8 }}
-                  className="items-center justify-center bg-border active:bg-accent-brand"
-                  style={{
-                    position: "absolute",
-                    top: 0,
-                    bottom: 0,
-                    left: leftWidth - 3,
-                    width: 6,
-                    zIndex: 2,
-                  }}
-                >
-                  <View className="h-8 w-0.5 bg-muted-foreground/50" />
-                </View>
-              ) : null}
-            </View>
-          );
-          const companionId =
-            isTablet && activeSession && !partnerId
-              ? companionFor[activeSession.id]
-              : null;
-          const def = companionId
-            ? companionsOf(activeSession).find((c) => c.id === companionId)
-            : null;
-          if (!activeSession || !def) return tabs;
-          const side = def.layout?.().side ?? "right";
-          const pane = (
-            <SessionAccountProvider
-              key={`companion-${activeSession.id}`}
-              accountId={activeSession.accountId}
-            >
-              <CompanionPane
-                def={def}
-                side={side}
-                screenWidth={screenDimensions.width}
-                props={{
-                  session: activeSession,
-                  getHandle: () => sessionHandles.get(activeSession.id),
-                  isVisible: true,
-                  layout: "side",
-                  close: () => toggleCompanion(activeSession, def.id),
-                }}
-              />
-            </SessionAccountProvider>
-          );
-          return (
-            <View style={{ flex: 1, flexDirection: "row" }}>
-              {side === "left" ? pane : null}
-              <View style={{ flex: 1 }}>{tabs}</View>
-              {side === "right" ? pane : null}
-            </View>
-          );
-        })()}
-        {sessions.length > 1 ? (
-          <>
-            <TabSwipeEdge side="left" onSwipe={() => stepTab(-1)} />
-            <TabSwipeEdge side="right" onSwipe={() => stepTab(1)} />
-          </>
-        ) : null}
-      </View>
-
-      {/* Connections panel: full screen when no sessions, overlay when sessions exist */}
-      {(sessions.length === 0 || showConnectionsPanel) && (
         <View
           style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 1010,
+            flex: 1,
+            marginBottom: getBottomMargin(activeSession?.type),
           }}
         >
-          {sessions.length === 0 ? (
-            <Screen title="Connections">
-              <ConnectionsPanel />
-            </Screen>
-          ) : (
-            <View style={{ flex: 1, backgroundColor: ui.background }}>
+          {(() => {
+            const leftWidth = Math.round(stageWidth * splitRatio);
+            // Each tab keeps its own wrapper, so starting or ending a split never remounts it.
+            const paneStyle = (id: string) => {
+              const shown = id === activeSessionId || id === partnerId;
+              if (!partnerId || !shown) {
+                return [StyleSheet.absoluteFill, { zIndex: shown ? 1 : 0 }];
+              }
+              const order = sessions.findIndex((s) => s.id === id);
+              const other = sessions.findIndex(
+                (s) =>
+                  s.id === (id === partnerId ? activeSessionId : partnerId),
+              );
+              const left = order < other;
+              return [
+                {
+                  position: "absolute" as const,
+                  top: 0,
+                  bottom: 0,
+                  zIndex: 1,
+                  left: left ? 0 : leftWidth + 3,
+                  width: left ? leftWidth - 3 : stageWidth - leftWidth - 3,
+                },
+              ];
+            };
+            const tabs = (
               <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  paddingTop: insets.top + 8,
-                  paddingBottom: 8,
-                  paddingHorizontal: 16,
-                  borderBottomWidth: 1,
-                  borderBottomColor: ui.border,
-                  backgroundColor: ui.background,
-                }}
+                style={{ flex: 1 }}
+                onLayout={(e) => setStageWidth(e.nativeEvent.layout.width)}
               >
-                <View style={{ flex: 1 }}>
-                  <Text weight="bold" className="text-base text-foreground">
-                    Connections
-                  </Text>
-                </View>
-                <Pressable
-                  onPress={closeConnectionsPanel}
-                  hitSlop={10}
+                {sessions.map((session) => {
+                  const shown =
+                    session.id === activeSessionId || session.id === partnerId;
+                  return (
+                    <View
+                      key={session.id}
+                      style={paneStyle(session.id)}
+                      pointerEvents={shown ? "auto" : "none"}
+                      onTouchStart={
+                        session.id === partnerId
+                          ? () => handleTabPress(session.id)
+                          : undefined
+                      }
+                    >
+                      <SessionAccountProvider accountId={session.accountId}>
+                        {renderSession(session)}
+                      </SessionAccountProvider>
+                    </View>
+                  );
+                })}
+                {partnerId ? (
+                  <View
+                    {...dividerPan.panHandlers}
+                    accessibilityRole="adjustable"
+                    accessibilityLabel="Resize split view"
+                    hitSlop={{ left: 8, right: 8 }}
+                    className="items-center justify-center bg-border active:bg-accent-brand"
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      bottom: 0,
+                      left: leftWidth - 3,
+                      width: 6,
+                      zIndex: 2,
+                    }}
+                  >
+                    <View className="h-8 w-0.5 bg-muted-foreground/50" />
+                  </View>
+                ) : null}
+              </View>
+            );
+            const companionId =
+              isTablet && activeSession && !partnerId
+                ? companionFor[activeSession.id]
+                : null;
+            const def = companionId
+              ? companionsOf(activeSession).find((c) => c.id === companionId)
+              : null;
+            if (!activeSession || !def) return tabs;
+            const side = def.layout?.().side ?? "right";
+            const pane = (
+              <SessionAccountProvider
+                key={`companion-${activeSession.id}`}
+                accountId={activeSession.accountId}
+              >
+                <CompanionPane
+                  def={def}
+                  side={side}
+                  screenWidth={win.width}
+                  props={{
+                    session: activeSession,
+                    getHandle: () => sessionHandles.get(activeSession.id),
+                    isVisible: true,
+                    layout: "side",
+                    close: () => toggleCompanion(activeSession, def.id),
+                  }}
+                />
+              </SessionAccountProvider>
+            );
+            return (
+              <View style={{ flex: 1, flexDirection: "row" }}>
+                {side === "left" ? pane : null}
+                <View style={{ flex: 1 }}>{tabs}</View>
+                {side === "right" ? pane : null}
+              </View>
+            );
+          })()}
+          {sessions.length > 1 ? (
+            <>
+              <TabSwipeEdge side="left" onSwipe={() => stepTab(-1)} />
+              <TabSwipeEdge side="right" onSwipe={() => stepTab(1)} />
+            </>
+          ) : null}
+        </View>
+
+        {/* Connections panel: full screen when no sessions, overlay when sessions exist */}
+        {(sessions.length === 0 || showConnectionsPanel) && (
+          <View
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 1010,
+            }}
+          >
+            {sessions.length === 0 ? (
+              <Screen title="Connections">
+                <ConnectionsPanel />
+              </Screen>
+            ) : (
+              <View style={{ flex: 1, backgroundColor: ui.background }}>
+                <View
                   style={{
-                    width: 32,
-                    height: 32,
+                    flexDirection: "row",
                     alignItems: "center",
-                    justifyContent: "center",
-                    borderWidth: 1,
-                    borderColor: ui.border,
-                    backgroundColor: ui.muted,
+                    paddingTop: insets.top + 8,
+                    paddingBottom: 8,
+                    paddingHorizontal: 16,
+                    borderBottomWidth: 1,
+                    borderBottomColor: ui.border,
+                    backgroundColor: ui.background,
                   }}
                 >
-                  <X size={15} color={ui.text} />
-                </Pressable>
+                  <View style={{ flex: 1 }}>
+                    <Text weight="bold" className="text-base text-foreground">
+                      Connections
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={closeConnectionsPanel}
+                    hitSlop={10}
+                    style={{
+                      width: 32,
+                      height: 32,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderWidth: 1,
+                      borderColor: ui.border,
+                      backgroundColor: ui.muted,
+                    }}
+                  >
+                    <X size={15} color={ui.text} />
+                  </Pressable>
+                </View>
+                <ConnectionsPanel onClose={closeConnectionsPanel} />
               </View>
-              <ConnectionsPanel onClose={closeConnectionsPanel} />
+            )}
+          </View>
+        )}
+
+        {sessions.length > 0 &&
+          activeIsTerminal &&
+          KeyRowBar &&
+          !isCustomKeyboardVisible && (
+            <View
+              style={{
+                position: "absolute",
+                bottom: keyboardIntentionallyHiddenRef.current
+                  ? 0
+                  : isKeyboardVisible && currentKeyboardHeight > 0
+                    ? currentKeyboardHeight + (isLandscape && !isIPad ? 4 : 0)
+                    : 0,
+                left: 0,
+                right: 0,
+                height: keyboardIntentionallyHiddenRef.current
+                  ? KEYBOARD_BAR_HEIGHT_EXTENDED
+                  : KEYBOARD_BAR_HEIGHT,
+                zIndex: 1003,
+                overflow: "visible",
+                justifyContent: "center",
+              }}
+            >
+              <SessionAccountProvider
+                accountId={activeSession?.accountId ?? LOCAL_ACCOUNT_ID}
+              >
+                <KeyRowBar
+                  terminalRef={
+                    (activeSessionId && tabRefs.current[activeSessionId]) ||
+                    NO_TERMINAL
+                  }
+                  host={activeSession?.host}
+                  isVisible={true}
+                  isKeyboardIntentionallyHidden={
+                    keyboardIntentionallyHiddenRef.current
+                  }
+                  bottomInset={KEYBOARD_BAR_BOTTOM_INSET}
+                  onCommand={handleKeyCommand}
+                />
+              </SessionAccountProvider>
             </View>
           )}
-        </View>
-      )}
 
-      {sessions.length > 0 &&
-        activeIsTerminal &&
-        KeyRowBar &&
-        !isCustomKeyboardVisible && (
-          <View
-            style={{
-              position: "absolute",
-              bottom: keyboardIntentionallyHiddenRef.current
-                ? 0
-                : isKeyboardVisible && currentKeyboardHeight > 0
-                  ? currentKeyboardHeight + (isLandscape && !isIPad ? 4 : 0)
-                  : 0,
-              left: 0,
-              right: 0,
-              height: keyboardIntentionallyHiddenRef.current
-                ? KEYBOARD_BAR_HEIGHT_EXTENDED
-                : KEYBOARD_BAR_HEIGHT,
-              zIndex: 1003,
-              overflow: "visible",
-              justifyContent: "center",
-            }}
-          >
-            <SessionAccountProvider
-              accountId={activeSession?.accountId ?? LOCAL_ACCOUNT_ID}
-            >
-              <KeyRowBar
-                terminalRef={
-                  activeSessionId
-                    ? tabRefs.current[activeSessionId]
-                    : React.createRef<TerminalHandle>()
-                }
-                host={activeSession?.host}
-                isVisible={true}
-                isKeyboardIntentionallyHidden={
-                  keyboardIntentionallyHiddenRef.current
-                }
-                bottomInset={KEYBOARD_BAR_BOTTOM_INSET}
-                onCommand={handleKeyCommand}
-              />
-            </SessionAccountProvider>
-          </View>
-        )}
-
-      {sessions.length > 0 &&
-        features.sessionHas(activeSession?.type, "keyboard-cover") &&
-        isCustomKeyboardVisible && (
-          <View
-            style={{
-              position: "absolute",
-              bottom: 0,
-              left: 0,
-              right: 0,
-              height: effectiveKeyboardHeight,
-              backgroundColor: ui.background,
-              zIndex: 1002,
-            }}
-          />
-        )}
-
-      <View
-        style={{
-          position: "absolute",
-          bottom: getTabBarBottomPosition(),
-          left: 0,
-          right: 0,
-          height: SESSION_TAB_BAR_HEIGHT,
-          zIndex: 1004,
-          display: isRdpKeyboardOpen ? "none" : "flex",
-        }}
-      >
-        <TabBar
-          sessions={sessions}
-          activeSessionId={activeSessionId}
-          onTabPress={handleTabPress}
-          onTabClose={handleTabClose}
-          onAddSession={handleAddSession}
-          onToggleKeyboard={handleToggleKeyboard}
-          isCustomKeyboardVisible={isCustomKeyboardVisible}
-          onKeyboard={keyboard}
-          onHideKeyboard={() => setKeyboardIntentionallyHidden(true)}
-          onShowKeyboard={() => setKeyboardIntentionallyHidden(false)}
-          keyboardIntentionallyHiddenRef={keyboardIntentionallyHiddenRef}
-          activeSessionType={activeSession?.type}
-          onShowConnections={() => {
-            setKeyboardIntentionallyHidden(true);
-            Keyboard.dismiss();
-            keyboard("blur");
-            setShowConnectionsPanel(true);
-          }}
-          hasBackgroundSessions={backgroundTabRecords.some(
-            (r) => !sessions.find((s) => s.instanceId === r.id),
+        {sessions.length > 0 &&
+          features.sessionHas(activeSession?.type, "keyboard-cover") &&
+          isCustomKeyboardVisible && (
+            <View
+              style={{
+                position: "absolute",
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: effectiveKeyboardHeight,
+                backgroundColor: ui.background,
+                zIndex: 1002,
+              }}
+            />
           )}
-          onTabMenu={setMenuFor}
-          onTabMove={moveSession}
-        />
-      </View>
 
-      {activeSession &&
-        BottomToolbar &&
-        isCustomKeyboardVisible &&
-        activeIsTerminal && (
-          <View
-            pointerEvents="box-none"
-            style={{
-              position: "absolute",
-              bottom: 0,
-              left: 0,
-              right: 0,
-              zIndex: 1002,
-              backgroundColor: ui.background,
-            }}
-          >
-            <SessionAccountProvider accountId={activeSession.accountId}>
-              <BottomToolbar
-                terminalRef={
-                  activeSessionId
-                    ? tabRefs.current[activeSessionId]
-                    : React.createRef<TerminalHandle>()
-                }
-                isVisible={isCustomKeyboardVisible}
-                keyboardHeight={customKeyboardHeight}
-                isKeyboardIntentionallyHidden={
-                  keyboardIntentionallyHiddenRef.current
-                }
-                initialTab={customKeyboardInitialTab}
-                hostId={activeSession?.host?.id}
-                host={activeSession?.host}
-                onCommand={handleKeyCommand}
-              />
-            </SessionAccountProvider>
-          </View>
-        )}
-
-      <SessionMenu
-        session={sessions.find((s) => s.id === menuFor) ?? null}
-        index={sessions.findIndex((s) => s.id === menuFor)}
-        count={sessions.length}
-        handle={menuFor ? (tabRefs.current[menuFor]?.current ?? null) : null}
-        onClose={() => setMenuFor(null)}
-        onRename={(title) => menuFor && renameSession(menuFor, title)}
-        onDuplicate={() => menuFor && duplicateSession(menuFor)}
-        onMove={(to) => menuFor && moveSession(menuFor, to)}
-        onCloseTab={() => menuFor && handleTabClose(menuFor)}
-        companions={companionsOf(sessions.find((s) => s.id === menuFor))}
-        companionOpen={menuFor ? (companionFor[menuFor] ?? null) : null}
-        companionAsTab={!isTablet}
-        splitTargets={splitOk ? sessions.filter((s) => s.id !== menuFor) : []}
-        splitOn={
-          !!partnerId && (menuFor === activeSessionId || menuFor === partnerId)
-        }
-        onSplit={(id) => {
-          if (!id) {
-            setSplitWith(null);
-            return;
-          }
-          if (menuFor && menuFor !== activeSessionId) setActiveSession(menuFor);
-          setSplitWith(id);
-        }}
-        onCloseAll={() => {
-          setSplitWith(null);
-          closeAllSessions();
-        }}
-        onCompanion={(id) => {
-          const session = sessions.find((s) => s.id === menuFor);
-          if (session) toggleCompanion(session, id);
-        }}
-        onView={(item, ctx) => {
-          keyboard("blur");
-          setFeatureView({ item, ctx });
-        }}
-      />
-
-      {featureView?.item.view ? (
         <View
           style={{
             position: "absolute",
-            top: 0,
+            bottom: getTabBarBottomPosition(),
             left: 0,
             right: 0,
-            bottom: 0,
-            zIndex: 1020,
-            backgroundColor: ui.background,
+            height: SESSION_TAB_BAR_HEIGHT,
+            zIndex: 1004,
+            display: isRdpKeyboardOpen ? "none" : "flex",
           }}
         >
-          <SessionAccountProvider accountId={featureView.ctx.session.accountId}>
-            <featureView.item.view
-              ctx={featureView.ctx}
-              onClose={() => setFeatureView(null)}
-            />
-          </SessionAccountProvider>
+          <TabBar
+            sessions={sessions}
+            activeSessionId={activeSessionId}
+            onTabPress={handleTabPress}
+            onTabClose={handleTabClose}
+            onAddSession={handleAddSession}
+            onToggleKeyboard={handleToggleKeyboard}
+            isCustomKeyboardVisible={isCustomKeyboardVisible}
+            onKeyboard={keyboard}
+            onHideKeyboard={() => setKeyboardIntentionallyHidden(true)}
+            onShowKeyboard={() => setKeyboardIntentionallyHidden(false)}
+            keyboardIntentionallyHiddenRef={keyboardIntentionallyHiddenRef}
+            activeSessionType={activeSession?.type}
+            onShowConnections={() => {
+              setKeyboardIntentionallyHidden(true);
+              Keyboard.dismiss();
+              keyboard("blur");
+              setShowConnectionsPanel(true);
+            }}
+            hasBackgroundSessions={backgroundTabRecords.some(
+              (r) => !sessions.find((s) => s.instanceId === r.id),
+            )}
+            onTabMenu={setMenuFor}
+            onTabMove={moveSession}
+          />
         </View>
-      ) : null}
 
-      {HIDDEN_INPUT &&
-        sessions.length > 0 &&
-        !isCustomKeyboardVisible &&
-        activeIsTerminal && (
-          <TerminalImeInput
-            ref={hiddenInputRef}
+        {activeSession &&
+          BottomToolbar &&
+          isCustomKeyboardVisible &&
+          activeIsTerminal && (
+            <View
+              pointerEvents="box-none"
+              style={{
+                position: "absolute",
+                bottom: 0,
+                left: 0,
+                right: 0,
+                zIndex: 1002,
+                backgroundColor: ui.background,
+              }}
+            >
+              <SessionAccountProvider accountId={activeSession.accountId}>
+                <BottomToolbar
+                  terminalRef={
+                    (activeSessionId && tabRefs.current[activeSessionId]) ||
+                    NO_TERMINAL
+                  }
+                  isVisible={isCustomKeyboardVisible}
+                  keyboardHeight={customKeyboardHeight}
+                  isKeyboardIntentionallyHidden={
+                    keyboardIntentionallyHiddenRef.current
+                  }
+                  initialTab={customKeyboardInitialTab}
+                  hostId={activeSession?.host?.id}
+                  host={activeSession?.host}
+                  onCommand={handleKeyCommand}
+                />
+              </SessionAccountProvider>
+            </View>
+          )}
+
+        <SessionMenu
+          session={sessions.find((s) => s.id === menuFor) ?? null}
+          index={sessions.findIndex((s) => s.id === menuFor)}
+          count={sessions.length}
+          handle={menuFor ? (tabRefs.current[menuFor]?.current ?? null) : null}
+          onClose={() => setMenuFor(null)}
+          onRename={(title) => menuFor && renameSession(menuFor, title)}
+          onDuplicate={() => menuFor && duplicateSession(menuFor)}
+          onMove={(to) => menuFor && moveSession(menuFor, to)}
+          onCloseTab={() => menuFor && handleTabClose(menuFor)}
+          companions={companionsOf(sessions.find((s) => s.id === menuFor))}
+          companionOpen={menuFor ? (companionFor[menuFor] ?? null) : null}
+          companionAsTab={!isTablet}
+          splitTargets={splitOk ? sessions.filter((s) => s.id !== menuFor) : []}
+          splitOn={
+            !!partnerId &&
+            (menuFor === activeSessionId || menuFor === partnerId)
+          }
+          onSplit={(id) => {
+            if (!id) {
+              setSplitWith(null);
+              return;
+            }
+            if (menuFor && menuFor !== activeSessionId)
+              setActiveSession(menuFor);
+            setSplitWith(id);
+          }}
+          onCloseAll={() => {
+            setSplitWith(null);
+            closeAllSessions();
+          }}
+          onCompanion={(id) => {
+            const session = sessions.find((s) => s.id === menuFor);
+            if (session) toggleCompanion(session, id);
+          }}
+          onView={(item, ctx) => {
+            keyboard("blur");
+            setFeatureView({ item, ctx });
+          }}
+        />
+
+        {featureView?.item.view ? (
+          <View
             style={{
               position: "absolute",
-              bottom: -1000,
-              left: -1000,
-              width: 1,
-              height: 1,
-              opacity: 0,
-              zIndex: -1,
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 1020,
+              backgroundColor: ui.background,
             }}
-            pointerEvents="box-none"
-            onCommitText={({ nativeEvent }) => {
-              dispatchCommittedText(nativeEvent.text);
-            }}
-            onSpecialKey={({ nativeEvent }) => {
-              dispatchSpecialKey(nativeEvent);
-            }}
-            onCompositionStateChange={({ nativeEvent }) => {
-              compositionActiveRef.current = nativeEvent.active;
-              if (nativeEvent.active) {
-                lastSpecialKeyRef.current = null;
-              }
-            }}
-            onImeFocus={() => {
-              setKeyboardIntentionallyHidden(false);
-            }}
-            onImeBlur={() => {
-              const activeRef = activeSessionId
-                ? tabRefs.current[activeSessionId]
-                : null;
-              const isDialogOpen =
-                activeRef?.current?.isDialogOpen?.() || false;
-              const isCurrentlySelecting =
-                activeRef?.current?.isSelecting?.() || false;
+          >
+            <SessionAccountProvider
+              accountId={featureView.ctx.session.accountId}
+            >
+              <featureView.item.view
+                ctx={featureView.ctx}
+                onClose={() => setFeatureView(null)}
+              />
+            </SessionAccountProvider>
+          </View>
+        ) : null}
 
-              if (
-                !keyboardIntentionallyHiddenRef.current &&
-                !isCustomKeyboardVisible &&
-                activeIsTerminal &&
-                !isDialogOpen &&
-                !isCurrentlySelecting &&
-                !isSelectingRef.current
-              ) {
-                requestAnimationFrame(() => {
-                  const stillNotSelecting =
-                    !activeRef?.current?.isSelecting?.();
-                  if (stillNotSelecting) {
-                    keyboard("focus");
-                  }
-                });
-              }
-            }}
-          />
-        )}
+        {HIDDEN_INPUT &&
+          sessions.length > 0 &&
+          !isCustomKeyboardVisible &&
+          activeIsTerminal && (
+            <TerminalImeInput
+              ref={hiddenInputRef}
+              style={{
+                position: "absolute",
+                bottom: -1000,
+                left: -1000,
+                width: 1,
+                height: 1,
+                opacity: 0,
+                zIndex: -1,
+              }}
+              pointerEvents="box-none"
+              onCommitText={({ nativeEvent }) => {
+                dispatchCommittedText(nativeEvent.text);
+              }}
+              onSpecialKey={({ nativeEvent }) => {
+                dispatchSpecialKey(nativeEvent);
+              }}
+              onCompositionStateChange={({ nativeEvent }) => {
+                compositionActiveRef.current = nativeEvent.active;
+                if (nativeEvent.active) {
+                  lastSpecialKeyRef.current = null;
+                }
+              }}
+              onImeFocus={() => {
+                setKeyboardIntentionallyHidden(false);
+              }}
+              onImeBlur={() => {
+                const activeRef = activeSessionId
+                  ? tabRefs.current[activeSessionId]
+                  : null;
+                const isDialogOpen =
+                  activeRef?.current?.isDialogOpen?.() || false;
+                const isCurrentlySelecting =
+                  activeRef?.current?.isSelecting?.() || false;
+
+                if (
+                  !keyboardIntentionallyHiddenRef.current &&
+                  !isCustomKeyboardVisible &&
+                  activeIsTerminal &&
+                  !isDialogOpen &&
+                  !isCurrentlySelecting &&
+                  !isSelectingRef.current
+                ) {
+                  requestAnimationFrame(() => {
+                    const stillNotSelecting =
+                      !activeRef?.current?.isSelecting?.();
+                    if (stillNotSelecting) {
+                      keyboard("focus");
+                    }
+                  });
+                }
+              }}
+            />
+          )}
+      </View>
     </View>
   );
 }

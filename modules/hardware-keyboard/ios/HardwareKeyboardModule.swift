@@ -7,11 +7,17 @@ public class HardwareKeyboardModule: Module {
   private static var lastEmit: (input: String, shift: Bool, ctrl: Bool, alt: Bool, time: TimeInterval)?
   // Only the xterm fallback needs keys taken from the whole app; the native terminal reads its own.
   static var enabled = false
+  // App wide shortcuts from JS (id, key, modifiers, title). They work in every tab, terminal or not.
+  static var appShortcuts: [[String: Any]] = []
 
   public func definition() -> ModuleDefinition {
     Name("HardwareKeyboard")
 
-    Events("onKeyCommand")
+    Events("onKeyCommand", "onAppShortcut")
+
+    Function("setAppShortcuts") { (items: [[String: Any]]) in
+      HardwareKeyboardModule.appShortcuts = items
+    }
 
     Function("setEnabled") { (value: Bool) in
       HardwareKeyboardModule.enabled = value
@@ -56,6 +62,12 @@ public class HardwareKeyboardModule: Module {
       )
     {
       method_exchangeImplementations(original, replacement)
+    }
+  }
+
+  static func emitShortcut(_ id: String) {
+    for instance in instances.values {
+      instance.sendEvent("onAppShortcut", ["id": id])
     }
   }
 
@@ -190,8 +202,29 @@ extension UIResponder {
 
 extension UIViewController {
   @objc func hk_keyCommands() -> [UIKeyCommand]? {
-    guard HardwareKeyboardModule.enabled else { return hk_keyCommands() }
     var commands = self.hk_keyCommands() ?? []
+
+    for item in HardwareKeyboardModule.appShortcuts {
+      guard
+        let id = item["id"] as? String,
+        let input = item["input"] as? String
+      else { continue }
+      var flags: UIKeyModifierFlags = []
+      for name in (item["modifiers"] as? [String]) ?? [] {
+        switch name {
+        case "cmd": flags.insert(.command)
+        case "shift": flags.insert(.shift)
+        case "alt": flags.insert(.alternate)
+        case "ctrl": flags.insert(.control)
+        default: break
+        }
+      }
+      let cmd = UIKeyCommand(input: input, modifierFlags: flags, action: #selector(hk_handleAppShortcut(_:)), propertyList: id)
+      cmd.discoverabilityTitle = item["title"] as? String
+      commands.append(cmd)
+    }
+
+    guard HardwareKeyboardModule.enabled else { return commands }
 
     // Shift+Tab
     let shiftTab = UIKeyCommand(input: "\t", modifierFlags: .shift, action: #selector(hk_handleShiftTab))
@@ -236,6 +269,11 @@ extension UIViewController {
     }
 
     return commands
+  }
+
+  @objc func hk_handleAppShortcut(_ sender: UIKeyCommand) {
+    guard let id = sender.propertyList as? String else { return }
+    HardwareKeyboardModule.emitShortcut(id)
   }
 
   @objc func hk_handleTab()         { HardwareKeyboardModule.emitToAll("\t",         shift: false) }

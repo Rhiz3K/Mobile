@@ -2,16 +2,11 @@ import { useMemo } from "react";
 import { useRouter } from "expo-router";
 import * as Clipboard from "expo-clipboard";
 import {
-  Blocks,
-  Database,
   FileText,
-  Keyboard,
   Link,
   Plus,
-  RefreshCw,
   Server,
   Settings,
-  SquareTerminal,
   Users,
   Zap,
 } from "lucide-react-native";
@@ -23,7 +18,6 @@ import {
   features,
   useCapability,
   useQuickActions,
-  useSettingsLinks,
   useTools,
   type ToolDef,
 } from "@/core/features";
@@ -36,63 +30,11 @@ import {
   sendToTerminal,
   snippetMode,
 } from "@/features/snippets/run";
+import { useSettingsGroups } from "@/screens/settings/schema";
 import { useOpenHost } from "@/screens/hosts/useOpenHost";
 import type { Snippet } from "@/types";
 import { toast } from "@/utils/toast";
 import type { PaletteItem } from "./search";
-
-export const SETTINGS_PAGES: {
-  id: string;
-  label: string;
-  detail: string;
-  href: string;
-  icon: PaletteItem["icon"];
-  serverOnly?: boolean;
-}[] = [
-  {
-    id: "settings",
-    label: "Settings",
-    detail: "Account, appearance, security",
-    href: "/(tabs)/settings",
-    icon: Settings,
-  },
-  {
-    id: "sync",
-    label: "Sync and proxy",
-    detail: "What syncs, conflicts, proxy",
-    href: "/tabs/settings/Sync",
-    icon: RefreshCw,
-    serverOnly: true,
-  },
-  {
-    id: "plugins",
-    label: "Plugins",
-    detail: "What works where",
-    href: "/tabs/settings/Plugins",
-    icon: Blocks,
-  },
-  {
-    id: "terminal",
-    label: "Terminal",
-    detail: "Font, theme, cursor, scrollback",
-    href: "/tabs/settings/TerminalCustomization",
-    icon: SquareTerminal,
-  },
-  {
-    id: "keyboard",
-    label: "Keyboard",
-    detail: "Key rows and shortcuts",
-    href: "/tabs/settings/KeyboardCustomization",
-    icon: Keyboard,
-  },
-  {
-    id: "local-data",
-    label: "Local data",
-    detail: "Backup, restore, delete",
-    href: "/tabs/settings/LocalData",
-    icon: Database,
-  },
-];
 
 /**
  * Everything the palette can find: hosts, snippets, actions and settings.
@@ -114,7 +56,7 @@ export function usePaletteItems({
   const openHost = useOpenHost();
   const tools = useTools();
   const quick = useQuickActions();
-  const links = useSettingsLinks();
+  const settingsGroups = useSettingsGroups();
   const canQuickConnect = useCapability("host.quickConnect");
   const hosts = useLiveList(repos.hosts, () => repos.hosts.list(), [repos]);
   const snippets = useLiveList<Snippet>(
@@ -228,12 +170,27 @@ export function usePaletteItems({
         },
       },
     );
+    const settingsKeywords = new Map<string, string[]>();
+    for (const { items: entries } of settingsGroups) {
+      for (const entry of entries) {
+        if (!entry.href) continue;
+        const path = entry.href.split("?")[0];
+        settingsKeywords.set(path, [
+          ...(settingsKeywords.get(path) ?? []),
+          ...(entry.keywords ?? []),
+        ]);
+      }
+    }
     for (const tool of tools) {
       items.push({
         id: `tool:${tool.id}`,
         section: "actions",
         label: tool.label,
         detail: tool.description,
+        keywords:
+          !tool.tabType && tool.href
+            ? settingsKeywords.get(tool.href.split("?")[0])
+            : undefined,
         icon: tool.icon,
         run: tool.tabType
           ? () => pickHost(tool)
@@ -254,38 +211,44 @@ export function usePaletteItems({
       });
     }
 
-    for (const page of SETTINGS_PAGES) {
-      if (page.serverOnly && account.kind !== "server") continue;
-      items.push({
-        id: `settings:${page.id}`,
-        section: "settings",
-        label: page.label,
-        detail: page.detail,
-        icon: page.icon,
-        run: go(page.href),
-      });
-    }
+    items.push({
+      id: "settings:home",
+      section: "settings",
+      label: "Settings",
+      detail: "Accounts, appearance, security",
+      icon: Settings,
+      run: go("/(tabs)/settings"),
+    });
     const toolPaths = new Set(
-      tools.flatMap((tool) => (tool.href ? [tool.href.split("?")[0]] : [])),
+      tools.flatMap((tool) =>
+        !tool.tabType && tool.href ? [tool.href.split("?")[0]] : [],
+      ),
     );
-    for (const link of links) {
-      if (toolPaths.has(link.href.split("?")[0])) continue;
-      items.push({
-        id: `settings:${link.id}`,
-        section: "settings",
-        label: link.label,
-        icon: link.icon,
-        run: go(link.href),
-      });
+    for (const { section, items: entries } of settingsGroups) {
+      for (const entry of entries) {
+        if (entry.href && toolPaths.has(entry.href.split("?")[0])) continue;
+        items.push({
+          id: `settings:${entry.id}`,
+          section: "settings",
+          label: entry.label,
+          detail: entry.description ?? section.title,
+          keywords: [section.title, ...(entry.keywords ?? [])],
+          icon: entry.icon,
+          // Switches and pickers have no screen, so open Settings searching for them.
+          run: go(
+            entry.href ??
+              `/(tabs)/settings?q=${encodeURIComponent(entry.label)}`,
+          ),
+        });
+      }
     }
     return items;
   }, [
-    account.kind,
     activeSessionId,
     canQuickConnect,
     close,
     hosts.data,
-    links,
+    settingsGroups,
     navigateToSessions,
     openAccountSwitcher,
     openAuthFlow,

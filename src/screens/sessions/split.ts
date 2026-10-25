@@ -1,10 +1,10 @@
-/** Smallest screen side that gets split view, same as companion panels. */
-export const SPLIT_MIN_SIDE = 600;
+import { windowInfo } from "@/utils/window-class";
+
 const MIN_RATIO = 0.3;
 const MAX_RATIO = 0.7;
 
 export function canSplit(width: number, height: number): boolean {
-  return Math.min(width, height) >= SPLIT_MIN_SIDE;
+  return windowInfo(width, height).canSplit;
 }
 
 /** The tab shown beside the active one, or null when it is gone or the same. */

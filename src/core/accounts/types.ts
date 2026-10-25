@@ -29,6 +29,8 @@ export interface ServerAccount {
   /** Entity types the user turned off for sync. */
   disabledTypes: string[];
   options: Record<string, unknown>;
+  /** Still being linked: hidden from lists and dropped if never finished. */
+  pending?: boolean;
 }
 
 export type Account = LocalAccount | ServerAccount;

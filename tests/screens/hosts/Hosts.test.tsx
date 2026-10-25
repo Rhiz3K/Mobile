@@ -35,7 +35,7 @@ jest.mock("@/screens/home/ServerReachBanner", () => ({
   ServerReachBanner: () => null,
 }));
 jest.mock("@/screens/hosts/SyncBanner", () => ({ SyncBanner: () => null }));
-jest.mock("@/screens/hosts/HostForm", () => () => null);
+jest.mock("@/screens/hosts/editor/HostEditor", () => () => null);
 jest.mock("@/screens/hosts/CredentialListModal", () => () => null);
 jest.mock("@/screens/hosts/QuickConnect", () => ({ QuickConnect: () => null }));
 jest.mock("@/features/tailscale/TailscaleDevices", () => ({

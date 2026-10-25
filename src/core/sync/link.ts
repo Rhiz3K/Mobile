@@ -3,7 +3,13 @@ import { isServerAccount, type ServerAccount } from "@/core/accounts/types";
 import { AppError } from "@/core/errors";
 import { localStores, type LocalStores } from "@/core/db/stores";
 import { changes } from "@/core/db/changes";
-import { copyData, hasOwnData, type CopyResult } from "./copy";
+import {
+  copyData,
+  hasOwnData,
+  ownDataCounts,
+  type CopyResult,
+  type OwnDataCounts,
+} from "./copy";
 import { deviceId, deviceName } from "./device";
 import { SyncError } from "./errors";
 import { SyncRemote } from "./remote";
@@ -107,6 +113,17 @@ export async function thisDeviceHasData(
     return hasOwnData((await stores.get("local")).db);
   } catch {
     return false;
+  }
+}
+
+/** What This device has that Merge would copy. Null when it can't be read. */
+export async function thisDeviceCounts(
+  stores: LocalStores = localStores,
+): Promise<OwnDataCounts | null> {
+  try {
+    return ownDataCounts((await stores.get("local")).db);
+  } catch {
+    return null;
   }
 }
 

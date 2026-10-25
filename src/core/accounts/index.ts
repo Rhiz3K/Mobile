@@ -29,6 +29,14 @@ export function requireActiveClient(): AccountClient {
   return client;
 }
 
+/** API of a client from a hook, or an error when there is no server. */
+export function apiOf(client: AccountClient | null): ApiModules {
+  if (!client) {
+    throw new AppError("Link a Termix server to use this", "NO_SERVER");
+  }
+  return client.api;
+}
+
 /** API of the active account. Session code uses its own account instead. */
 export function api(): ApiModules {
   return requireActiveClient().api;

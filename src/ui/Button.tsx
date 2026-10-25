@@ -50,13 +50,13 @@ export const BUTTON_CONTAINER: Record<ButtonVariant, string> = {
 };
 
 export const BUTTON_PRESSED: Record<ButtonVariant, string> = {
-  default: "active:bg-accent-brand/25",
-  outline: "active:bg-accent-brand/10",
-  secondary: "active:bg-accent-brand/20",
-  muted: "active:bg-muted",
-  ghost: "active:bg-muted",
-  destructive: "active:bg-destructive/25",
-  link: "active:opacity-70",
+  default: "hover:bg-accent-brand/20 active:bg-accent-brand/25",
+  outline: "hover:bg-accent-brand/5 active:bg-accent-brand/10",
+  secondary: "hover:bg-accent-brand/15 active:bg-accent-brand/20",
+  muted: "hover:bg-muted/60 active:bg-muted",
+  ghost: "hover:bg-muted/60 active:bg-muted",
+  destructive: "hover:bg-destructive/20 active:bg-destructive/25",
+  link: "hover:opacity-80 active:opacity-70",
 };
 
 export const BUTTON_TEXT: Record<ButtonVariant, string> = {

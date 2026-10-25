@@ -81,6 +81,10 @@ export interface SSHHost {
   enableServices?: boolean;
   sshPort?: number;
   notes?: string;
+  /** Hex color like #3b82f6, synced with the server. */
+  color?: string | null;
+  /** Lucide icon name. */
+  icon?: string | null;
   guacamoleConfig?: string | Record<string, unknown> | null;
   // Remote desktop (Guacamole) protocol fields
   rdpAuthType?: "direct" | "credential" | "none";
@@ -155,7 +159,11 @@ export interface SSHHostData {
   enableDocker?: boolean;
   enableServices?: boolean;
   notes?: string;
+  color?: string | null;
+  icon?: string | null;
   macAddress?: string;
+  /** Plugin host settings the editor changed directly, by plugin id. */
+  pluginSettingsPatch?: Record<string, Record<string, unknown>>;
   /** Vault plugin profile for hosts that sign in with Vault. */
   vaultProfileId?: number | null;
   rdpUser?: string;
@@ -215,6 +223,8 @@ export interface Credential {
   publicKey?: string;
   keyPassword?: string;
   keyType?: string;
+  /** OpenSSH user certificate signed for the key. */
+  certPublicKey?: string;
   usageCount: number;
   lastUsed?: string;
   createdAt: string;
@@ -255,6 +265,8 @@ export interface CredentialData {
   publicKey?: string;
   keyPassword?: string;
   keyType?: string;
+  /** Empty clears the saved certificate. */
+  certPublicKey?: string;
 }
 
 // ============================================================================

@@ -117,6 +117,8 @@ export const hosts = sqliteTable(
     statusCheckInterval: integer("status_check_interval"),
     sshOptions: text("ssh_options"),
     notes: text("notes"),
+    color: text("color"),
+    icon: text("icon"),
     enableSsh: bool("enable_ssh").notNull().default(true),
     sshPort: integer("ssh_port").default(22),
     useSocks5: bool("use_socks5"),

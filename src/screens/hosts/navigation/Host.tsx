@@ -1,7 +1,14 @@
 import { View, Pressable } from "react-native";
 import { Pin, Cpu, MemoryStick, GripVertical } from "lucide-react-native";
 import { SSHHost } from "@/types";
-import { Checkbox, Text } from "@/ui";
+import {
+  Checkbox,
+  LookIcon,
+  Text,
+  isLookColor,
+  lookIcon,
+  useContextMenu,
+} from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { useHostBadges } from "@/core/features";
 import { isSshActive } from "@/utils/hosts";
@@ -94,6 +101,22 @@ export default function Host({
   const accent = color("accent-brand") ?? "#f59145";
   const online = status === "online";
   const badges = useHostBadges();
+  const rightClick = useContextMenu(
+    selecting
+      ? []
+      : [
+          { id: "open", label: "Open", onPress: () => onPress(host) },
+          ...(onLongPress
+            ? [
+                {
+                  id: "more",
+                  label: "More actions",
+                  onPress: () => onLongPress(host),
+                },
+              ]
+            : []),
+        ],
+  );
 
   const sshActive = isSshActive(host);
   const protocols: string[] = [];
@@ -107,6 +130,7 @@ export default function Host({
 
   return (
     <Pressable
+      {...rightClick.triggerProps}
       onPress={() => onPress(host)}
       onLongPress={onLongPress ? () => onLongPress(host) : undefined}
       accessibilityRole="button"
@@ -116,7 +140,7 @@ export default function Host({
       }
       accessibilityState={selecting ? { selected } : undefined}
       style={{ marginLeft: depth * 14 }}
-      className={`flex-row items-stretch active:bg-muted/40 ${
+      className={`flex-row items-stretch hover:bg-muted/30 active:bg-muted/40 ${
         dragging || selected
           ? "bg-muted/50"
           : striped
@@ -147,6 +171,17 @@ export default function Host({
             }}
             className="h-1.5 w-1.5 shrink-0 rounded-full"
           />
+          {lookIcon(host.icon) || isLookColor(host.color) ? (
+            <LookIcon
+              name={host.icon}
+              size={12}
+              color={
+                isLookColor(host.color)
+                  ? host.color
+                  : (color("muted-foreground") ?? "#9ca3af")
+              }
+            />
+          ) : null}
           <Text
             weight="medium"
             className="shrink text-[13px] text-foreground"
@@ -232,6 +267,7 @@ export default function Host({
           <GripVertical size={16} color={color("muted-foreground")} />
         </Pressable>
       ) : null}
+      {rightClick.menu}
     </Pressable>
   );
 }

@@ -40,16 +40,31 @@
 - Delete local data from Settings
 - Open a terminal to hosts on This device with no Termix server: password, key, keyboard-interactive and TOTP, certificates, jump hosts, proxies and port knocking
 - Host keys of hosts on This device are checked and saved on the phone, with a warning when a key changes
-- PuTTY keys loaded in the host or login editor are changed to OpenSSH format
+- PuTTY keys loaded or pasted in the host or login editor are changed to OpenSSH format
 - Pick per host whether a linked server's host connects from the phone, through the server, or automatically
 - A failed connection says what went wrong and what to try, with buttons to try again or connect the other way
 - Features that need a Termix server say so, with a button to connect the host through the server
 - A linked server keeps its own copy on the phone and syncs hosts, logins, snippets and settings both ways, also in the background
 - Hosts of a linked server work offline and can connect from the phone
-- The first time you link a server, merge This device's hosts into it or start with only the server's data
+- The first time you link a server, merge This device's hosts into it or start with only the server's data. The choice says how many hosts, logins and snippets the phone has
 - Unlink a server and keep a copy of your own hosts, logins and snippets on This device, or delete them from the phone
 - Pick what syncs for each server, and see changes the server kept over yours with a button to keep yours
-- Sign in through the browser, which works with passkeys and security keys (needs Termix 26.10.6 or newer)
+- Open a host in the app from a link, like `termix-mobile://open?server=https://termix.example&view=terminal&hostId=12` or `termix-mobile://open?url=` with a Termix web link, for notifications from ntfy or Home Assistant (#87)
+- Keep a server's password behind Face ID, Touch ID or a fingerprint, and sign in again with one look when the server signs you out. Turn it off per server under Sync (#91)
+- Password managers like Bitwarden, 1Password and Apple Passwords can fill the server address, username, password and one time code (#91)
+- Sign in with a passkey or security key (Face ID, fingerprint, NFC or USB keys) through the browser when your server has passkeys on, and say when the sign in was canceled or turned down (needs Termix 26.10.6 or newer) (#83)
+- A welcome screen on a new install: use the app with no server, link a server, or import hosts and backups. Each choice says what it does
+- Link a server by its name alone: https is added, and the address is checked before anything is saved
+- Sign in with every login your server lists: password, LDAP, each SSO provider, TOTP and backup codes, and passkeys or security keys in the browser
+- SSO uses the login your phone's browser already has, so it doesn't ask again
+- Hosts can have a color and an icon, which sync with Termix (needs Termix 26.10.6 or newer)
+- Pick jump hosts in the host editor and change their order
+- On a linked server the host editor shows simple settings of plugins the app has no screen for, like Databases or Session Recording
+- Make Ed25519 and ECDSA keys on the phone with an optional passphrase, and RSA keys through the server's Credential Tools plugin
+- Keys are checked as you type, with the key type, fingerprint and whether the passphrase opens it
+- A login's certificate shows who it is for, when it expires and whether it fits the key
+- Test connection in the host and login editors logs in from the phone without saving
+- The host and login editors ask before you leave with unsaved changes
 - Servers behind a reverse proxy: extra headers, Cloudflare service tokens, basic auth, client certificates and the proxy's own sign in page
 - When a server signs you out, the Hosts screen says why and offers the quickest fix
 - A new native terminal that is faster, scrolls smoothly and stays responsive when a program prints a lot
@@ -125,6 +140,21 @@
 - Plugin screens about a host open from the host's menu as a tab; the others are listed on Home and Tools under From your server and in Settings, Plugins
 - Plugin screens follow the app's theme, work behind proxies and client certificates, and only reach their own plugin on your server
 - An open tab of a plugin an admin turned off says so, and comes back when the plugin is on again
+- Settings is rebuilt in sections: accounts and sync, appearance, terminal, keyboard, security, notifications, privacy, plugins, backup and about
+- Search settings from the top of Settings or the search button
+- Choose text size and row density
+- App Lock can lock right away or after 15 seconds, 1 minute or 5 minutes, and you can change the PIN
+- Hide Termix in the app switcher
+- App Lock waits 30 seconds after 5 wrong PINs
+- Copy or share the latest app logs from Settings, About and logs
+- Clear your recent hosts
+- A sidebar instead of the bottom bar on tablets and wide windows, with the host list beside open sessions on large screens
+- The app follows window size changes on iPad (resizable windows) and on Android tablets, foldables and desktop mode without dropping sessions
+- A compact key row when the window is short, like a phone held sideways
+- App wide keyboard shortcuts on iPad (Cmd K, Cmd /, Cmd Opt 1 to 4, Cmd ,) and on Android (Ctrl Shift K, /, N, comma and Ctrl Alt 1 to 4) with a shortcut sheet in Settings, Keyboard
+- Hover highlights and right click menus for mouse and trackpad
+- Home screen widgets work with no server, show hosts and snippets from this device and follow the app theme
+- Share anonymous usage statistics to help improve the app: off until you answer the first-run question, with a switch, a preview of the next report and an id reset in Settings
 
 ### Changed
 
@@ -144,7 +174,9 @@
 - The theme picker shows the same swatches as Termix
 - Buttons, inputs, switches, tabs, lists and toasts now look the same as in Termix
 - Popups are now sheets that slide up from the bottom, and confirmations use them instead of system alerts
-- The host, credential, file and key editors open in place with a back button instead of as popups
+- The host, login, file and key editors open in place with a back button instead of as popups
+- The host editor is one page with sections for each protocol and feature instead of tabs, and tags are added one at a time
+- Credentials are called logins everywhere in the app
 - The iOS app icon, including the dark and tinted versions, now uses the same logo as Termix on the web and desktop
 - Needs iOS 16.4 or newer
 - A terminal that fails to connect stays open with the error instead of closing
@@ -160,7 +192,15 @@
 
 ### Fixed
 
+- The keyboard no longer stays open over the App Lock PIN pad when you come back to the app (#100)
+- Face ID asks for you when you return to a locked app
+- Face ID prompts no longer lock the app again
 - A reverse proxy asking you to sign in again no longer signs you out of Termix
+- A proxy sign in like Authelia or Authentik is kept after the app restarts, and the app asks you to sign in to the proxy again when it runs out instead of making you add the server again (#103)
+- A client certificate (mTLS) is sent on every request, socket and SSH relay, including file uploads and downloads on iPhone and remote desktop through the server (#84)
+- Signing in through the browser keeps your SSO login. Signing out of one server no longer makes the next sign in forget it, and Android uses the system browser after a sign out too, so passkeys work there
+- A sign in link from an older try can no longer finish a sign in, and each link works once
+- Servers behind Cloudflare Access work after you sign in: when Access wants a sign in, the app opens it instead of saying it can't reach Termix (#81)
 - Terminal settings saved on a host in Termix 2.9 and newer are now used on the phone
 - A host with tmux turned on in Termix no longer hangs when the host has more than one tmux session
 - A host's environment variables and startup snippet from Termix 2.9 and newer now apply in the terminal

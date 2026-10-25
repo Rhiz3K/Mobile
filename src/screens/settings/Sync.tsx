@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ArrowLeft, RefreshCw } from "lucide-react-native";
 import {
   accountLabel,
+  accounts,
   isServerAccount,
-  useActiveAccount,
+  useAccounts,
   useClient,
 } from "@/core/accounts";
 import { toUserMessage } from "@/core/errors";
@@ -28,6 +29,7 @@ import { useThemeColor } from "@/contexts/ThemeContext";
 import { Badge, Button, FakeSwitch, SettingRow, Text } from "@/ui";
 import { toast } from "@/utils/toast";
 import { ProxySettings } from "@/screens/accounts/ProxySettings";
+import { SavedLoginRow } from "@/screens/accounts/SavedLoginRow";
 import { UnlinkSheet } from "@/screens/accounts/UnlinkSheet";
 import { useSyncFix } from "@/screens/accounts/useSyncFix";
 
@@ -62,17 +64,23 @@ function Section({ title, hint }: { title: string; hint?: string }) {
   );
 }
 
-/** Sync status and settings of the active linked server. */
+/** Sync status and settings of a linked server: the one in the link, else the active one. */
 export default function SyncSettings() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const color = useThemeColor();
-  const account = useActiveAccount();
+  const params = useLocalSearchParams<{ account?: string }>();
+  const { accounts: list, active } = useAccounts();
+  const account = list.find((a) => a.id === params.account) ?? active;
   const client = useClient(account.id);
   const status = useAccountSync(account.id);
   const { conflicts, rejected } = useSyncIssues(account.id);
   const { openAuthFlow } = useAppContext();
-  const { fix, overlay } = useSyncFix(account.id, () => openAuthFlow("login"));
+  const { fix, overlay } = useSyncFix(account.id, async () => {
+    // Signing in works on the active account.
+    if (account.id !== active.id) await accounts.setActive(account.id);
+    openAuthFlow("login");
+  });
   const [unlinkOpen, setUnlinkOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -270,6 +278,10 @@ export default function SyncSettings() {
                 </>
               ) : null}
             </>
+          ) : null}
+
+          {client ? (
+            <SavedLoginRow key={client.accountId} client={client} />
           ) : null}
 
           <Section

@@ -11,6 +11,8 @@ export interface FakeNet extends TermixNetNative {
   certs: Map<string, string>;
   cookies: Map<string, NetCookie[]>;
   webCookies: NetCookie[];
+  /** What the app's own request jar holds. */
+  jarCookies: NetCookie[];
   cleared: [string, string][];
   requests: Parameters<NonNullable<TermixNetNative["request"]>>[0][];
   emit(event: "onStream" | "onSocket", body: unknown): void;
@@ -25,6 +27,7 @@ export function fakeNet(options: { nativeRequests?: boolean } = {}): FakeNet {
     certs: new Map(),
     cookies: new Map(),
     webCookies: [],
+    jarCookies: [],
     cleared: [],
     requests: [],
     reply: () => ({ status: 200, headers: {}, body: "{}", url: "" }),
@@ -43,6 +46,9 @@ export function fakeNet(options: { nativeRequests?: boolean } = {}): FakeNet {
     },
     async readWebCookies() {
       return net.webCookies;
+    },
+    async readJarCookies() {
+      return net.jarCookies;
     },
     async setCookies(url, cookies) {
       net.cookies.set(url, cookies);

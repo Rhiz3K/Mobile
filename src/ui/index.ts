@@ -8,9 +8,17 @@ export { FakeSwitch, Checkbox } from "./Switch";
 export { SettingRow } from "./SettingRow";
 export { AccordionSection } from "./Accordion";
 export { Sheet, SheetBody, SheetRow } from "./Sheet";
+export { Popover } from "./Popover";
+export type { PopoverAnchor } from "./Popover";
 export { ConfirmProvider, useConfirm } from "./Confirm";
 export type { ConfirmOptions } from "./Confirm";
 export { PromptSheet } from "./PromptSheet";
+export {
+  ContextMenu,
+  isSecondaryClick,
+  useContextMenu,
+  type ContextMenuItem,
+} from "./ContextMenu";
 export { InlineView } from "./InlineView";
 export { ListRow, ListRowAction } from "./ListRow";
 export type { ListRowTone } from "./ListRow";
@@ -20,3 +28,13 @@ export { Toaster } from "./Toast";
 export { Badge } from "./Badge";
 export type { BadgeVariant } from "./Badge";
 export { ChoiceRow } from "./ChoiceRow";
+export { Field, FieldRow, digits } from "./Field";
+export {
+  LookIcon,
+  LOOK_ICONS,
+  LOOK_COLORS,
+  isLookColor,
+  lookIcon,
+} from "./LookIcon";
+export { PinPad, PIN_LENGTH } from "./PinPad";
+export { SettingsLinkRow } from "./SettingsLinkRow";

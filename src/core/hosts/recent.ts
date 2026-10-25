@@ -55,6 +55,15 @@ export async function recordRecent(
     .catch(() => {});
 }
 
+/** Forgets the recent hosts of one account. */
+export async function clearRecent(accountId: string): Promise<void> {
+  cache.set(accountId, []);
+  listeners.forEach((l) => l(accountId));
+  await accountStorage(accountId)
+    .data.remove(KEY)
+    .catch(() => {});
+}
+
 export function subscribeRecent(
   listener: (accountId: string) => void,
 ): () => void {

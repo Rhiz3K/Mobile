@@ -28,7 +28,7 @@ export function Tabs<T extends string>({
         onPress={() => onChange(opt.id)}
         accessibilityRole="tab"
         accessibilityState={{ selected: active }}
-        className={`min-h-11 flex-row items-center justify-center gap-1.5 border-b-2 px-3 ${size === "sm" ? "py-1.5" : "py-2"} ${active ? "border-accent-brand" : "border-transparent active:bg-muted/50"} ${fill ? "flex-1" : ""}`}
+        className={`min-h-11 flex-row items-center justify-center gap-1.5 border-b-2 px-3 ${size === "sm" ? "py-1.5" : "py-2"} ${active ? "border-accent-brand" : "border-transparent hover:bg-muted/30 active:bg-muted/50"} ${fill ? "flex-1" : ""}`}
       >
         {opt.icon ?? null}
         <Text

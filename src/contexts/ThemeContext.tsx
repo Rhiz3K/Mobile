@@ -71,7 +71,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const setTheme = useCallback((t: ThemeId) => {
     setThemeState(t);
-    AsyncStorage.setItem(STORAGE_KEYS.theme, t).catch(() => {});
+    // Widgets read the theme back from storage, so the write lands first.
+    AsyncStorage.setItem(STORAGE_KEYS.theme, t)
+      .then(() => republishWithPreferences())
+      .catch(() => {});
   }, []);
 
   const setAccent = useCallback((hex: string) => {

@@ -353,6 +353,8 @@ const HOST_FIELDS = [
   "statusCheckInterval",
   "sshOptions",
   "notes",
+  "color",
+  "icon",
   "enableSsh",
   "sshPort",
   "useSocks5",

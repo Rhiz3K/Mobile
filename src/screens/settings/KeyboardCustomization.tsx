@@ -4,7 +4,7 @@ import { useRouter } from "expo-router";
 import { ArrowLeft } from "lucide-react-native";
 import { Screen } from "@/components/Screen";
 import { ChoiceRow, FakeSwitch, Label, SettingRow, Tabs, Text } from "@/ui";
-import { shortcutHelp } from "@/features/terminal/shortcuts";
+import { shortcutSections, shortcutSheet } from "@/core/shortcuts";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { KeyLayoutEditor } from "@/features/terminal/keys/KeyLayoutEditor";
 import {
@@ -104,17 +104,24 @@ export default function KeyboardCustomization() {
           />
           <View className="mt-6 gap-1 pb-6">
             <Label>Hardware keyboard</Label>
-            {shortcutHelp().map((row, i, all) => (
-              <SettingRow
-                key={row.label}
-                label={row.label}
-                last={i === all.length - 1}
-              >
-                <Text className="text-meta text-muted-foreground">
-                  {row.keys}
-                </Text>
+            <Pressable onPress={shortcutSheet.open} accessibilityRole="button">
+              <SettingRow label="All shortcuts" last>
+                <Text className="text-meta text-muted-foreground">Show</Text>
               </SettingRow>
-            ))}
+            </Pressable>
+            {shortcutSections()
+              .flatMap((section) => section.rows)
+              .map((row, i, all) => (
+                <SettingRow
+                  key={row.label}
+                  label={row.label}
+                  last={i === all.length - 1}
+                >
+                  <Text className="text-meta text-muted-foreground">
+                    {row.keys}
+                  </Text>
+                </SettingRow>
+              ))}
           </View>
         </ScrollView>
       )}

@@ -83,6 +83,11 @@ export class AccountStore {
       const saved = await this.kv.getJson<Saved>(STORE_KEY);
       if (saved && Array.isArray(saved.accounts)) {
         this.servers = saved.accounts.filter((a) => a?.kind === "server");
+        // A link the app was closed in the middle of.
+        for (const left of this.servers.filter((a) => a.pending)) {
+          await this.wipe(left.id).catch(() => {});
+        }
+        this.servers = this.servers.filter((a) => !a.pending);
         this.activeId = this.find(saved.activeId)
           ? saved.activeId
           : LOCAL_ACCOUNT_ID;
@@ -125,7 +130,9 @@ export class AccountStore {
 
   findByUrl(serverUrl: string): ServerAccount | null {
     return (
-      this.servers.find((a) => sameServerUrl(a.serverUrl, serverUrl)) ?? null
+      this.servers.find(
+        (a) => !a.pending && sameServerUrl(a.serverUrl, serverUrl),
+      ) ?? null
     );
   }
 
@@ -156,8 +163,23 @@ export class AccountStore {
     return () => this.listeners.delete(listener);
   };
 
-  /** Adds a linked server. Like the desktop, it does not switch to it. */
-  async add(serverUrl: string): Promise<ServerAccount> {
+  /** Server accounts still being linked, for the link flow. */
+  findPending(serverUrl: string): ServerAccount | null {
+    return (
+      this.servers.find(
+        (a) => a.pending && sameServerUrl(a.serverUrl, serverUrl),
+      ) ?? null
+    );
+  }
+
+  /**
+   * Adds a linked server. Like the desktop, it does not switch to it. A
+   * pending one stays out of lists until `confirm`.
+   */
+  async add(
+    serverUrl: string,
+    opts: { pending?: boolean } = {},
+  ): Promise<ServerAccount> {
     const account: ServerAccount = {
       id: this.newId(),
       kind: "server",
@@ -173,6 +195,7 @@ export class AccountStore {
       lastSyncAt: null,
       disabledTypes: [],
       options: {},
+      ...(opts.pending ? { pending: true } : {}),
     };
     this.servers = [...this.servers, account];
     await this.commit();
@@ -205,6 +228,35 @@ export class AccountStore {
     await this.commit();
   }
 
+  /** A pending account finished linking and shows up in lists. */
+  async confirm(id: string): Promise<void> {
+    const account = this.servers.find((a) => a.id === id);
+    if (!account?.pending) return;
+    this.servers = this.servers.map((a) => {
+      if (a.id !== id) return a;
+      const { pending: _done, ...rest } = a;
+      return rest;
+    });
+    await this.commit();
+  }
+
+  /** Drops a pending account and anything saved for it. */
+  async discardPending(id: string): Promise<void> {
+    const account = this.servers.find((a) => a.id === id);
+    if (!account?.pending || id === this.activeId) return;
+    await this.wipe(id);
+    this.servers = this.servers.filter((a) => a.id !== id);
+    await this.commit();
+  }
+
+  private async wipe(id: string): Promise<void> {
+    const client = this.client(id);
+    await client?.wipe();
+    clearFrameCache(id);
+    await this.wipeLocalData(id);
+    this.clients.delete(id);
+  }
+
   /** Removes a linked server and wipes its data. This device stays. */
   async remove(id: string): Promise<void> {
     if (id === LOCAL_ACCOUNT_ID) {
@@ -214,11 +266,7 @@ export class AccountStore {
       throw new AppError("Switch to another account first", "VALIDATION_ERROR");
     }
     if (!this.find(id)) throw new AppError("No such account", "NOT_FOUND");
-    const client = this.client(id);
-    await client?.wipe();
-    clearFrameCache(id);
-    await this.wipeLocalData(id);
-    this.clients.delete(id);
+    await this.wipe(id);
     this.servers = this.servers.filter((a) => a.id !== id);
     await this.commit();
   }
@@ -238,7 +286,7 @@ export class AccountStore {
 
   private refreshSnapshot(): void {
     this.snapshot = {
-      accounts: [LOCAL, ...this.servers],
+      accounts: [LOCAL, ...this.servers.filter((a) => !a.pending)],
       active: this.find(this.activeId) ?? LOCAL,
     };
   }

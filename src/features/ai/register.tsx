@@ -24,6 +24,9 @@ export const aiFeature: FeatureDef = {
       icon: Sparkles,
       order: 15,
       href: "/(tabs)/ai?from=settings",
+      section: "plugins",
+      description: "Chat with your server's AI assistant",
+      keywords: ["chat", "conversation", "artificial intelligence"],
     },
   ],
 };

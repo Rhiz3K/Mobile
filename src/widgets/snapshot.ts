@@ -16,6 +16,7 @@ import {
   buildWidgetSnippetLink,
   type WidgetHostEntry,
   type WidgetHostStatus,
+  type WidgetPalette,
   type WidgetPreferences,
   type WidgetSnapshot,
   type WidgetSnippetEntry,
@@ -41,6 +42,8 @@ export interface BuildSnapshotInput {
   serverUrl?: string | null;
   /** Whether the user is signed in. Drives the "signed-out" state. */
   authenticated: boolean;
+  /** App theme colors. */
+  palette?: WidgetPalette | null;
   /** Injected for deterministic tests. */
   now?: number;
 }
@@ -193,6 +196,7 @@ function summarize(entries: WidgetHostEntry[]): WidgetSummary {
 export function buildSignedOutSnapshot(
   accent: string,
   now = Date.now(),
+  palette: WidgetPalette | null = null,
 ): WidgetSnapshot {
   return {
     version: SNAPSHOT_VERSION,
@@ -203,6 +207,7 @@ export function buildSignedOutSnapshot(
     summary: { total: 0, online: 0, offline: 0, unknown: 0 },
     hosts: [],
     snippets: [],
+    theme: palette,
   };
 }
 
@@ -220,11 +225,12 @@ export function buildWidgetSnapshot(input: BuildSnapshotInput): WidgetSnapshot {
     accent,
     serverUrl,
     authenticated,
+    palette = null,
     now = Date.now(),
   } = input;
 
   if (!authenticated || !preferences.enabled) {
-    return buildSignedOutSnapshot(accent, now);
+    return buildSignedOutSnapshot(accent, now, palette);
   }
 
   const safeHosts = Array.isArray(hosts) ? hosts : [];
@@ -265,6 +271,7 @@ export function buildWidgetSnapshot(input: BuildSnapshotInput): WidgetSnapshot {
     summary,
     hosts: visible,
     snippets: visibleSnippets,
+    theme: palette,
   };
 }
 

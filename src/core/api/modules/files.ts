@@ -8,6 +8,9 @@ import type {
 import type { TrashItem } from "../types";
 import { toPluginPath } from "../compat/api-compat";
 import { ApiError } from "../errors";
+import { nativeStreamResponse, toFetchResponse } from "../native-adapter";
+import { toBase64 } from "@/core/db/bytes";
+import { nativeRequest } from "@/modules/termix-net";
 
 export function createFilesApi(c: AccountClient) {
   async function getFileManagerRecent(
@@ -890,12 +893,24 @@ export function createFilesApi(c: AccountClient) {
       "Content-Type": "application/json",
     };
     if (offset > 0) headers.Range = `bytes=${offset}-`;
-    const response = await fetch(streamUrl("downloadFileStream"), {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ sessionId, path }),
-      signal,
-    });
+    const body = JSON.stringify({ sessionId, path });
+    // iOS sends a client certificate only from the native module.
+    const response = c.usesNativeNetwork()
+      ? await nativeStreamResponse(
+          {
+            url: streamUrl("downloadFileStream"),
+            method: "POST",
+            headers,
+            body,
+          },
+          signal,
+        )
+      : await fetch(streamUrl("downloadFileStream"), {
+          method: "POST",
+          headers,
+          body,
+          signal,
+        });
     if (!response.ok) await failStream(response, "download file");
     return response;
   }
@@ -917,19 +932,28 @@ export function createFilesApi(c: AccountClient) {
       offset: String(offset),
       totalSize: String(totalSize),
     });
-    const response = await fetch(
-      `${streamUrl("uploadFileChunk")}?${query.toString()}`,
-      {
-        method: "POST",
-        headers: {
-          ...c.requestHeaders(),
-          "Content-Type": "application/octet-stream",
-        },
-        // expo/fetch sends typed arrays as is; the DOM types just don't list them.
-        body: bytes as unknown as BodyInit,
-        signal,
-      },
-    );
+    const url = `${streamUrl("uploadFileChunk")}?${query.toString()}`;
+    const headers = {
+      ...c.requestHeaders(),
+      "Content-Type": "application/octet-stream",
+    };
+    const response = c.usesNativeNetwork()
+      ? toFetchResponse(
+          await nativeRequest({
+            url,
+            method: "POST",
+            headers,
+            bodyBase64: toBase64(bytes),
+            timeoutMs: 120000,
+          }),
+        )
+      : await fetch(url, {
+          method: "POST",
+          headers,
+          // expo/fetch sends typed arrays as is; the DOM types just don't list them.
+          body: bytes as unknown as BodyInit,
+          signal,
+        });
     if (!response.ok) await failStream(response, "upload file");
     const data = (await response.json()) as {
       nextOffset?: number;

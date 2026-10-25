@@ -8,6 +8,8 @@ final class NetSession: NSObject, URLSessionDataDelegate, URLSessionWebSocketDel
   private let lock = NSLock()
   private var streams: [Int: String] = [:]
   private var streamTasks: [String: URLSessionDataTask] = [:]
+  // File downloads, whose chunks go out as base64.
+  private var binaryStreams: Set<String> = []
   private var sockets: [String: URLSessionWebSocketTask] = [:]
   private var socketIds: [Int: String] = [:]
 
@@ -24,7 +26,7 @@ final class NetSession: NSObject, URLSessionDataDelegate, URLSessionWebSocketDel
     self.emit = emit
   }
 
-  private func makeRequest(url: String, method: String, headers: [String: String], body: String?, timeoutMs: Double) throws -> URLRequest {
+  private func makeRequest(url: String, method: String, headers: [String: String], body: Data?, timeoutMs: Double) throws -> URLRequest {
     guard let target = URL(string: url) else {
       throw CertError(code: "BAD_URL", message: "Bad address: \(url)")
     }
@@ -34,7 +36,7 @@ final class NetSession: NSObject, URLSessionDataDelegate, URLSessionWebSocketDel
       request.setValue(value, forHTTPHeaderField: name)
     }
     if let body {
-      request.httpBody = body.data(using: .utf8)
+      request.httpBody = body
     }
     if timeoutMs > 0 {
       request.timeoutInterval = timeoutMs / 1000
@@ -50,7 +52,7 @@ final class NetSession: NSObject, URLSessionDataDelegate, URLSessionWebSocketDel
     return out
   }
 
-  func request(url: String, method: String, headers: [String: String], body: String?, timeoutMs: Double,
+  func request(url: String, method: String, headers: [String: String], body: Data?, timeoutMs: Double,
                done: @escaping (Result<[String: Any?], Error>) -> Void) {
     do {
       let request = try makeRequest(url: url, method: method, headers: headers, body: body, timeoutMs: timeoutMs)
@@ -74,13 +76,14 @@ final class NetSession: NSObject, URLSessionDataDelegate, URLSessionWebSocketDel
 
   // Streams
 
-  func startStream(id: String, url: String, method: String, headers: [String: String], body: String?) {
+  func startStream(id: String, url: String, method: String, headers: [String: String], body: Data?, binary: Bool) {
     do {
       let request = try makeRequest(url: url, method: method, headers: headers, body: body, timeoutMs: 0)
       let task = session.dataTask(with: request)
       lock.lock()
       streams[task.taskIdentifier] = id
       streamTasks[id] = task
+      if binary { binaryStreams.insert(id) }
       lock.unlock()
       task.resume()
     } catch {
@@ -111,7 +114,11 @@ final class NetSession: NSObject, URLSessionDataDelegate, URLSessionWebSocketDel
 
   func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
     guard let id = streamId(dataTask) else { return }
-    emit("onStream", ["id": id, "type": "data", "chunk": String(decoding: data, as: UTF8.self)])
+    lock.lock()
+    let binary = binaryStreams.contains(id)
+    lock.unlock()
+    let chunk = binary ? data.base64EncodedString() : String(decoding: data, as: UTF8.self)
+    emit("onStream", ["id": id, "type": "data", "chunk": chunk])
   }
 
   func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
@@ -119,6 +126,7 @@ final class NetSession: NSObject, URLSessionDataDelegate, URLSessionWebSocketDel
     lock.lock()
     streams.removeValue(forKey: task.taskIdentifier)
     streamTasks.removeValue(forKey: id)
+    binaryStreams.remove(id)
     lock.unlock()
     if let error {
       emit("onStream", ["id": id, "type": "error", "message": error.localizedDescription])

@@ -12,9 +12,11 @@ jest.mock("expo-secure-store", () => {
     deleteItemAsync: jest.fn(async (key: string) => {
       store.delete(key);
     }),
+    canUseBiometricAuthentication: jest.fn(() => true),
     WHEN_UNLOCKED: 0,
     WHEN_UNLOCKED_THIS_DEVICE_ONLY: 6,
     AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY: 2,
+    WHEN_PASSCODE_SET_THIS_DEVICE_ONLY: 3,
     __reset: () => store.clear(),
   };
 });

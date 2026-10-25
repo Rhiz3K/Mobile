@@ -66,6 +66,7 @@ function kotlinFields(name: string) {
 
 test.each([
   ["WidgetSnapshot", "WidgetSnapshot"],
+  ["WidgetPalette", "WidgetPalette"],
   ["WidgetSummary", "HostSummary"],
   ["WidgetHostEntry", "HostEntry"],
   ["WidgetSnippetEntry", "SnippetEntry"],

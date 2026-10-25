@@ -25,7 +25,20 @@ import {
 import type { AccountClient } from "@/core/api/AccountClient";
 import { refreshPluginLists } from "@/core/plugins/refresh";
 import { getLatestGitHubRelease, isNewerVersion } from "@/core/updates";
-import { linkAccount, sync, SyncError, type LinkOutcome } from "@/core/sync";
+import {
+  linkAccount,
+  sync,
+  SyncError,
+  thisDeviceHasData,
+  type LinkOutcome,
+} from "@/core/sync";
+import {
+  alreadySetUp,
+  markOnboardingDone,
+  onboardingDone,
+  shouldWelcome,
+} from "@/core/onboarding";
+import { APP_LOCK_ENABLED_KEY } from "@/contexts/AppLockContext";
 import { updateBackgroundSync } from "@/core/sync/background";
 
 interface Server {
@@ -51,19 +64,20 @@ interface AppContextType {
   hasServerConfigured: boolean;
 
   /**
-   * Points the sign in flow at a server: reuses the account for that URL, or
-   * the active one if it never signed in, otherwise adds a new account. The
-   * account becomes active.
+   * Call once the active account has a session: links it for sync. Null
+   * when nothing was linked.
    */
-  linkServer: (serverUrl: string) => Promise<AccountClient>;
-  /** Call once the active account has a session. */
-  /** Links the signed in server for sync. Null when nothing was linked. */
   finishSignIn: () => Promise<LinkOutcome | null>;
 
   /** Account switcher sheet. */
   accountSwitcherVisible: boolean;
   openAccountSwitcher: () => void;
   closeAccountSwitcher: () => void;
+
+  /** The welcome screen of a new install. */
+  welcomeVisible: boolean;
+  /** Closes the welcome screen for good, then does what was picked. */
+  finishWelcome: (choice: "standalone" | "link" | "import") => void;
 
   /** Auth flow overlay control. */
   authFlowVisible: boolean;
@@ -193,6 +207,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [showUpdateScreen, setShowUpdateScreen] = useState<boolean>(false);
 
   const [authFlowVisible, setAuthFlowVisible] = useState(false);
+  const [welcomeVisible, setWelcomeVisible] = useState(false);
   const [accountSwitcherVisible, setAccountSwitcherVisible] = useState(false);
   const openAccountSwitcher = useCallback(
     () => setAccountSwitcherVisible(true),
@@ -241,10 +256,17 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
           setAuthenticatedState(await validateSession(current, client));
           // A configured but signed out server lands on the empty state shell;
           // the user opens the auth flow themselves.
-        } else if (accounts.list().length === 1) {
-          // Brand new install: guide the user, but the flow is dismissible.
-          openAuthFlow("server");
         }
+        // A brand new install gets the welcome screen, once.
+        const state = {
+          done: await onboardingDone(),
+          hasServers: accounts.list().length > 1,
+          hasLocalData: await thisDeviceHasData(),
+          appLockOn:
+            (await AsyncStorage.getItem(APP_LOCK_ENABLED_KEY)) === "true",
+        };
+        if (shouldWelcome(state)) setWelcomeVisible(true);
+        else if (alreadySetUp(state)) void markOnboardingDone();
         // After the check above, so its request never races the token swap.
         void upgradeLogins();
       } catch {
@@ -255,7 +277,16 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     };
 
     initializeApp();
-  }, [openAuthFlow]);
+  }, []);
+
+  const finishWelcome = useCallback(
+    (choice: "standalone" | "link" | "import") => {
+      void markOnboardingDone();
+      setWelcomeVisible(false);
+      if (choice === "link") openAuthFlow("server");
+    },
+    [openAuthFlow],
+  );
 
   // Switching accounts re-checks the new one. Open sessions keep running.
   const firstActive = useRef(true);
@@ -300,11 +331,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
   // Losing authentication (sign-out elsewhere, expired token, server change)
   // must also empty the home-screen widgets - they would otherwise keep showing
-  // host names the user can no longer reach.
+  // host names the user can no longer reach. This device has no sign in, so
+  // its widgets stay filled.
   useEffect(() => {
-    if (isLoading || isAuthenticated) return;
+    if (isLoading || isAuthenticated || active.kind !== "server") return;
     void publishSignedOutSnapshot();
-  }, [isAuthenticated, isLoading]);
+  }, [isAuthenticated, isLoading, active.kind]);
 
   const lastValidationTimeRef = useRef<number>(0);
   const validationInProgressRef = useRef<boolean>(false);
@@ -351,25 +383,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     return () => subscription.remove();
   }, [isAuthenticated, setAuthenticated]);
 
-  const linkServer = useCallback(async (serverUrl: string) => {
-    const url = serverUrl.trim().replace(/\/+$/, "");
-    const current = accounts.active();
-    let account = accounts.findByUrl(url);
-    if (
-      !account &&
-      isServerAccount(current) &&
-      current.status === "signed_out"
-    ) {
-      account = await accounts.update(current.id, { serverUrl: url });
-    }
-    account ??= await accounts.add(url);
-    await accounts.setActive(account.id);
-    const client = accounts.client(account.id)!;
-    await client.load();
-    await client.refreshServerApi();
-    return client;
-  }, []);
-
   const finishSignIn = useCallback(async (): Promise<LinkOutcome | null> => {
     const current = accounts.active();
     const client = accounts.activeClient();
@@ -407,11 +420,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         isLoading,
         setIsLoading,
         hasServerConfigured: isServerAccount(active),
-        linkServer,
         finishSignIn,
         accountSwitcherVisible,
         openAccountSwitcher,
         closeAccountSwitcher,
+        welcomeVisible,
+        finishWelcome,
         authFlowVisible,
         authFlowInitialStep,
         openAuthFlow,

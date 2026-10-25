@@ -1,4 +1,5 @@
 import { Pressable, View, type PressableProps } from "react-native";
+import { useUiPrefs } from "@/core/ui-prefs";
 import { Text } from "./Text";
 
 export type ListRowTone =
@@ -59,6 +60,7 @@ export function ListRow({
   className?: string;
   children?: React.ReactNode;
 } & Omit<PressableProps, "children" | "onPress" | "onLongPress">) {
+  const compact = useUiPrefs().density === "compact";
   const bg = selected
     ? "bg-accent-brand/10"
     : index % 2 === 1
@@ -72,7 +74,7 @@ export function ListRow({
       disabled={!onPress && !onLongPress}
       accessibilityRole={onPress ? "button" : undefined}
       accessibilityState={{ selected: !!selected }}
-      className={`min-h-11 flex-row items-stretch border-b border-border/40 active:bg-muted/50 ${bg} ${dimmed ? "opacity-60" : ""} ${className ?? ""}`}
+      className={`${compact ? "min-h-9" : "min-h-11"} flex-row items-stretch border-b border-border/40 hover:bg-muted/30 active:bg-muted/50 ${bg} ${dimmed ? "opacity-60" : ""} ${className ?? ""}`}
     >
       <View
         className={`w-[3px] shrink-0 ${selected ? "bg-accent-brand" : color ? "" : STRIPE[tone]}`}
@@ -81,7 +83,9 @@ export function ListRow({
       {leading ? (
         <View className="shrink-0 justify-center pl-2.5">{leading}</View>
       ) : null}
-      <View className="min-w-0 flex-1 justify-center gap-1 py-2.5 pl-2.5 pr-2">
+      <View
+        className={`min-w-0 flex-1 justify-center gap-1 ${compact ? "py-1.5" : "py-2.5"} pl-2.5 pr-2`}
+      >
         <View className="min-w-0 flex-row items-center gap-1.5">
           {icon ? <View className="shrink-0">{icon}</View> : null}
           {typeof title === "string" ? (

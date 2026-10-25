@@ -20,11 +20,12 @@ import * as Clipboard from "expo-clipboard";
 import { Text, Button, Input, Sheet, SheetBody } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { toast } from "@/utils/toast";
-import { api, activeClient } from "@/core/accounts";
+import { apiOf, useActiveClient } from "@/core/accounts";
 
 type TotpPhase = "idle" | "setup" | "backup";
 
 export default function TwoFactorAuth() {
+  const client = useActiveClient();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const color = useThemeColor();
@@ -46,17 +47,17 @@ export default function TwoFactorAuth() {
   const [disableBusy, setDisableBusy] = useState(false);
 
   useEffect(() => {
-    api()
+    apiOf(client)
       .auth.getUserInfo()
       .then((u) => setTotpEnabled(!!u.totp_enabled))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [client]);
 
   const startSetup = async () => {
     setBusy(true);
     try {
-      const res = await api().totp.setupTOTP();
+      const res = await apiOf(client).totp.setupTOTP();
       setQrCode(res.qr_code);
       setSecret(res.secret);
       setPhase("setup");
@@ -71,7 +72,7 @@ export default function TwoFactorAuth() {
     if (verifyCode.trim().length < 6) return;
     setBusy(true);
     try {
-      const res = await api().totp.enableTOTP(verifyCode.trim());
+      const res = await apiOf(client).totp.enableTOTP(verifyCode.trim());
       setBackupCodes(res.backup_codes ?? []);
       setTotpEnabled(true);
       setPhase("backup");
@@ -86,7 +87,7 @@ export default function TwoFactorAuth() {
   const handleDisable = async () => {
     setDisableBusy(true);
     try {
-      await api().totp.disableTOTP(disablePassword.trim() || undefined);
+      await apiOf(client).totp.disableTOTP(disablePassword.trim() || undefined);
       setTotpEnabled(false);
       setDisableDialog(false);
       setDisablePassword("");
@@ -101,7 +102,7 @@ export default function TwoFactorAuth() {
   const fetchBackupCodes = async () => {
     setBusy(true);
     try {
-      const res = await api().totp.getTOTPBackupCodes();
+      const res = await apiOf(client).totp.getTOTPBackupCodes();
       setBackupCodes(res.backup_codes ?? []);
       setPhase("backup");
     } catch (e: any) {
@@ -248,7 +249,7 @@ export default function TwoFactorAuth() {
             {totpEnabled ? (
               <View className="gap-2">
                 {/* 2.9+ servers only regenerate codes, they can't show old ones */}
-                {!(activeClient()?.isPluginApi() ?? false) && (
+                {!(client?.isPluginApi() ?? false) && (
                   <Button
                     variant="muted"
                     onPress={fetchBackupCodes}
@@ -290,7 +291,7 @@ export default function TwoFactorAuth() {
         icon={<ShieldOff size={20} color={color("destructive")} />}
         title="Disable Two-Factor Authentication"
         description={
-          (activeClient()?.isPluginApi() ?? false)
+          (client?.isPluginApi() ?? false)
             ? "Enter a code from your authenticator app to confirm. You can re-enable 2FA at any time."
             : "Enter your password to confirm. You can re-enable 2FA at any time."
         }
@@ -322,15 +323,11 @@ export default function TwoFactorAuth() {
             value={disablePassword}
             onChangeText={setDisablePassword}
             placeholder={
-              (activeClient()?.isPluginApi() ?? false)
-                ? "000000"
-                : "Your password"
+              (client?.isPluginApi() ?? false) ? "000000" : "Your password"
             }
-            secureTextEntry={!(activeClient()?.isPluginApi() ?? false)}
+            secureTextEntry={!(client?.isPluginApi() ?? false)}
             keyboardType={
-              (activeClient()?.isPluginApi() ?? false)
-                ? "number-pad"
-                : "default"
+              (client?.isPluginApi() ?? false) ? "number-pad" : "default"
             }
             autoCapitalize="none"
             autoFocus

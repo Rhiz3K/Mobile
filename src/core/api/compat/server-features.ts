@@ -2,6 +2,10 @@ import {
   parseMobileContribution,
   type MobileContribution,
 } from "@/core/plugins/mobile";
+import {
+  parseHostSettings,
+  type PluginHostSettings,
+} from "@/core/plugins/host-settings";
 
 /** What a plugin web view needs from the server's plugin list. */
 export interface PluginFrameInfo {
@@ -34,6 +38,8 @@ export interface ServerPlugin {
   mobile?: MobileContribution;
   /** Set when the plugin has a web frontend. */
   frame?: PluginFrameInfo;
+  /** The manifest's host settings, which the host editor can draw. */
+  hostSettings?: PluginHostSettings;
 }
 
 function parseFrame(p: any): PluginFrameInfo | undefined {
@@ -97,6 +103,10 @@ export function parseServerPlugins(list: unknown): ServerPlugin[] | null {
       if (mobile) out.mobile = mobile;
       const frame = parseFrame(p);
       if (frame) out.frame = frame;
+      const hostSettings = parseHostSettings(
+        p.contributes?.settings?.host ?? p.hostSettings,
+      );
+      if (hostSettings) out.hostSettings = hostSettings;
       return out;
     });
 }
