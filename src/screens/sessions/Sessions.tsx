@@ -79,6 +79,8 @@ const HIDDEN_INPUT = XTERM_FALLBACK;
 
 // The key row keeps its own sticky modifiers now; typed text gets none.
 const NO_MODIFIERS = { ctrl: false, alt: false, shift: false };
+// Stands in until a new tab's ref exists
+const NO_TERMINAL: React.RefObject<TerminalHandle | null> = { current: null };
 
 export default function Sessions() {
   const ui = useUiColors();
@@ -749,10 +751,11 @@ export default function Sessions() {
         onMenu={() => setMenuFor(session.id)}
         onShortcut={handleShortcut}
         onBackgroundColorChange={(color) => {
-          setTerminalBackgroundColors((prev) => ({
-            ...prev,
-            [session.id]: color,
-          }));
+          setTerminalBackgroundColors((prev) =>
+            prev[session.id] === color
+              ? prev
+              : { ...prev, [session.id]: color },
+          );
         }}
       />
     );
@@ -975,9 +978,8 @@ export default function Sessions() {
               >
                 <KeyRowBar
                   terminalRef={
-                    activeSessionId
-                      ? tabRefs.current[activeSessionId]
-                      : React.createRef<TerminalHandle>()
+                    (activeSessionId && tabRefs.current[activeSessionId]) ||
+                    NO_TERMINAL
                   }
                   host={activeSession?.host}
                   isVisible={true}
@@ -1063,9 +1065,8 @@ export default function Sessions() {
               <SessionAccountProvider accountId={activeSession.accountId}>
                 <BottomToolbar
                   terminalRef={
-                    activeSessionId
-                      ? tabRefs.current[activeSessionId]
-                      : React.createRef<TerminalHandle>()
+                    (activeSessionId && tabRefs.current[activeSessionId]) ||
+                    NO_TERMINAL
                   }
                   isVisible={isCustomKeyboardVisible}
                   keyboardHeight={customKeyboardHeight}

@@ -186,16 +186,22 @@ export function ConnectionsPanel({ onClose }: { onClose?: () => void }) {
   refreshRef.current = refreshBackgroundTabs;
 
   const refresh = useCallback(async () => {
+    const client = accounts.activeClient();
+    if (!client) {
+      await refreshRef.current();
+      return;
+    }
     const [live] = await Promise.all([
-      api().openTabs.getActiveSessions(),
+      client.api.openTabs.getActiveSessions(),
       refreshRef.current(),
     ]);
     setActiveSessions(live);
   }, []);
 
   useEffect(() => {
-    api()
-      .hosts.getSSHHosts()
+    accounts
+      .activeClient()
+      ?.api.hosts.getSSHHosts()
       .then((res: any) => {
         const list = Array.isArray(res) ? res : (res?.hosts ?? []);
         setHosts(list);
