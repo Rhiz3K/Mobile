@@ -102,7 +102,7 @@ export interface SavedHostKey {
 export interface HostConnectProfile {
   host: SSHHost;
   /** The login the host points to, with its secrets and certificate. */
-  credential: (Credential & { certPublicKey?: string }) | null;
+  credential: Credential | null;
   /** Core's ssh_options JSON (keepalive, legacy algorithms, env vars). */
   sshOptions: Record<string, unknown>;
   socks5: {

@@ -29,6 +29,7 @@
     "@expo/metro-runtime": "~57.0.17",
     "@expo/vector-icons": "^15.0.2",
     "@noble/ciphers": "^2.4.0",
+    "@noble/curves": "^2.4.0",
     "@noble/hashes": "^2.4.0",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "axios": "^1.12.2",

@@ -185,37 +185,63 @@ export interface HostActionDef {
   run: (host: SSHHost, ctx: HostActionContext) => void | Promise<void>;
 }
 
-/** A host switch in the host editor (Protocols or Features section). */
+/**
+ * A host switch in the host editor (Protocols or Features list). Its key is
+ * a boolean field on the host, like enableDocker.
+ */
 export interface HostToggleDef {
   key: string;
   label: string;
   description?: string;
   group: "protocol" | "feature";
   order: number;
-  /** An editor tab shown while the switch is on. */
-  formTab?: {
-    id: string;
-    label: string;
-    order: number;
-    /** Draws the tab itself. Tabs without one are drawn by the host form. */
-    editor?: HostFormEditor;
-  };
+  /** What a new host starts with. Off when unset. */
+  defaultOn?: boolean;
 }
 
-/** The values a feature's host editor tab works on. */
+/** The values a host editor section works on. */
 export type HostFormValues = Record<string, unknown>;
+
+/** What a section can know about the rest of the editor. */
+export interface HostEditorContext {
+  isEdit: boolean;
+  /** The account's other hosts, for pickers. */
+  otherHosts: SSHHost[];
+  /** Current value of every host switch, by key. */
+  toggles: Record<string, boolean>;
+}
 
 export interface HostFormTabProps {
   host: SSHHost | null;
   value: HostFormValues;
   onChange: (patch: HostFormValues) => void;
+  context: HostEditorContext;
 }
 
 export interface HostFormEditor {
+  /** Gets the host with its secrets when editing. */
   read: (host: SSHHost | null) => HostFormValues;
-  /** Puts the tab's values on the payload the form saves. */
+  /** Puts the section's values on the payload the form saves. */
   write: (value: HostFormValues, payload: SSHHostData) => void;
   component: ComponentType<HostFormTabProps>;
+  /** A message when the values can't be saved, checked on Save. */
+  validate?: (value: HostFormValues) => string | null;
+}
+
+/**
+ * A section of the host editor a feature draws. "host" sections sit with the
+ * name and address, "ssh" ones under SSH (shown while SSH is on), "protocol"
+ * ones after SSH and "feature" ones at the end.
+ */
+export interface HostEditorSectionDef {
+  id: string;
+  label: string;
+  icon?: FeatureIcon;
+  group: "host" | "ssh" | "protocol" | "feature";
+  order: number;
+  /** Shown only while this host switch is on. */
+  toggle?: string;
+  editor: HostFormEditor;
 }
 
 /** A short tag on host rows, like DKR. */
@@ -413,6 +439,9 @@ export interface FeatureDef {
   sessionTabs?: SessionTabDef[];
   hostActions?: HostActionDef[];
   hostToggles?: HostToggleDef[];
+  /** A list, or a function for sections that depend on the account. */
+  hostEditorSections?:
+    HostEditorSectionDef[] | ((ctx: FeatureContext) => HostEditorSectionDef[]);
   hostBadges?: HostBadgeDef[];
   hostFilters?: HostFilterDef[];
   settingsLinks?: SettingsLinkDef[];
@@ -434,9 +463,7 @@ export interface FeatureDef {
  * not a plugin, so a different feature can fill one later.
  */
 export type Capability =
-  | "host.wake"
   | "host.quickConnect"
   | "hosts.discovery"
   | "credentials.keyTools"
-  | "files.defaultPath"
   | "widgets.snippets";

@@ -121,14 +121,14 @@ test("capabilities come from available features only", async () => {
   r.register(
     feature("wol", {
       requires: { plugin: "wake-on-lan" },
-      capabilities: ["host.wake"],
+      capabilities: ["host.quickConnect"],
     }),
   );
   const off = await serverCtx([]);
-  expect(r.hasCapability("host.wake", off)).toBe(false);
+  expect(r.hasCapability("host.quickConnect", off)).toBe(false);
   await resetStorage();
   const on = await serverCtx([{ id: "wake-on-lan" }]);
-  expect(r.hasCapability("host.wake", on)).toBe(true);
+  expect(r.hasCapability("host.quickConnect", on)).toBe(true);
 });
 
 test("session tabs name their feature and what they need from the transport", () => {

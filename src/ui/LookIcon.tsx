@@ -1,3 +1,4 @@
+import { createElement } from "react";
 import {
   Activity,
   Bookmark,
@@ -145,6 +146,5 @@ export function LookIcon({
   size?: number;
   fallback?: LucideIcon;
 }) {
-  const Icon = lookIcon(name) ?? fallback;
-  return <Icon size={size} color={color} />;
+  return createElement(lookIcon(name) ?? fallback, { size, color });
 }

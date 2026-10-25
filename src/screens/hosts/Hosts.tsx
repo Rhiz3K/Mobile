@@ -44,7 +44,7 @@ import {
 import { TailscaleDevices } from "@/features/tailscale/TailscaleDevices";
 import CredentialListModal from "@/screens/hosts/CredentialListModal";
 import { HostActionSheet } from "@/screens/hosts/HostActionSheet";
-import HostForm from "@/screens/hosts/HostForm";
+import HostEditor from "@/screens/hosts/editor/HostEditor";
 import { QuickConnect } from "@/screens/hosts/QuickConnect";
 import { SyncBanner } from "@/screens/hosts/SyncBanner";
 import { ServerReachBanner } from "@/screens/home/ServerReachBanner";
@@ -604,7 +604,7 @@ export default function Hosts() {
       titleNode={<AccountButton />}
       overlay={
         <>
-          <HostForm
+          <HostEditor
             visible={formOpen}
             host={formHost}
             draft={formDraft}

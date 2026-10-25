@@ -174,6 +174,14 @@ export class FeatureRegistry {
     return this.collect(ctx, (d) => d.hostToggles).sort(byOrder);
   }
 
+  hostEditorSections(ctx: FeatureContext) {
+    return this.collect(ctx, (d) =>
+      typeof d.hostEditorSections === "function"
+        ? d.hostEditorSections(ctx)
+        : d.hostEditorSections,
+    ).sort(byOrder);
+  }
+
   hostBadges(ctx: FeatureContext) {
     return this.collect(ctx, (d) => d.hostBadges).sort(byOrder);
   }

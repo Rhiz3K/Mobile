@@ -2,6 +2,8 @@ import { SshError } from "@/modules/termix-ssh";
 import {
   importMessage,
   importPrivateKey,
+  keyStatus,
+  keyStatusText,
   publicKeyOf,
 } from "@/utils/keyImport";
 
@@ -102,4 +104,35 @@ test("without the engine the text is kept and public keys come from the server",
   mockEngine.available = true;
   mockEngine.inspectKey.mockReturnValue({ publicOpenssh: "ssh-ed25519 C" });
   expect(publicKeyOf("KEY", "pp")).toBe("ssh-ed25519 C");
+});
+
+test("key status says what is wrong with a key or its passphrase", () => {
+  expect(keyStatus("  ")).toEqual({ kind: "empty" });
+  mockEngine.inspectKey.mockReturnValueOnce({
+    keyType: "ssh-ed25519",
+    bits: 256,
+    sha256: "SHA256:x",
+  });
+  const ok = keyStatus("KEY", "pp");
+  expect(ok).toEqual({
+    kind: "ok",
+    keyType: "ssh-ed25519",
+    bits: 256,
+    fingerprint: "SHA256:x",
+  });
+  expect(keyStatusText(ok)).toBe("ssh-ed25519 256 bit | SHA256:x");
+  mockEngine.inspectKey.mockImplementationOnce(() => {
+    throw new SshError("passphraseRequired", "locked");
+  });
+  expect(keyStatus("KEY").kind).toBe("needsPassphrase");
+  mockEngine.inspectKey.mockImplementationOnce(() => {
+    throw new SshError("badPassphrase", "bad");
+  });
+  expect(keyStatus("KEY", "x").kind).toBe("wrongPassphrase");
+  mockEngine.inspectKey.mockImplementationOnce(() => {
+    throw new SshError("invalidKey", "bad");
+  });
+  expect(keyStatusText(keyStatus("junk"))).toMatch(/private key/);
+  mockEngine.available = false;
+  expect(keyStatus("KEY").kind).toBe("unchecked");
 });

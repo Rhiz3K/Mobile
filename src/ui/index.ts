@@ -20,6 +20,7 @@ export { Toaster } from "./Toast";
 export { Badge } from "./Badge";
 export type { BadgeVariant } from "./Badge";
 export { ChoiceRow } from "./ChoiceRow";
+export { Field, FieldRow, digits } from "./Field";
 export {
   LookIcon,
   LOOK_ICONS,

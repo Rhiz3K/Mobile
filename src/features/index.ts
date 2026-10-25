@@ -5,6 +5,7 @@ import { fileManagerFeature } from "./file-manager/register";
 import { hostDefaultsFeature } from "./host-defaults/register";
 import { hostTransferFeature } from "./host-transfer/register";
 import { hostMetricsFeature } from "./host-metrics/register";
+import { pluginHostFieldsFeature } from "./plugin-host-fields/register";
 import {
   rdpFeature,
   remoteDesktopFeature,
@@ -52,4 +53,5 @@ export function registerBuiltInFeatures(
     registered = true;
   }
   for (const def of BUILT_IN_FEATURES) registry.register(def);
+  registry.register(pluginHostFieldsFeature(registry));
 }

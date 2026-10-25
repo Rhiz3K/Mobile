@@ -5,6 +5,7 @@ import { serverHostId } from "@/core/sync";
 import { originOf } from "@/core/transport";
 import { wakeFromDevice } from "@/core/wol";
 import type { SSHHost } from "@/types";
+import { wakeHostSection } from "./host-section";
 
 /** Where the packet starts: the phone on This device, else the host's origin. */
 export async function wakeRoute(
@@ -67,5 +68,5 @@ export const wakeOnLanFeature: FeatureDef = {
       },
     },
   ],
-  capabilities: ["host.wake"],
+  hostEditorSections: [wakeHostSection],
 };

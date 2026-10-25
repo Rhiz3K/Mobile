@@ -3,6 +3,7 @@ import { Network } from "lucide-react-native";
 import type { FeatureDef, SessionTabProps } from "@/core/features/types";
 import { isSshHost } from "@/utils/hosts";
 import { TunnelManager, type TunnelManagerHandle } from "./TunnelManager";
+import { hostTunnelsEditor } from "./HostTunnelsSection";
 
 const TunnelsTab = forwardRef<TunnelManagerHandle, SessionTabProps>(
   ({ session, isVisible, onClose }, ref) => (
@@ -77,7 +78,16 @@ export const tunnelsFeature: FeatureDef = {
       label: "Tunnels",
       group: "feature",
       order: 30,
-      formTab: { id: "tunnels", label: "Tunnels", order: 10 },
+    },
+  ],
+  hostEditorSections: [
+    {
+      id: "tunnels",
+      label: "Tunnels",
+      group: "ssh",
+      order: 20,
+      toggle: "enableTunnel",
+      editor: hostTunnelsEditor,
     },
   ],
   hostBadges: [

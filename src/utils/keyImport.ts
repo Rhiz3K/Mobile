@@ -61,3 +61,52 @@ export function importMessage(name: string, imported: ImportedKey): string {
   }
   return `Loaded ${name}`;
 }
+
+export type KeyStatus =
+  | { kind: "empty" }
+  /** No engine here (web, Expo Go), so the key can't be checked. */
+  | { kind: "unchecked" }
+  | { kind: "ok"; keyType: string; bits: number; fingerprint: string }
+  | { kind: "needsPassphrase" }
+  | { kind: "wrongPassphrase" }
+  | { kind: "invalid" };
+
+/** What the phone can tell about a key and its passphrase. */
+export function keyStatus(text: string, passphrase?: string): KeyStatus {
+  const key = text.trim();
+  if (!key) return { kind: "empty" };
+  if (!isSshEngineAvailable) return { kind: "unchecked" };
+  try {
+    const info = inspectKey(key, passphrase || undefined);
+    return {
+      kind: "ok",
+      keyType: info.keyType,
+      bits: info.bits,
+      fingerprint: info.sha256,
+    };
+  } catch (err) {
+    if (err instanceof SshError && err.kind === "passphraseRequired") {
+      return { kind: "needsPassphrase" };
+    }
+    if (err instanceof SshError && err.kind === "badPassphrase") {
+      return { kind: "wrongPassphrase" };
+    }
+    return { kind: "invalid" };
+  }
+}
+
+/** One plain line for a key status, or null when there is nothing to say. */
+export function keyStatusText(status: KeyStatus): string | null {
+  switch (status.kind) {
+    case "ok":
+      return `${status.keyType}${status.bits ? ` ${status.bits} bit` : ""} | ${status.fingerprint}`;
+    case "needsPassphrase":
+      return "This key is locked. Enter its passphrase.";
+    case "wrongPassphrase":
+      return "That passphrase doesn't open this key.";
+    case "invalid":
+      return "This doesn't look like a private key.";
+    default:
+      return null;
+  }
+}
