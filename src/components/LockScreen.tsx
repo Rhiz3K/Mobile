@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { AppState, Keyboard, View, Pressable } from "react-native";
-import { Lock, Fingerprint, Delete, ChevronLeft } from "lucide-react-native";
+import { Lock, ChevronLeft } from "lucide-react-native";
 import { useAppLock } from "@/contexts/AppLockContext";
-import { Text } from "@/ui";
+import { PinPad, PIN_LENGTH, Text } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
 
 interface LockScreenProps {
@@ -71,7 +71,7 @@ export function LockScreen({
   }, [overlay, resumes, hasBiometrics]);
 
   useEffect(() => {
-    if (pin.length !== 4) return;
+    if (pin.length !== PIN_LENGTH) return;
     verifyPin(pin).then((ok) => {
       if (ok) {
         onSuccess?.();
@@ -85,10 +85,7 @@ export function LockScreen({
     });
   }, [pin, verifyPin, onSuccess]);
 
-  const waiting = overlay && pinWaitMs > 0;
-  const press = (d: string) => {
-    if (!waiting && pin.length < 4) setPin((p) => p + d);
-  };
+  const waiting = pinWaitMs > 0;
 
   const handleBiometric = async () => {
     if (!hasBiometrics) return;
@@ -121,66 +118,13 @@ export function LockScreen({
           : subtitle}
       </Text>
 
-      {/* PIN dots */}
-      <View className="mb-8 flex-row gap-3">
-        {[0, 1, 2, 3].map((i) => (
-          <View
-            key={i}
-            className={`h-3.5 w-3.5 rounded-full border ${
-              error
-                ? "border-destructive bg-destructive"
-                : i < pin.length
-                  ? "border-accent-brand bg-accent-brand"
-                  : "border-border"
-            }`}
-          />
-        ))}
-      </View>
-
-      {/* Keypad */}
-      <View className="gap-3">
-        {[
-          ["1", "2", "3"],
-          ["4", "5", "6"],
-          ["7", "8", "9"],
-        ].map((row, ri) => (
-          <View key={ri} className="flex-row gap-3">
-            {row.map((d) => (
-              <Key key={d} label={d} onPress={() => press(d)} />
-            ))}
-          </View>
-        ))}
-        <View className="flex-row gap-3">
-          <Pressable
-            onPress={handleBiometric}
-            className="h-16 w-16 items-center justify-center"
-          >
-            {hasBiometrics ? (
-              <Fingerprint size={24} color={color("muted-foreground")} />
-            ) : null}
-          </Pressable>
-          <Key label="0" onPress={() => press("0")} />
-          <Pressable
-            onPress={() => setPin((p) => p.slice(0, -1))}
-            className="h-16 w-16 items-center justify-center border border-border active:bg-muted/40"
-          >
-            <Delete size={20} color={color("foreground")} />
-          </Pressable>
-        </View>
-      </View>
+      <PinPad
+        value={pin}
+        onChange={setPin}
+        error={error}
+        disabled={waiting}
+        onBiometric={hasBiometrics ? handleBiometric : undefined}
+      />
     </View>
-  );
-}
-
-function Key({ label, onPress }: { label: string; onPress: () => void }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      className="h-16 w-16 items-center justify-center border border-border bg-card active:bg-muted/40"
-    >
-      <Text weight="medium" className="text-xl text-foreground">
-        {label}
-      </Text>
-    </Pressable>
   );
 }

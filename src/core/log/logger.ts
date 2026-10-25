@@ -1,3 +1,5 @@
+import { pushLog } from "./buffer";
+
 export type LogLevel = "debug" | "info" | "warn" | "error" | "success";
 
 export interface LogContext {
@@ -52,6 +54,18 @@ export function describeError(error: unknown): unknown {
     };
   }
   return error;
+}
+
+/** One line of text for an error, for the log buffer. */
+function errorText(error: unknown): string {
+  const e = describeError(error);
+  if (e instanceof Error) return `${e.name}: ${e.message}`;
+  if (typeof e === "string") return e;
+  try {
+    return JSON.stringify(e) ?? String(e);
+  } catch {
+    return String(e);
+  }
 }
 
 class FrontendLogger {
@@ -135,6 +149,11 @@ class FrontendLogger {
       level,
       message,
       redact(context),
+    );
+
+    pushLog(
+      level,
+      error ? `${formattedMessage} ${errorText(error)}` : formattedMessage,
     );
 
     switch (level) {

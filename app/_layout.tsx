@@ -36,6 +36,7 @@ import { FONT_MAP, MONO_FONT, MONO_FONT_BOLD } from "@/constants/fonts";
 import "../global.css";
 import UpdateRequired from "@/screens/authentication/UpdateRequired";
 import { WidgetDeepLinkHost } from "@/widgets";
+import { loadUiPrefs } from "@/core/ui-prefs";
 import { registerBuiltInFeatures } from "@/features";
 import { usePluginFrameFeatures } from "@/features/plugin-webview/register";
 import { AccountSwitcher } from "@/screens/accounts/AccountSwitcher";
@@ -140,6 +141,9 @@ function ThemedStatusBar() {
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts(FONT_MAP);
+  useEffect(() => {
+    loadUiPrefs().catch(() => {});
+  }, []);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

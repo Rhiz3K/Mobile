@@ -14,6 +14,9 @@ export const hostDefaultsFeature: FeatureDef = {
       icon: SlidersHorizontal,
       order: 42,
       href: "/tabs/settings/HostDefaults",
+      section: "accounts",
+      description: "Port, user and options for new hosts",
+      keywords: ["new host", "port", "default"],
     },
   ],
 };

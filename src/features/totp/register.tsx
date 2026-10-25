@@ -14,6 +14,9 @@ export const totpFeature: FeatureDef = {
       icon: ShieldCheck,
       order: 10,
       href: "/tabs/settings/TwoFactorAuth",
+      section: "security",
+      description: "Codes from an authenticator app for your server account",
+      keywords: ["2fa", "totp", "authenticator", "code"],
     },
   ],
 };

@@ -30,3 +30,5 @@ export {
   isLookColor,
   lookIcon,
 } from "./LookIcon";
+export { PinPad, PIN_LENGTH } from "./PinPad";
+export { SettingsLinkRow } from "./SettingsLinkRow";

@@ -1,5 +1,6 @@
 import {
   addRecent,
+  clearRecent,
   clearRecentCache,
   listRecent,
   recordRecent,
@@ -39,4 +40,14 @@ test("recordRecent keeps each account apart and survives a reload", async () => 
   clearRecentCache();
   expect((await listRecent("local")).map((r) => r.hostId)).toEqual([1]);
   expect((await listRecent("s1")).map((r) => r.hostId)).toEqual([2]);
+});
+
+test("clearRecent forgets the list for that account only", async () => {
+  await recordRecent("a", host(1));
+  await recordRecent("b", host(2));
+  await clearRecent("a");
+  expect(await listRecent("a")).toEqual([]);
+  clearRecentCache();
+  expect(await listRecent("a")).toEqual([]);
+  expect((await listRecent("b")).map((r) => r.hostId)).toEqual([2]);
 });

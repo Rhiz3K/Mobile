@@ -139,6 +139,9 @@ export const fileManagerFeature: FeatureDef = {
       icon: Folder,
       order: 45,
       href: "/tabs/settings/FileSettings",
+      section: "terminal",
+      description: "File manager and transfers",
+      keywords: ["sftp", "files", "transfer", "download"],
     },
   ],
 };

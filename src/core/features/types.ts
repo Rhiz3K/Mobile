@@ -262,6 +262,19 @@ export interface HostFilterDef {
 
 // Settings and quick actions
 
+/** The groups Settings is built from. */
+export type SettingsSectionId =
+  | "accounts"
+  | "appearance"
+  | "terminal"
+  | "keyboard"
+  | "security"
+  | "notifications"
+  | "privacy"
+  | "plugins"
+  | "backup"
+  | "about";
+
 export interface SettingsLinkDef {
   id: string;
   label: string;
@@ -269,6 +282,12 @@ export interface SettingsLinkDef {
   order: number;
   /** Route to open. */
   href: string;
+  /** Where it sits in Settings. Accounts when left out. */
+  section?: SettingsSectionId;
+  /** One line under the label. */
+  description?: string;
+  /** Extra words the Settings search matches. */
+  keywords?: string[];
 }
 
 /**

@@ -137,6 +137,14 @@
 - Plugin screens about a host open from the host's menu as a tab; the others are listed on Home and Tools under From your server and in Settings, Plugins
 - Plugin screens follow the app's theme, work behind proxies and client certificates, and only reach their own plugin on your server
 - An open tab of a plugin an admin turned off says so, and comes back when the plugin is on again
+- Settings is rebuilt in sections: accounts and sync, appearance, terminal, keyboard, security, notifications, privacy, plugins, backup and about
+- Search settings from the top of Settings or the search button
+- Choose text size and row density
+- App Lock can lock right away or after 15 seconds, 1 minute or 5 minutes, and you can change the PIN
+- Hide Termix in the app switcher
+- App Lock waits 30 seconds after 5 wrong PINs
+- Copy or share the latest app logs from Settings, About and logs
+- Clear your recent hosts
 
 ### Changed
 
@@ -174,6 +182,9 @@
 
 ### Fixed
 
+- The keyboard no longer stays open over the App Lock PIN pad when you come back to the app (#100)
+- Face ID asks for you when you return to a locked app
+- Face ID prompts no longer lock the app again
 - A reverse proxy asking you to sign in again no longer signs you out of Termix
 - Terminal settings saved on a host in Termix 2.9 and newer are now used on the phone
 - A host with tmux turned on in Termix no longer hangs when the host has more than one tmux session

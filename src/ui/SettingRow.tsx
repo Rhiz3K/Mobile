@@ -1,4 +1,5 @@
 import { View } from "react-native";
+import { useUiPrefs } from "@/core/ui-prefs";
 import { Text } from "./Text";
 
 /**
@@ -18,9 +19,10 @@ export function SettingRow({
   children: React.ReactNode;
   last?: boolean;
 }) {
+  const compact = useUiPrefs().density === "compact";
   return (
     <View
-      className={`min-h-11 flex-row items-center justify-between gap-3 py-2.5 ${last ? "" : "border-b border-border/40"}`}
+      className={`${compact ? "min-h-9 py-1.5" : "min-h-11 py-2.5"} flex-row items-center justify-between gap-3 ${last ? "" : "border-b border-border/40"}`}
     >
       <View className="min-w-0 flex-1">
         <View className="flex-row items-center gap-1.5">

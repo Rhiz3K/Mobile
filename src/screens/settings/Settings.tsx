@@ -1,915 +1,113 @@
-import { useEffect, useState } from "react";
-import { ScrollView, View, Pressable } from "react-native";
-import { useRouter } from "expo-router";
+import { useMemo, useState } from "react";
+import { ScrollView, View } from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import Constants from "expo-constants";
-import {
-  User,
-  Palette,
-  Shield,
-  SlidersHorizontal,
-  ChevronRight,
-  LogOut,
-  Lock,
-  Server as ServerIcon,
-  Users,
-  Monitor,
-  Key,
-  LayoutGrid,
-  Trash2,
-  RefreshCw,
-  Blocks,
-} from "lucide-react-native";
-import { useAppContext } from "@/contexts/AppContext";
-import { useTerminalSessions } from "@/contexts/TerminalSessionsContext";
-import { useTheme, useThemeColor } from "@/contexts/ThemeContext";
-import { useAppLock } from "@/contexts/AppLockContext";
-import { useCapability, useSettingsLinks } from "@/core/features";
+import { Search } from "lucide-react-native";
+import { useThemeColor } from "@/contexts/ThemeContext";
 import { Screen } from "@/components/Screen";
-import { LockScreen } from "@/components/LockScreen";
+import { Input, SettingsLinkRow, Text } from "@/ui";
 import {
-  Text,
-  Button,
-  Input,
-  Label,
-  AccordionSection,
-  SettingRow,
-  FakeSwitch,
-  Sheet,
-  SheetBody,
-} from "@/ui";
-import {
-  ACCENT_PRESET_COLORS,
-  THEMES,
-  THEME_LABELS,
-  THEME_SWATCHES,
-} from "@/constants/theme";
-import { toast } from "@/utils/toast";
-import {
-  DEFAULT_WIDGET_PREFERENCES,
-  isWidgetSupported,
-  loadWidgetPreferences,
-  publishSignedOutSnapshot,
-  republishWithPreferences,
-  resetWidgets,
-  saveWidgetPreferences,
-  type WidgetPreferences,
-} from "@/widgets";
-import { clearCachedUserId } from "@/utils/user";
-import { apiOf, useActiveClient } from "@/core/accounts";
-import { clearSession } from "@/core/api/webSession";
-import { BackgroundSessionsSection } from "./BackgroundSessionsSection";
+  searchSettings,
+  useSettingsGroups,
+  type SettingsItemDef,
+} from "./schema";
 
-export default function Settings() {
-  const client = useActiveClient();
+function ItemRow({ item }: { item: SettingsItemDef }) {
   const router = useRouter();
-  const settingsLinks = useSettingsLinks();
-  const hasSnippetWidget = useCapability("widgets.snippets");
+  if (item.Control) return <item.Control />;
+  return (
+    <SettingsLinkRow
+      label={item.label}
+      description={item.description}
+      icon={item.icon}
+      destructive={item.destructive}
+      onPress={() => router.push(item.href as never)}
+      last
+    />
+  );
+}
+
+/** Settings, built from the schema in `./schema` and the feature registry. */
+export default function Settings() {
   const color = useThemeColor();
+  const params = useLocalSearchParams<{ q?: string }>();
+  const groups = useSettingsGroups();
+  const [query, setQuery] = useState(params.q ?? "");
   const appVersion = Constants.expoConfig?.version ?? "";
-  const {
-    isAuthenticated,
-    setAuthenticated,
-    openAuthFlow,
-    authFlowVisible,
-    openAccountSwitcher,
-  } = useAppContext();
-  const { clearAllSessions } = useTerminalSessions();
-  const { theme, setTheme, accent, setAccent } = useTheme();
-  const appLock = useAppLock();
 
-  const [accentDraft, setAccentDraft] = useState(accent);
-
-  // Keep draft in sync when accent changes from a swatch tap
-  useEffect(() => {
-    setAccentDraft(accent);
-  }, [accent]);
-
-  const [username, setUsername] = useState("-");
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [totpEnabled, setTotpEnabled] = useState(false);
-  const [version, setVersion] = useState("");
-  const [serverUrl, setServerUrl] = useState<string>(
-    () => client?.serverUrl ?? "",
-  );
-  const [open, setOpen] = useState<string | null>("appearance");
-
-  // Home-screen widget preferences (no-ops on builds without widget support).
-  const [widgetPrefs, setWidgetPrefs] = useState<WidgetPreferences>(
-    DEFAULT_WIDGET_PREFERENCES,
-  );
-
-  useEffect(() => {
-    if (!isWidgetSupported) return;
-    loadWidgetPreferences()
-      .then(setWidgetPrefs)
-      .catch(() => {});
-  }, []);
-
-  const updateWidgetPref = async (patch: Partial<WidgetPreferences>) => {
-    const next = await saveWidgetPreferences(patch);
-    setWidgetPrefs(next);
-    // Reflect the change on the home screen right away.
-    if (next.enabled) {
-      await republishWithPreferences();
-    } else {
-      await publishSignedOutSnapshot();
-    }
-  };
-
-  // App-lock PIN setup dialog (two-step: enter then confirm)
-  const [passwordDialog, setPasswordDialog] = useState(false);
-  const [oldPassword, setOldPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [deleteDialog, setDeleteDialog] = useState(false);
-  const [deletePassword, setDeletePassword] = useState("");
-  const [accountBusy, setAccountBusy] = useState(false);
-  const [pinDialog, setPinDialog] = useState(false);
-  const [pinStep, setPinStep] = useState<"enter" | "confirm">("enter");
-  const [pin, setPin] = useState(""); // first entry
-  const [confirm, setConfirm] = useState(""); // second entry
-  // Re-auth gate shown before disabling app lock.
-  const [reauth, setReauth] = useState<null | "disable">(null);
-
-  // Re-read on auth changes and whenever the auth flow closes - the user may
-  // have just changed the active server inside it (which leaves isAuthenticated
-  // unchanged, so we can't rely on that alone).
-  useEffect(() => {
-    if (authFlowVisible) return;
-    setServerUrl(client?.serverUrl ?? "");
-    if (!isAuthenticated) {
-      setUsername("-");
-      setIsAdmin(false);
-      setTotpEnabled(false);
-      return;
-    }
-    apiOf(client)
-      .auth.getUserInfo()
-      .then((u) => {
-        setUsername(u.username ?? "-");
-        setIsAdmin(!!u.is_admin);
-        setTotpEnabled(!!u.totp_enabled);
-      })
-      .catch(() => {});
-    apiOf(client)
-      .server.getVersionInfo()
-      .then((v) => setVersion(v?.localVersion ?? v?.version ?? ""))
-      .catch(() => {});
-  }, [isAuthenticated, authFlowVisible, client]);
-
-  const toggle = (id: string) => setOpen((o) => (o === id ? null : id));
-
-  const handleLogout = async () => {
-    try {
-      await apiOf(client).auth.logoutUser();
-    } catch {
-      // best-effort - server-side logout may fail if token already expired
-    }
-    await clearSession(client);
-    clearCachedUserId(client?.accountId);
-    // Host names and addresses must not survive on the home screen.
-    await resetWidgets();
-    setAuthenticated(false);
-    // The tabs fall back to their "no server connected" empty states; the user
-    // re-authenticates from there or from this Server section.
-  };
-
-  const handleChangeServer = async () => {
-    // Mirror sign-out: invalidate the server-side session too (not just the
-    // local JWT), otherwise the still-valid Termix cookie in the browser/WebView
-    // lets the next OIDC resume the old account.
-    try {
-      await apiOf(client).auth.logoutUser();
-    } catch {
-      // best-effort - session may already be gone
-    }
-    await clearSession(client);
-    clearCachedUserId(client?.accountId);
-    setAuthenticated(false);
-    // Same reason as sign-out: the old server's hosts must not linger on the
-    // home screen while the user points the app somewhere else.
-    await resetWidgets();
-    openAuthFlow("server");
-  };
-
-  const handleAppLockToggle = (v: boolean) => {
-    if (v) {
-      setPin("");
-      setConfirm("");
-      setPinStep("enter");
-      setPinDialog(true);
-    } else {
-      // Require re-authentication before disabling - the switch stays on
-      // (it's controlled by appLock.enabled) until the gate succeeds.
-      setReauth("disable");
-    }
-  };
-
-  const advancePin = async () => {
-    if (pinStep === "enter") {
-      if (pin.length !== 4) {
-        toast.error("PIN must be 4 digits");
-        return;
-      }
-      setPinStep("confirm");
-      return;
-    }
-    if (confirm !== pin) {
-      toast.error("PINs don't match");
-      setPin("");
-      setConfirm("");
-      setPinStep("enter");
-      return;
-    }
-    await appLock.enable(pin);
-    setPinDialog(false);
-    toast.success("App lock enabled");
-  };
-
-  const closePasswordDialog = () => {
-    setPasswordDialog(false);
-    setOldPassword("");
-    setNewPassword("");
-  };
-
-  const submitPasswordChange = async () => {
-    if (!oldPassword || !newPassword) return;
-    setAccountBusy(true);
-    try {
-      await apiOf(client).users.changePassword(oldPassword, newPassword);
-      toast.success("Password changed");
-      closePasswordDialog();
-    } catch (e: any) {
-      toast.error(e?.message || "Failed to change password");
-    } finally {
-      setAccountBusy(false);
-    }
-  };
-
-  const closeDeleteDialog = () => {
-    setDeleteDialog(false);
-    setDeletePassword("");
-  };
-
-  const submitDeleteAccount = async () => {
-    if (!deletePassword) return;
-    setAccountBusy(true);
-    try {
-      await apiOf(client).users.deleteAccount(deletePassword);
-      closeDeleteDialog();
-      await handleLogout();
-      toast.success("Account deleted");
-    } catch (e: any) {
-      toast.error(e?.message || "Failed to delete account");
-    } finally {
-      setAccountBusy(false);
-    }
-  };
-
-  const closePinDialog = () => {
-    setPinDialog(false);
-    setPin("");
-    setConfirm("");
-    setPinStep("enter");
-  };
+  const hits = useMemo(() => searchSettings(groups, query), [groups, query]);
+  const searching = query.trim().length > 0;
 
   return (
     <Screen title="Settings">
       <ScrollView
-        contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 40 }}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: 40 }}
       >
-        {/* Server */}
-        <AccordionSection
-          label="Server"
-          icon={<ServerIcon size={14} color={color("muted-foreground")} />}
-          open={open === "server"}
-          onToggle={() => toggle("server")}
-        >
-          <View className="gap-2.5 pt-3">
-            <View className="gap-1">
-              <Label>Active Server</Label>
-              <View className="flex-row items-center gap-2">
-                <View
-                  className={`h-2 w-2 rounded-full ${isAuthenticated ? "bg-accent-brand" : "bg-muted-foreground"}`}
-                />
-                <Text
-                  weight="medium"
-                  className="flex-1 text-sm text-foreground"
-                  numberOfLines={1}
-                >
-                  {serverUrl
-                    ? serverUrl.replace(/^https?:\/\//, "")
-                    : "Not configured"}
-                </Text>
-              </View>
-              <Text className="text-[11px] text-muted-foreground">
-                {isAuthenticated
-                  ? "Connected"
-                  : serverUrl
-                    ? "Configured but not signed in"
-                    : "No server added yet"}
-              </Text>
-            </View>
-
-            <Button
-              variant="muted"
-              className="mt-1"
-              onPress={openAccountSwitcher}
-              icon={<Users size={15} color={color("foreground")} />}
-            >
-              Switch account
-            </Button>
-
-            {serverUrl ? (
-              <Button
-                variant="muted"
-                onPress={() => router.push("/tabs/settings/Sync" as any)}
-                icon={<RefreshCw size={15} color={color("foreground")} />}
-              >
-                Sync and proxy
-              </Button>
-            ) : null}
-
-            <Button
-              variant="muted"
-              onPress={() => router.push("/tabs/settings/Plugins" as any)}
-              icon={<Blocks size={15} color={color("foreground")} />}
-            >
-              Plugins
-            </Button>
-
-            <Button
-              variant="muted"
-              onPress={handleChangeServer}
-              icon={<ServerIcon size={15} color={color("foreground")} />}
-            >
-              {serverUrl ? "Change server" : "Add server"}
-            </Button>
-
-            {isAuthenticated ? (
-              <Button
-                variant="destructive"
-                onPress={handleLogout}
-                icon={<LogOut size={15} color={color("destructive")} />}
-              >
-                Sign out
-              </Button>
-            ) : serverUrl ? (
-              <Button variant="default" onPress={() => openAuthFlow("login")}>
-                Sign in
-              </Button>
-            ) : null}
-          </View>
-        </AccordionSection>
-
-        {/* Account */}
-        {isAuthenticated ? (
-          <AccordionSection
-            label="Account"
-            icon={<User size={14} color={color("muted-foreground")} />}
-            open={open === "account"}
-            onToggle={() => toggle("account")}
-          >
-            <View className="gap-2.5 pt-3">
-              <View className="flex-row justify-between">
-                <Label>Username</Label>
-                <Text weight="medium" className="text-sm text-foreground">
-                  {username}
-                </Text>
-              </View>
-              <View className="flex-row justify-between">
-                <Label>Role</Label>
-                <View className="border border-accent-brand/40 bg-accent-brand/10 px-1.5 py-0.5">
-                  <Text className="text-[10px] uppercase tracking-wider text-accent-brand">
-                    {isAdmin ? "Administrator" : "User"}
-                  </Text>
-                </View>
-              </View>
-              <View className="flex-row justify-between">
-                <Label>2FA</Label>
-                <Text
-                  weight="medium"
-                  className={`text-sm ${totpEnabled ? "text-accent-brand" : "text-muted-foreground"}`}
-                >
-                  {totpEnabled ? "Enabled" : "Disabled"}
-                </Text>
-              </View>
-              {version ? (
-                <View className="flex-row justify-between">
-                  <Label>Version</Label>
-                  <Text weight="medium" className="text-sm text-accent-brand">
-                    v{version}
-                  </Text>
-                </View>
-              ) : null}
-
-              <View className="mt-1 gap-0">
-                {settingsLinks.map((link) => {
-                  const Icon = link.icon;
-                  return (
-                    <Pressable
-                      key={link.id}
-                      onPress={() => router.push(link.href as any)}
-                      className="flex-row items-center justify-between border-t border-border py-3"
-                    >
-                      <View className="flex-row items-center gap-2">
-                        <Icon size={15} color={color("muted-foreground")} />
-                        <Text
-                          weight="medium"
-                          className="text-sm text-foreground"
-                        >
-                          {link.label}
-                        </Text>
-                      </View>
-                      <ChevronRight
-                        size={15}
-                        color={color("muted-foreground")}
-                      />
-                    </Pressable>
-                  );
-                })}
-                {isAdmin ? (
-                  <Pressable
-                    onPress={() =>
-                      router.push("/tabs/settings/ActiveSessions" as any)
-                    }
-                    className="flex-row items-center justify-between border-t border-border py-3"
-                  >
-                    <View className="flex-row items-center gap-2">
-                      <Monitor size={15} color={color("muted-foreground")} />
-                      <Text weight="medium" className="text-sm text-foreground">
-                        Active Sessions
-                      </Text>
-                    </View>
-                    <ChevronRight size={15} color={color("muted-foreground")} />
-                  </Pressable>
-                ) : null}
-                {isAdmin ? (
-                  <Pressable
-                    onPress={() => router.push("/tabs/settings/ApiKeys" as any)}
-                    className="flex-row items-center justify-between border-t border-border py-3"
-                  >
-                    <View className="flex-row items-center gap-2">
-                      <Key size={15} color={color("muted-foreground")} />
-                      <Text weight="medium" className="text-sm text-foreground">
-                        API Keys
-                      </Text>
-                    </View>
-                    <ChevronRight size={15} color={color("muted-foreground")} />
-                  </Pressable>
-                ) : null}
-                <Pressable
-                  onPress={() => setPasswordDialog(true)}
-                  className="flex-row items-center justify-between border-t border-border py-3"
-                >
-                  <View className="flex-row items-center gap-2">
-                    <Lock size={15} color={color("muted-foreground")} />
-                    <Text weight="medium" className="text-sm text-foreground">
-                      Change Password
-                    </Text>
-                  </View>
-                  <ChevronRight size={15} color={color("muted-foreground")} />
-                </Pressable>
-                <Pressable
-                  onPress={() => setDeleteDialog(true)}
-                  className="flex-row items-center justify-between border-t border-border py-3"
-                >
-                  <View className="flex-row items-center gap-2">
-                    <Trash2 size={15} color={color("destructive")} />
-                    <Text weight="medium" className="text-sm text-destructive">
-                      Delete Account
-                    </Text>
-                  </View>
-                  <ChevronRight size={15} color={color("muted-foreground")} />
-                </Pressable>
-              </View>
-            </View>
-          </AccordionSection>
-        ) : null}
-
-        {/* Appearance - headline feature */}
-        <AccordionSection
-          label="Appearance"
-          icon={<Palette size={14} color={color("muted-foreground")} />}
-          open={open === "appearance"}
-          onToggle={() => toggle("appearance")}
-        >
-          <View className="gap-4 pt-3">
-            {/* Theme */}
-            <View className="gap-2">
-              <Label>Theme</Label>
-              <View className="flex-row flex-wrap gap-1.5">
-                {THEMES.map((id) => {
-                  const active = theme === id;
-                  const swatches =
-                    id === "system"
-                      ? [THEME_SWATCHES.light, THEME_SWATCHES.dark]
-                      : [THEME_SWATCHES[id]];
-                  return (
-                    <Pressable
-                      key={id}
-                      onPress={() => setTheme(id)}
-                      className={`flex-row items-center gap-1.5 border px-2 py-1.5 ${active ? "border-accent-brand/50 bg-accent-brand/10" : "border-border"}`}
-                    >
-                      <View className="h-3.5 w-3.5 flex-row overflow-hidden border border-border">
-                        {swatches.map((sw, i) => (
-                          <View
-                            key={i}
-                            style={{ backgroundColor: sw.background }}
-                            className="flex-1 justify-end"
-                          >
-                            <View
-                              style={{ backgroundColor: sw.panel }}
-                              className="h-1"
-                            />
-                          </View>
-                        ))}
-                      </View>
-                      <Text
-                        className={`text-[11px] ${active ? "text-accent-brand" : "text-muted-foreground"}`}
-                      >
-                        {THEME_LABELS[id]}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-
-            {/* Accent color */}
-            <View className="gap-2">
-              <Label>Accent Color</Label>
-              <View className="flex-row flex-wrap gap-2">
-                {ACCENT_PRESET_COLORS.map((ac) => {
-                  const active =
-                    accent.toLowerCase() === ac.value.toLowerCase();
-                  return (
-                    <Pressable
-                      key={ac.value}
-                      onPress={() => setAccent(ac.value)}
-                      style={{ backgroundColor: ac.value }}
-                      className={`h-8 w-8 border-2 ${active ? "border-foreground" : "border-transparent"}`}
-                    />
-                  );
-                })}
-              </View>
-              <View className="mt-1 h-9 flex-row items-center gap-2 border border-border bg-card px-2.5">
-                <View
-                  style={{ backgroundColor: accent }}
-                  className="h-4 w-4 border border-border/60"
-                />
-                <Input
-                  containerClassName="flex-1 h-9 border-0 bg-transparent px-0"
-                  value={accentDraft}
-                  onChangeText={(v) => {
-                    setAccentDraft(v);
-                    if (/^#[0-9a-fA-F]{6}$/.test(v.trim())) setAccent(v.trim());
-                  }}
-                  onBlur={() => {
-                    if (!/^#[0-9a-fA-F]{6}$/.test(accentDraft.trim())) {
-                      setAccentDraft(accent);
-                    }
-                  }}
-                  autoCapitalize="none"
-                  placeholder="#f59145"
-                />
-                <Text className="text-[10px] text-muted-foreground">hex</Text>
-              </View>
-            </View>
-          </View>
-        </AccordionSection>
-
-        {/* Security */}
-        <AccordionSection
-          label="Security"
-          icon={<Shield size={14} color={color("muted-foreground")} />}
-          open={open === "security"}
-          onToggle={() => toggle("security")}
-        >
-          <View className="pt-1">
-            <SettingRow
-              label="App Lock"
-              description={
-                appLock.hasBiometrics
-                  ? "Require biometrics or PIN to open the app"
-                  : "Require a PIN to open the app"
-              }
-              last
-            >
-              <FakeSwitch
-                checked={appLock.enabled}
-                onChange={handleAppLockToggle}
-              />
-            </SettingRow>
-            <Pressable
-              onPress={() => router.push("/tabs/settings/LocalData" as any)}
-              className="flex-row items-center justify-between border-t border-border/40 py-3"
-            >
-              <View>
-                <Text weight="medium" className="text-sm text-foreground">
-                  Local data
-                </Text>
-                <Text className="mt-0.5 text-[11px] text-muted-foreground">
-                  Backup, restore and delete what is saved on this phone
-                </Text>
-              </View>
-              <ChevronRight size={16} color={color("muted-foreground")} />
-            </Pressable>
-          </View>
-        </AccordionSection>
-
-        <BackgroundSessionsSection
-          open={open === "background"}
-          onToggle={() => toggle("background")}
+        <Input
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search settings"
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="search"
+          leading={<Search size={15} color={color("muted-foreground")} />}
+          accessibilityLabel="Search settings"
         />
 
-        {/* Home-screen widgets */}
-        {isWidgetSupported ? (
-          <AccordionSection
-            label="Widgets"
-            icon={<LayoutGrid size={14} color={color("muted-foreground")} />}
-            open={open === "widgets"}
-            onToggle={() => toggle("widgets")}
-          >
-            <View className="pt-1">
-              <SettingRow
-                label="Home screen widgets"
-                description="Show your hosts and snippets on the home screen"
-                last={!widgetPrefs.enabled}
-              >
-                <FakeSwitch
-                  checked={widgetPrefs.enabled}
-                  onChange={(value) => updateWidgetPref({ enabled: value })}
-                />
-              </SettingRow>
-
-              {/* The rest only matters while publishing is on. */}
-              {widgetPrefs.enabled ? (
-                <>
-                  <SettingRow
-                    label="Show addresses"
-                    description="Show user@host under each server name"
-                  >
-                    <FakeSwitch
-                      checked={widgetPrefs.showAddresses}
-                      onChange={(value) =>
-                        updateWidgetPref({ showAddresses: value })
-                      }
-                    />
-                  </SettingRow>
-
-                  <SettingRow
-                    label="Include offline hosts"
-                    description="Off shows only servers that are online"
-                  >
-                    <FakeSwitch
-                      checked={widgetPrefs.includeOffline}
-                      onChange={(value) =>
-                        updateWidgetPref({ includeOffline: value })
-                      }
-                    />
-                  </SettingRow>
-
-                  <SettingRow
-                    label="Pinned hosts only"
-                    description="Show only the hosts you pinned"
-                    last={!hasSnippetWidget}
-                  >
-                    <FakeSwitch
-                      checked={widgetPrefs.pinnedOnly}
-                      onChange={(value) =>
-                        updateWidgetPref({ pinnedOnly: value })
-                      }
-                    />
-                  </SettingRow>
-
-                  {hasSnippetWidget ? (
-                    <SettingRow
-                      label="Snippets widget"
-                      description="Show saved commands on the home screen"
-                      last={!widgetPrefs.includeSnippets}
-                    >
-                      <FakeSwitch
-                        checked={widgetPrefs.includeSnippets}
-                        onChange={(value) =>
-                          updateWidgetPref({ includeSnippets: value })
-                        }
-                      />
-                    </SettingRow>
-                  ) : null}
-
-                  {widgetPrefs.includeSnippets && hasSnippetWidget ? (
-                    <SettingRow
-                      label="Show command preview"
-                      description="Show the first line of each command"
-                      last
-                    >
-                      <FakeSwitch
-                        checked={widgetPrefs.showSnippetPreview}
-                        onChange={(value) =>
-                          updateWidgetPref({ showSnippetPreview: value })
-                        }
-                      />
-                    </SettingRow>
-                  ) : null}
-                </>
-              ) : null}
+        {searching ? (
+          hits.length ? (
+            <View className="border border-border bg-card px-3">
+              {hits.map((hit, i) => (
+                <View
+                  key={hit.item.id}
+                  className={i > 0 ? "border-t border-border/40" : ""}
+                >
+                  <Text className="pt-2 text-2xs uppercase text-muted-foreground">
+                    {hit.sectionTitle}
+                  </Text>
+                  <ItemRow item={hit.item} />
+                </View>
+              ))}
             </View>
-          </AccordionSection>
-        ) : null}
-
-        {/* Customization */}
-        <AccordionSection
-          label="Customization"
-          icon={
-            <SlidersHorizontal size={14} color={color("muted-foreground")} />
-          }
-          open={open === "customization"}
-          onToggle={() => toggle("customization")}
-        >
-          <View className="pt-2">
-            <Pressable
-              onPress={() =>
-                router.push("/tabs/settings/TerminalCustomization" as any)
-              }
-              className="flex-row items-center justify-between border-b border-border py-3"
-            >
-              <View>
-                <Text weight="medium" className="text-sm text-foreground">
-                  Terminal
-                </Text>
-                <Text className="mt-0.5 text-[11px] text-muted-foreground">
-                  Font, theme, cursor, scrollback
-                </Text>
+          ) : (
+            <Text className="py-6 text-center text-xs text-muted-foreground">
+              No settings match.
+            </Text>
+          )
+        ) : (
+          groups.map(({ section, items }) => {
+            const Icon = section.icon;
+            return (
+              <View key={section.id} className="gap-2">
+                <View className="flex-row items-center gap-2">
+                  <Icon size={14} color={color("muted-foreground")} />
+                  <Text
+                    weight="bold"
+                    className="text-meta uppercase text-muted-foreground"
+                  >
+                    {section.title}
+                  </Text>
+                </View>
+                <View className="border border-border bg-card px-3">
+                  {items.map((item, i) => (
+                    <View
+                      key={item.id}
+                      className={i > 0 ? "border-t border-border/40" : ""}
+                    >
+                      <ItemRow item={item} />
+                    </View>
+                  ))}
+                </View>
               </View>
-              <ChevronRight size={16} color={color("muted-foreground")} />
-            </Pressable>
-            <Pressable
-              onPress={() =>
-                router.push("/tabs/settings/KeyboardCustomization" as any)
-              }
-              className="flex-row items-center justify-between py-3"
-            >
-              <View>
-                <Text weight="medium" className="text-sm text-foreground">
-                  Keyboard
-                </Text>
-                <Text className="mt-0.5 text-[11px] text-muted-foreground">
-                  Layout, keys, presets
-                </Text>
-              </View>
-              <ChevronRight size={16} color={color("muted-foreground")} />
-            </Pressable>
-          </View>
-        </AccordionSection>
+            );
+          })
+        )}
 
-        {/* Version footer */}
-        <Text className="mt-4 text-center text-[11px] text-muted-foreground">
+        <Text className="text-center text-meta text-muted-foreground">
           {appVersion ? `Termix Mobile v${appVersion}` : "Termix Mobile"}
         </Text>
       </ScrollView>
-
-      {/* Change password */}
-      <Sheet
-        scroll
-        visible={passwordDialog}
-        onClose={closePasswordDialog}
-        title="Change Password"
-        description="Enter your current password, then choose a new one."
-        icon={<Lock size={15} color={color("accent-brand")} />}
-        footer={
-          <>
-            <Button variant="ghost" size="sm" onPress={closePasswordDialog}>
-              Cancel
-            </Button>
-            <Button
-              variant="default"
-              size="sm"
-              disabled={accountBusy || !oldPassword || !newPassword}
-              onPress={submitPasswordChange}
-            >
-              Change
-            </Button>
-          </>
-        }
-      >
-        <SheetBody>
-          <View className="gap-2">
-            <Input
-              value={oldPassword}
-              onChangeText={setOldPassword}
-              secureTextEntry
-              placeholder="Current password"
-              autoCapitalize="none"
-            />
-            <Input
-              value={newPassword}
-              onChangeText={setNewPassword}
-              secureTextEntry
-              placeholder="New password"
-              autoCapitalize="none"
-            />
-          </View>
-        </SheetBody>
-      </Sheet>
-
-      {/* Delete account */}
-      <Sheet
-        scroll
-        visible={deleteDialog}
-        onClose={closeDeleteDialog}
-        title="Delete Account"
-        description="This permanently deletes your account and all of its data. This cannot be undone."
-        icon={<Trash2 size={15} color={color("destructive")} />}
-        footer={
-          <>
-            <Button variant="ghost" size="sm" onPress={closeDeleteDialog}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              disabled={accountBusy || !deletePassword}
-              onPress={submitDeleteAccount}
-            >
-              Delete
-            </Button>
-          </>
-        }
-      >
-        <SheetBody>
-          <Input
-            value={deletePassword}
-            onChangeText={setDeletePassword}
-            secureTextEntry
-            placeholder="Confirm your password"
-            autoCapitalize="none"
-          />
-        </SheetBody>
-      </Sheet>
-
-      {/* App-lock PIN setup dialog (two-step) */}
-      <Sheet
-        scroll
-        visible={pinDialog}
-        onClose={closePinDialog}
-        title={pinStep === "enter" ? "Set App Lock PIN" : "Confirm PIN"}
-        description={
-          pinStep === "enter"
-            ? "Choose a 4-digit PIN. Biometrics can be used to unlock when available."
-            : "Re-enter your PIN to confirm."
-        }
-        icon={<Lock size={15} color={color("accent-brand")} />}
-        footer={
-          <>
-            <Button variant="ghost" size="sm" onPress={closePinDialog}>
-              Cancel
-            </Button>
-            <Button variant="default" size="sm" onPress={advancePin}>
-              {pinStep === "enter" ? "Next" : "Enable"}
-            </Button>
-          </>
-        }
-      >
-        <SheetBody>
-          {pinStep === "enter" ? (
-            <Input
-              key="pin-enter"
-              value={pin}
-              onChangeText={(v) => setPin(v.replace(/\D/g, "").slice(0, 4))}
-              keyboardType="number-pad"
-              secureTextEntry
-              placeholder="••••"
-              autoFocus
-            />
-          ) : (
-            <Input
-              key="pin-confirm"
-              value={confirm}
-              onChangeText={(v) => setConfirm(v.replace(/\D/g, "").slice(0, 4))}
-              keyboardType="number-pad"
-              secureTextEntry
-              placeholder="••••"
-              autoFocus
-            />
-          )}
-        </SheetBody>
-      </Sheet>
-
-      {/* Re-auth gate before disabling app lock */}
-      {reauth === "disable" ? (
-        <LockScreen
-          title="Confirm it's you"
-          subtitle="Enter your PIN to disable App Lock"
-          onVerifyPin={appLock.verifyPin}
-          onBiometric={appLock.authenticateBiometrics}
-          onCancel={() => setReauth(null)}
-          onSuccess={async () => {
-            await appLock.disable();
-            setReauth(null);
-            toast.success("App lock disabled");
-          }}
-        />
-      ) : null}
     </Screen>
   );
 }
