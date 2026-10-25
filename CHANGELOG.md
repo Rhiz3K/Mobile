@@ -49,6 +49,7 @@
 - The first time you link a server, merge This device's hosts into it or start with only the server's data. The choice says how many hosts, logins and snippets the phone has
 - Unlink a server and keep a copy of your own hosts, logins and snippets on This device, or delete them from the phone
 - Pick what syncs for each server, and see changes the server kept over yours with a button to keep yours
+- Open a host in the app from a link, like `termix-mobile://open?server=https://termix.example&view=terminal&hostId=12` or `termix-mobile://open?url=` with a Termix web link, for notifications from ntfy or Home Assistant (#87)
 - Keep a server's password behind Face ID, Touch ID or a fingerprint, and sign in again with one look when the server signs you out. Turn it off per server under Sync (#91)
 - Password managers like Bitwarden, 1Password and Apple Passwords can fill the server address, username, password and one time code (#91)
 - Sign in with a passkey or security key (Face ID, fingerprint, NFC or USB keys) through the browser when your server has passkeys on, and say when the sign in was canceled or turned down (needs Termix 26.10.6 or newer) (#83)

@@ -42,6 +42,7 @@ import { registerBuiltInFeatures } from "@/features";
 import { usePluginFrameFeatures } from "@/features/plugin-webview/register";
 import { AccountSwitcher } from "@/screens/accounts/AccountSwitcher";
 import { ProxyGateHost } from "@/screens/accounts/ProxyGateHost";
+import { OpenLinkHost } from "@/screens/links/OpenLinkHost";
 import { ShortcutSheet } from "@/screens/shortcuts/ShortcutSheet";
 import { useAppShortcuts } from "@/core/shortcuts/useAppShortcuts";
 import { CommandPalette } from "@/screens/palette/CommandPalette";
@@ -105,6 +106,7 @@ function RootLayoutContent() {
           sheet. Mounted here so it is active for the whole session, including
           cold starts from a widget. */}
       <WidgetDeepLinkHost />
+      <OpenLinkHost />
       <LabLaunch />
       <CommandPalette />
       <ShortcutSheet />

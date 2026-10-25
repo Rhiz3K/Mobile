@@ -2,7 +2,7 @@ const {
   restrictOidcCallbackIntentFilters,
 } = require("../../plugins/withOidcCallbackIntentFilter.js");
 
-test("app scheme intent filters only open oidc-callback and widget", () => {
+test("app scheme intent filters only open oidc-callback, widget and open", () => {
   const manifest = {
     manifest: {
       application: [
@@ -37,8 +37,10 @@ test("app scheme intent filters only open oidc-callback and widget", () => {
   ).toEqual([
     ["termix-mobile", "oidc-callback"],
     ["termix-mobile", "widget"],
+    ["termix-mobile", "open"],
     ["exp+termix", "oidc-callback"],
     ["exp+termix", "widget"],
+    ["exp+termix", "open"],
   ]);
   expect(filters[1].data[0].$["android:host"]).toBeUndefined();
 });
