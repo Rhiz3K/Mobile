@@ -1,6 +1,6 @@
 import { act, fireEvent, render } from "@testing-library/react-native";
-import { Linking } from "react-native";
-import { useFeatureContext } from "@/core/features/hooks";
+import { BackHandler, Linking, Platform } from "react-native";
+import { useFeatureContext } from "@/core/features";
 import type { FeatureContext } from "@/core/features/types";
 import type { AiAccess } from "@/features/ai/access";
 import { initialRun } from "@/features/ai/run";
@@ -10,7 +10,7 @@ import AiAssistant from "@/screens/settings/AiAssistant";
 import type { ConfirmOptions } from "@/ui/Confirm";
 
 jest.mock("@/features/ai/useAiChat", () => ({ useAiChat: jest.fn() }));
-jest.mock("@/core/features/hooks", () => ({ useFeatureContext: jest.fn() }));
+jest.mock("@/core/features", () => ({ useFeatureContext: jest.fn() }));
 jest.mock("@/contexts/ThemeContext", () => ({
   useThemeColor: () => () => "#999999",
 }));
@@ -24,7 +24,18 @@ jest.mock("@/ui/Toast", () => ({ Toaster: () => null }));
 jest.mock("@/utils/toast", () => ({ toast: { error: jest.fn() } }));
 
 const mockBack = jest.fn();
-jest.mock("expo-router", () => ({ useRouter: () => ({ back: mockBack }) }));
+const mockNavigate = jest.fn();
+let mockFrom: unknown;
+let mockFocused = true;
+jest.mock("expo-router", () => ({
+  useRouter: () => ({ back: mockBack }),
+  useNavigation: () => ({ navigate: mockNavigate }),
+  useLocalSearchParams: () => ({ from: mockFrom }),
+  useFocusEffect: (fn: () => void) => {
+    const { useEffect } = jest.requireActual("react");
+    useEffect(() => (mockFocused ? fn() : undefined), [fn, mockFocused]);
+  },
+}));
 const mockConfirm = jest.fn<Promise<boolean>, [ConfirmOptions]>();
 jest.mock("@/ui/Confirm", () => ({ useConfirm: () => mockConfirm }));
 const mockOpenURL = jest.spyOn(Linking, "openURL");
@@ -96,6 +107,9 @@ beforeEach(() => {
   mockConfirm.mockReset().mockResolvedValue(false);
   mockOpenURL.mockReset().mockResolvedValue(undefined);
   mockBack.mockClear();
+  mockNavigate.mockClear();
+  mockFrom = undefined;
+  mockFocused = true;
 });
 
 test("loading shows a spinner", async () => {
@@ -140,31 +154,147 @@ test("opting in enables the assistant", async () => {
   expect(chat.optIn).toHaveBeenCalledTimes(1);
 });
 
-test("tab mode lists conversations without a Back button and returns from chat", async () => {
+test("tab mode returns from chat to conversations before leaving for Tools", async () => {
   const result = await render(<AiAssistant mode="tab" />);
   expect(result.getByText("AI Assistant")).toBeTruthy();
   expect(result.getByText("Server health")).toBeTruthy();
-  expect(result.queryByRole("button", { name: "Back" })).toBeNull();
+  expect(result.getByRole("button", { name: "Back" })).toBeTruthy();
   await fireEvent.press(result.getByText("Server health"));
   await fireEvent.press(
     result.getByRole("button", { name: "Back to conversations" }),
   );
   expect(result.getByText("Server health")).toBeTruthy();
-  expect(result.queryByRole("button", { name: "Back" })).toBeNull();
+  expect(result.getByRole("button", { name: "Back" })).toBeTruthy();
+  expect(chat.cancel).toHaveBeenCalledTimes(1);
+  expect(mockNavigate).not.toHaveBeenCalled();
+  await fireEvent.press(result.getByRole("button", { name: "Back" }));
+  expect(mockNavigate).toHaveBeenCalledWith("tools");
   expect(mockBack).not.toHaveBeenCalled();
 });
 
-test("tab mode preserves the opt-in AccessState without a Back button", async () => {
+test("tab mode preserves the opt-in AccessState with a Back button", async () => {
   chat.access = { state: "needs-opt-in", allowReadOnlyCommands: true };
   const result = await render(<AiAssistant mode="tab" />);
   expect(
     result.getByText("Enable the AI assistant for your account"),
   ).toBeTruthy();
-  expect(result.queryByRole("button", { name: "Back" })).toBeNull();
+  expect(result.getByRole("button", { name: "Back" })).toBeTruthy();
   await fireEvent.press(
     result.getByRole("button", { name: "Enable AI assistant" }),
   );
   expect(chat.optIn).toHaveBeenCalledTimes(1);
+});
+
+test.each([
+  ["tools", "tools"],
+  ["settings", "settings"],
+  [undefined, "tools"],
+  ["home", "tools"],
+  [["settings"], "tools"],
+])("tab Back validates origin %j and returns to %s", async (from, origin) => {
+  mockFrom = from;
+  const result = await render(<AiAssistant mode="tab" />);
+  await fireEvent.press(result.getByRole("button", { name: "Back" }));
+  expect(mockNavigate).toHaveBeenCalledWith(origin);
+  expect(mockBack).not.toHaveBeenCalled();
+});
+
+test("stack Back returns through the router", async () => {
+  const result = await render(<AiAssistant />);
+  await fireEvent.press(result.getByRole("button", { name: "Back" }));
+  expect(mockBack).toHaveBeenCalledTimes(1);
+  expect(mockNavigate).not.toHaveBeenCalled();
+});
+
+const realOS = Platform.OS;
+let backListener: jest.SpyInstance | undefined;
+
+function captureHardwareBack() {
+  const handlers = new Set<
+    Parameters<typeof BackHandler.addEventListener>[1]
+  >();
+  const remove = jest.fn();
+  backListener = jest
+    .spyOn(BackHandler, "addEventListener")
+    .mockImplementation((_event, handler) => {
+      handlers.add(handler);
+      return {
+        remove: () => {
+          remove();
+          handlers.delete(handler);
+        },
+      };
+    });
+  return {
+    handlers,
+    remove,
+    press: () => {
+      const handler = [...handlers].at(-1);
+      expect(handler).toBeDefined();
+      return handler!({ type: "hardwareBackPress", timeStamp: Date.now() });
+    },
+  };
+}
+
+afterEach(() => {
+  Platform.OS = realOS;
+  backListener?.mockRestore();
+  backListener = undefined;
+});
+
+test.each(["tools", "settings", undefined])(
+  "Android back returns from chat to the list, then to origin %s",
+  async (from) => {
+    Platform.OS = "android";
+    mockFrom = from;
+    const hardware = captureHardwareBack();
+    const result = await render(<AiAssistant mode="tab" />);
+    await fireEvent.press(result.getByText("New chat"));
+    expect(result.getByLabelText("Message")).toBeTruthy();
+    await act(() => expect(hardware.press()).toBe(true));
+    expect(chat.cancel).toHaveBeenCalledTimes(1);
+    expect(result.getByText("Server health")).toBeTruthy();
+    expect(mockNavigate).not.toHaveBeenCalled();
+    await act(() => expect(hardware.press()).toBe(true));
+    expect(mockNavigate).toHaveBeenCalledWith(from ?? "tools");
+    expect(mockBack).not.toHaveBeenCalled();
+  },
+);
+
+test("Android back returns to the origin while access is loading", async () => {
+  Platform.OS = "android";
+  mockFrom = "settings";
+  chat.access = "loading";
+  const hardware = captureHardwareBack();
+  await render(<AiAssistant mode="tab" />);
+  await act(() => expect(hardware.press()).toBe(true));
+  expect(mockNavigate).toHaveBeenCalledWith("settings");
+});
+
+test("Android back handler is removed when AI loses focus or unmounts", async () => {
+  Platform.OS = "android";
+  const hardware = captureHardwareBack();
+  const result = await render(<AiAssistant mode="tab" />);
+  expect(hardware.handlers.size).toBe(1);
+  mockFocused = false;
+  await result.rerender(<AiAssistant mode="tab" />);
+  expect(hardware.handlers.size).toBe(0);
+  mockFocused = true;
+  await result.rerender(<AiAssistant mode="tab" />);
+  expect(hardware.handlers.size).toBe(1);
+  await result.unmount();
+  expect(hardware.handlers.size).toBe(0);
+  expect(hardware.remove).toHaveBeenCalled();
+});
+
+test.each<["ios" | "android", "stack" | "tab"]>([
+  ["ios", "tab"],
+  ["android", "stack"],
+])("%s in %s mode leaves hardware back alone", async (os, mode) => {
+  Platform.OS = os;
+  captureHardwareBack();
+  await render(<AiAssistant mode={mode} />);
+  expect(backListener).not.toHaveBeenCalled();
 });
 
 test("a recently updated conversation shows a relative time", async () => {

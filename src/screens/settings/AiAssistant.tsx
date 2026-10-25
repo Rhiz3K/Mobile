@@ -1,13 +1,26 @@
-import { useEffect, useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import {
+  BackHandler,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  View,
+} from "react-native";
 import { ArrowLeft } from "lucide-react-native";
-import { useRouter } from "expo-router";
+import {
+  useFocusEffect,
+  useLocalSearchParams,
+  useNavigation,
+  useRouter,
+} from "expo-router";
+import type { BottomTabBarProps } from "expo-router/tabs";
 import { Screen } from "@/components/Screen";
 import { useThemeColor } from "@/contexts/ThemeContext";
-import { useFeatureContext } from "@/core/features/hooks";
+import { useFeatureContext } from "@/core/features";
 import { AccessState } from "@/features/ai/components/AccessState";
 import { ChatView } from "@/features/ai/components/ChatView";
 import { ConversationList } from "@/features/ai/components/ConversationList";
+import { aiOrigin } from "@/features/ai/navigation";
 import { useAiChat } from "@/features/ai/useAiChat";
 import { Button, Text } from "@/ui";
 
@@ -18,6 +31,9 @@ export default function AiAssistant({
 } = {}) {
   const color = useThemeColor();
   const router = useRouter();
+  const navigation = useNavigation<BottomTabBarProps["navigation"]>();
+  const { from } = useLocalSearchParams<{ from?: string | string[] }>();
+  const origin = aiOrigin(from);
   const { account, client } = useFeatureContext();
   const chat = useAiChat();
   const [view, setView] = useState<"list" | "chat">("list");
@@ -50,14 +66,30 @@ export default function AiAssistant({
     chat.newConversation();
     setView("chat");
   };
-  const back = () => {
+  const back = useCallback(() => {
     if (ready && view === "chat") {
       chat.cancel();
       setView("list");
+    } else if (mode === "tab") {
+      navigation.navigate(origin);
     } else {
       router.back();
     }
-  };
+  }, [ready, view, chat, mode, navigation, origin, router]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (mode !== "tab" || Platform.OS !== "android") return;
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        () => {
+          back();
+          return true;
+        },
+      );
+      return () => subscription.remove();
+    }, [mode, back]),
+  );
 
   return (
     <KeyboardAvoidingView
@@ -72,18 +104,16 @@ export default function AiAssistant({
             : "AI Assistant"
         }
         headerLeft={
-          mode === "tab" && !(ready && view === "chat") ? undefined : (
-            <Pressable
-              onPress={back}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel={
-                ready && view === "chat" ? "Back to conversations" : "Back"
-              }
-            >
-              <ArrowLeft size={20} color={color("foreground")} />
-            </Pressable>
-          )
+          <Pressable
+            onPress={back}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={
+              ready && view === "chat" ? "Back to conversations" : "Back"
+            }
+          >
+            <ArrowLeft size={20} color={color("foreground")} />
+          </Pressable>
         }
         headerRight={
           ready && view === "list" ? (

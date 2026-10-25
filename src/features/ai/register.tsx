@@ -14,7 +14,7 @@ export const aiFeature: FeatureDef = {
       description: "Chat with your server's AI assistant",
       icon: Sparkles,
       order: 25,
-      href: "/(tabs)/ai",
+      href: "/(tabs)/ai?from=tools",
     },
   ],
   settingsLinks: [
@@ -23,7 +23,7 @@ export const aiFeature: FeatureDef = {
       label: "AI Assistant",
       icon: Sparkles,
       order: 15,
-      href: "/(tabs)/ai",
+      href: "/(tabs)/ai?from=settings",
     },
   ],
 };

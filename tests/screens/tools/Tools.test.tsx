@@ -82,7 +82,7 @@ test("AI Assistant opens its hidden tab route without picking a host", async () 
   await render(<Tools />);
   expect(screen.getByText("Chat with your server's AI assistant")).toBeTruthy();
   await fireEvent.press(screen.getByText("AI Assistant"));
-  expect(mockPush).toHaveBeenCalledWith("/(tabs)/ai");
+  expect(mockPush).toHaveBeenCalledWith("/(tabs)/ai?from=tools");
   expect(screen.queryByTestId("sheet")).toBeNull();
   expect(mockNavigate).not.toHaveBeenCalled();
 });

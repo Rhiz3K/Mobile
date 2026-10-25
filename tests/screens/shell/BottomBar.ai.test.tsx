@@ -1,10 +1,10 @@
-import { act, fireEvent, render } from "@testing-library/react-native";
-import { Keyboard, Platform, type KeyboardEvent } from "react-native";
+import { fireEvent, render } from "@testing-library/react-native";
+import { Keyboard, Platform } from "react-native";
 import type { BottomTabBarProps } from "expo-router/tabs";
 import { BottomBar } from "@/screens/shell/BottomBar";
-import { useFeatureAvailable } from "@/core/features/hooks";
+import { useKeyboard } from "@/contexts/KeyboardContext";
 
-jest.mock("@/core/features/hooks", () => ({ useFeatureAvailable: jest.fn() }));
+jest.mock("@/contexts/KeyboardContext", () => ({ useKeyboard: jest.fn() }));
 jest.mock("@/contexts/ThemeContext", () => ({
   useThemeColor: () => () => "#999999",
 }));
@@ -29,11 +29,18 @@ const mockNavigate = jest.fn();
 const mockEmit = jest.fn(() => ({ defaultPrevented: false }));
 const routes = ["home", "hosts", "sessions", "tools", "settings", "ai"];
 
-function props(active = "home"): BottomTabBarProps {
+function props(
+  active = "home",
+  aiParams?: { from?: unknown },
+): BottomTabBarProps {
   return {
     state: {
       index: routes.indexOf(active),
-      routes: routes.map((name) => ({ key: `${name}-key`, name })),
+      routes: routes.map((name) => ({
+        key: `${name}-key`,
+        name,
+        params: name === "ai" ? aiParams : undefined,
+      })),
     },
     navigation: { navigate: mockNavigate, emit: mockEmit },
   } as unknown as BottomTabBarProps;
@@ -42,7 +49,11 @@ function props(active = "home"): BottomTabBarProps {
 const realOS = Platform.OS;
 
 beforeEach(() => {
-  jest.mocked(useFeatureAvailable).mockReturnValue(true);
+  jest.mocked(useKeyboard).mockReturnValue({
+    keyboardHeight: 0,
+    isKeyboardVisible: false,
+    showKeyboard: jest.fn(),
+  });
   mockNavigate.mockClear();
   mockEmit.mockReset().mockReturnValue({ defaultPrevented: false });
 });
@@ -52,103 +63,124 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-test.each([true, false])(
-  "keeps five bottom buttons when AI availability is %s",
-  async (available) => {
-    jest.mocked(useFeatureAvailable).mockReturnValue(available);
-    const result = await render(<BottomBar {...props("settings")} />);
-    expect(useFeatureAvailable).toHaveBeenCalledWith("ai");
+test("keeps five bottom buttons and the active tab selected", async () => {
+  const result = await render(<BottomBar {...props("settings")} />);
+  expect(
+    result.getAllByRole("tab").map((tab) => tab.props.accessibilityLabel),
+  ).toEqual(["Home", "Hosts", "Sessions", "Tools", "Settings"]);
+  const settings = result.getByRole("tab", { name: "Settings" });
+  expect(settings.props.accessibilityState.selected).toBe(true);
+  await fireEvent.press(settings);
+  expect(mockNavigate).not.toHaveBeenCalled();
+});
+
+test.each([
+  { params: { from: "tools" }, selected: "Tools" },
+  { params: { from: "settings" }, selected: "Settings" },
+  { params: undefined, selected: "Tools" },
+  { params: {}, selected: "Tools" },
+  { params: { from: undefined }, selected: "Tools" },
+  { params: { from: null }, selected: "Tools" },
+  { params: { from: "" }, selected: "Tools" },
+  { params: { from: "home" }, selected: "Tools" },
+  { params: { from: "Settings" }, selected: "Tools" },
+  { params: { from: [] }, selected: "Tools" },
+  { params: { from: ["settings"] }, selected: "Tools" },
+  { params: { from: ["tools", "settings"] }, selected: "Tools" },
+  { params: { from: {} }, selected: "Tools" },
+  { params: { from: 1 }, selected: "Tools" },
+  { params: { from: true }, selected: "Tools" },
+])(
+  "highlights $selected on AI with params $params",
+  async ({ params, selected }) => {
+    const result = await render(<BottomBar {...props("ai", params)} />);
     expect(
-      result.getAllByRole("tab").map((tab) => tab.props.accessibilityLabel),
-    ).toEqual(["Home", "Hosts", "Sessions", "Tools", "Settings"]);
-    const settings = result.getByRole("tab", { name: "Settings" });
-    expect(settings.props.accessibilityState.selected).toBe(true);
-    await fireEvent.press(settings);
+      result.getByRole("tab", { name: selected }).props.accessibilityState
+        .selected,
+    ).toBe(true);
+    expect(
+      result
+        .getAllByRole("tab")
+        .filter((tab) => tab.props.accessibilityState.selected),
+    ).toHaveLength(1);
     expect(mockNavigate).not.toHaveBeenCalled();
   },
 );
 
-test("highlights Tools on AI and lets its button return to Tools", async () => {
-  const result = await render(<BottomBar {...props("ai")} />);
-  const tools = result.getByRole("tab", { name: "Tools" });
-  expect(tools.props.accessibilityState.selected).toBe(true);
+test("uses the active route when a previous AI route has a Settings origin", async () => {
+  const result = await render(
+    <BottomBar {...props("home", { from: "settings" })} />,
+  );
   expect(
     result
       .getAllByRole("tab")
-      .filter((tab) => tab.props.accessibilityState.selected),
-  ).toHaveLength(1);
-  await fireEvent.press(tools);
-  expect(mockEmit).toHaveBeenCalledWith({
-    type: "tabPress",
-    target: "tools-key",
-    canPreventDefault: true,
-  });
-  expect(mockNavigate).toHaveBeenCalledWith("tools");
+      .filter((tab) => tab.props.accessibilityState.selected)
+      .map((tab) => tab.props.accessibilityLabel),
+  ).toEqual(["Home"]);
 });
 
-test("respects prevented tab presses from AI", async () => {
-  mockEmit.mockReturnValueOnce({ defaultPrevented: true });
-  const result = await render(<BottomBar {...props("ai")} />);
-  await fireEvent.press(result.getByRole("tab", { name: "Tools" }));
-  expect(mockNavigate).not.toHaveBeenCalled();
-});
-
-test("leaves AI for Tools when the active account loses AI access", async () => {
-  const result = await render(<BottomBar {...props("ai")} />);
-  expect(mockNavigate).not.toHaveBeenCalled();
-  jest.mocked(useFeatureAvailable).mockReturnValue(false);
-  await result.rerender(<BottomBar {...props("ai")} />);
-  expect(mockNavigate).toHaveBeenCalledWith("tools");
-});
-
-test("leaves an initially unavailable AI route for Tools", async () => {
-  jest.mocked(useFeatureAvailable).mockReturnValue(false);
-  await render(<BottomBar {...props("ai")} />);
-  expect(mockNavigate).toHaveBeenCalledWith("tools");
-});
-
-function captureKeyboard() {
-  const callbacks: Record<string, () => void> = {};
-  const remove = jest.fn();
-  const listener = jest
-    .spyOn(Keyboard, "addListener")
-    .mockImplementation((event, callback) => {
-      callbacks[event] = () => callback({} as KeyboardEvent);
-      return { remove } as unknown as ReturnType<typeof Keyboard.addListener>;
+test.each(["tools", "settings"])(
+  "lets the Tools button return from AI with %s origin",
+  async (from) => {
+    const result = await render(<BottomBar {...props("ai", { from })} />);
+    await fireEvent.press(result.getByRole("tab", { name: "Tools" }));
+    expect(mockEmit).toHaveBeenCalledWith({
+      type: "tabPress",
+      target: "tools-key",
+      canPreventDefault: true,
     });
-  return { callbacks, remove, listener };
-}
+    expect(mockNavigate).toHaveBeenCalledWith("tools");
+  },
+);
 
-test("keeps the bar on iOS without keyboard listeners", async () => {
-  Platform.OS = "ios";
-  const { listener } = captureKeyboard();
-  const result = await render(<BottomBar {...props("ai")} />);
-  expect(listener).not.toHaveBeenCalled();
-  expect(result.getByRole("tab", { name: "Tools" })).toBeTruthy();
-});
+test.each(["tools", "settings"])(
+  "respects prevented tab presses from AI with %s origin",
+  async (from) => {
+    mockEmit.mockReturnValueOnce({ defaultPrevented: true });
+    const result = await render(<BottomBar {...props("ai", { from })} />);
+    await fireEvent.press(result.getByRole("tab", { name: "Tools" }));
+    expect(mockNavigate).not.toHaveBeenCalled();
+  },
+);
 
-test("hides the bar when mounting AI with the Android keyboard already open", async () => {
+test.each(["ios", "web"] as const)(
+  "keeps the bar with a visible keyboard on %s",
+  async (platform) => {
+    Platform.OS = platform;
+    jest.mocked(useKeyboard).mockReturnValue({
+      keyboardHeight: 300,
+      isKeyboardVisible: true,
+      showKeyboard: jest.fn(),
+    });
+    const result = await render(<BottomBar {...props("ai")} />);
+    expect(result.getAllByRole("tab")).toHaveLength(5);
+  },
+);
+
+test("uses keyboard context on Android AI without registering its own listeners", async () => {
   Platform.OS = "android";
-  jest.spyOn(Keyboard, "isVisible").mockReturnValue(true);
-  const { callbacks } = captureKeyboard();
+  const addListener = jest.spyOn(Keyboard, "addListener");
+  const isVisible = jest.spyOn(Keyboard, "isVisible").mockReturnValue(false);
+  jest.mocked(useKeyboard).mockReturnValue({
+    keyboardHeight: 300,
+    isKeyboardVisible: true,
+    showKeyboard: jest.fn(),
+  });
   const result = await render(<BottomBar {...props("ai")} />);
   expect(result.queryAllByRole("tab")).toHaveLength(0);
-  await act(async () => callbacks.keyboardDidHide());
-  expect(result.getByRole("tab", { name: "Tools" })).toBeTruthy();
-});
 
-test("hides the bar for the Android AI keyboard only and removes listeners", async () => {
-  Platform.OS = "android";
-  const { callbacks, remove } = captureKeyboard();
-  const result = await render(<BottomBar {...props("ai")} />);
-  await act(async () => callbacks.keyboardDidShow());
-  expect(result.queryAllByRole("tab")).toHaveLength(0);
   await result.rerender(<BottomBar {...props("settings")} />);
-  expect(result.getByRole("tab", { name: "Settings" })).toBeTruthy();
+  expect(result.getAllByRole("tab")).toHaveLength(5);
   await result.rerender(<BottomBar {...props("ai")} />);
   expect(result.queryAllByRole("tab")).toHaveLength(0);
-  await act(async () => callbacks.keyboardDidHide());
-  expect(result.getByRole("tab", { name: "Tools" })).toBeTruthy();
-  await result.unmount();
-  expect(remove).toHaveBeenCalledTimes(2);
+
+  jest.mocked(useKeyboard).mockReturnValue({
+    keyboardHeight: 0,
+    isKeyboardVisible: false,
+    showKeyboard: jest.fn(),
+  });
+  await result.rerender(<BottomBar {...props("ai")} />);
+  expect(result.getAllByRole("tab")).toHaveLength(5);
+  expect(addListener).not.toHaveBeenCalled();
+  expect(isVisible).not.toHaveBeenCalled();
 });

@@ -265,7 +265,11 @@ export function usePaletteItems({
         run: go(page.href),
       });
     }
+    const toolPaths = new Set(
+      tools.flatMap((tool) => (tool.href ? [tool.href.split("?")[0]] : [])),
+    );
     for (const link of links) {
+      if (toolPaths.has(link.href.split("?")[0])) continue;
       items.push({
         id: `settings:${link.id}`,
         section: "settings",

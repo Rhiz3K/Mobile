@@ -40,7 +40,7 @@ test("AI tools and settings are native and require the plugin API", () => {
   expect(links.find((link) => link.id === "ai")).toMatchObject({
     label: "AI Assistant",
     order: 15,
-    href: "/(tabs)/ai",
+    href: "/(tabs)/ai?from=settings",
   });
   expect(links.map((link) => link.order)).toEqual(
     links.map((link) => link.order).sort((a, b) => a - b),
@@ -51,7 +51,7 @@ test("AI tools and settings are native and require the plugin API", () => {
     description: expect.any(String),
     icon: Sparkles,
     order: 25,
-    href: "/(tabs)/ai",
+    href: "/(tabs)/ai?from=tools",
   });
   expect(tools.map((tool) => tool.order)).toEqual(
     tools.map((tool) => tool.order).sort((a, b) => a - b),

@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { Keyboard, Platform, Pressable, View } from "react-native";
+import { Platform, Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { BottomTabBarProps } from "expo-router/tabs";
 import {
@@ -11,10 +10,11 @@ import {
 } from "lucide-react-native";
 import { Text } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
+import { useKeyboard } from "@/contexts/KeyboardContext";
 import { useTerminalSessions } from "@/contexts/TerminalSessionsContext";
 import { useSessionStatuses, type SessionState } from "@/core/sessions/status";
 import { useOrientation } from "@/utils/orientation";
-import { useFeatureAvailable } from "@/core/features/hooks";
+import { aiOrigin } from "@/features/ai/navigation";
 
 type Icon = (props: { color: string; size: number }) => React.ReactNode;
 
@@ -53,32 +53,12 @@ export function BottomBar({ state, navigation }: BottomTabBarProps) {
   const color = useThemeColor();
   const { sessions } = useTerminalSessions();
   const statuses = useSessionStatuses();
-  const aiAvailable = useFeatureAvailable("ai");
-  const [keyboardVisible, setKeyboardVisible] = useState(
-    () => Platform.OS === "android" && Keyboard.isVisible(),
+  const { isKeyboardVisible } = useKeyboard();
+  const activeRoute = state.routes[state.index];
+  const onAi = activeRoute?.name === "ai";
+  const origin = aiOrigin(
+    (activeRoute?.params as { from?: unknown } | undefined)?.from,
   );
-  const onAi = state.routes[state.index]?.name === "ai";
-  const onUnavailableAi = onAi && !aiAvailable;
-
-  // Leave AI when the active account can no longer use it.
-  useEffect(() => {
-    if (onUnavailableAi) navigation.navigate("tools");
-  }, [onUnavailableAi, navigation]);
-
-  // Android lifts the bar over the chat input when the keyboard opens.
-  useEffect(() => {
-    if (Platform.OS !== "android") return;
-    const show = Keyboard.addListener("keyboardDidShow", () =>
-      setKeyboardVisible(true),
-    );
-    const hide = Keyboard.addListener("keyboardDidHide", () =>
-      setKeyboardVisible(false),
-    );
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, []);
 
   const accent = color("accent-brand") ?? "#f59145";
   const muted = color("muted-foreground") ?? "#a4a4a4";
@@ -88,7 +68,7 @@ export function BottomBar({ state, navigation }: BottomTabBarProps) {
     statuses,
   );
 
-  if (onAi && keyboardVisible) return null;
+  if (Platform.OS === "android" && onAi && isKeyboardVisible) return null;
 
   return (
     <View
@@ -99,7 +79,7 @@ export function BottomBar({ state, navigation }: BottomTabBarProps) {
         const tab = TABS.find((t) => t.name === route.name);
         if (!tab) return null;
         const focused =
-          state.index === index || (onAi && route.name === "tools");
+          state.index === index || (onAi && route.name === origin);
         const tint = focused ? accent : muted;
         const count = route.name === "sessions" ? sessions.length : 0;
 

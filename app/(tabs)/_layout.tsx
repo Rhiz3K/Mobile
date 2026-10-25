@@ -21,7 +21,7 @@ export default function TabLayout() {
           options={{ title: tab.label }}
         />
       ))}
-      <Tabs.Screen name="ai" options={{ title: "AI" }} />
+      <Tabs.Screen name="ai" options={{ title: "AI Assistant" }} />
     </Tabs>
   );
 }
