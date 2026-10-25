@@ -54,7 +54,11 @@ module.exports = defineConfig([
     },
   },
   {
-    files: ["scripts/**/*.{js,cjs,mjs}", "plugins/**/*.js"],
+    files: [
+      "scripts/**/*.{js,cjs,mjs}",
+      "plugins/**/*.js",
+      "tests/**/*.{cjs,mjs}",
+    ],
     languageOptions: { globals: { ...globals.node } },
     rules: { "react-hooks/rules-of-hooks": "off" },
   },
