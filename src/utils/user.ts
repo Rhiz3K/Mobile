@@ -1,23 +1,27 @@
-import { api } from "@/core/accounts";
+import type { AccountClient } from "@/core/api/AccountClient";
 
-let cachedUserId: string | null = null;
+const cached = new Map<string, string>();
 
 /**
- * The current authenticated user's id, used as `userId` on session-based
- * connect/file/docker calls (the backend ties activity + data unlock to it).
- * Cached after the first lookup; cleared on logout via `clearCachedUserId`.
+ * The signed in user's id on one server, used as `userId` on session based
+ * connect, file and docker calls. Cached per account, cleared on sign out.
  */
-export async function getCurrentUserId(): Promise<string | null> {
-  if (cachedUserId) return cachedUserId;
+export async function getCurrentUserId(
+  client: AccountClient | null,
+): Promise<string | null> {
+  if (!client) return null;
+  const hit = cached.get(client.accountId);
+  if (hit) return hit;
   try {
-    const info = await api().auth.getUserInfo();
-    cachedUserId = info?.userId || null;
-    return cachedUserId;
+    const info = await client.api.auth.getUserInfo();
+    if (info?.userId) cached.set(client.accountId, info.userId);
+    return info?.userId || null;
   } catch {
     return null;
   }
 }
 
-export function clearCachedUserId(): void {
-  cachedUserId = null;
+export function clearCachedUserId(accountId?: string): void {
+  if (accountId) cached.delete(accountId);
+  else cached.clear();
 }

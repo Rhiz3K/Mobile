@@ -54,11 +54,13 @@ import {
   saveWidgetPreferences,
   type WidgetPreferences,
 } from "@/widgets";
-import { api, activeClient } from "@/core/accounts";
+import { clearCachedUserId } from "@/utils/user";
+import { apiOf, useActiveClient } from "@/core/accounts";
 import { clearSession } from "@/core/api/webSession";
 import { BackgroundSessionsSection } from "./BackgroundSessionsSection";
 
 export default function Settings() {
+  const client = useActiveClient();
   const router = useRouter();
   const settingsLinks = useSettingsLinks();
   const hasSnippetWidget = useCapability("widgets.snippets");
@@ -87,7 +89,7 @@ export default function Settings() {
   const [totpEnabled, setTotpEnabled] = useState(false);
   const [version, setVersion] = useState("");
   const [serverUrl, setServerUrl] = useState<string>(
-    () => activeClient()?.serverUrl ?? "",
+    () => client?.serverUrl ?? "",
   );
   const [open, setOpen] = useState<string | null>("appearance");
 
@@ -133,14 +135,14 @@ export default function Settings() {
   // unchanged, so we can't rely on that alone).
   useEffect(() => {
     if (authFlowVisible) return;
-    setServerUrl(activeClient()?.serverUrl ?? "");
+    setServerUrl(client?.serverUrl ?? "");
     if (!isAuthenticated) {
       setUsername("-");
       setIsAdmin(false);
       setTotpEnabled(false);
       return;
     }
-    api()
+    apiOf(client)
       .auth.getUserInfo()
       .then((u) => {
         setUsername(u.username ?? "-");
@@ -148,21 +150,22 @@ export default function Settings() {
         setTotpEnabled(!!u.totp_enabled);
       })
       .catch(() => {});
-    api()
+    apiOf(client)
       .server.getVersionInfo()
       .then((v) => setVersion(v?.localVersion ?? v?.version ?? ""))
       .catch(() => {});
-  }, [isAuthenticated, authFlowVisible]);
+  }, [isAuthenticated, authFlowVisible, client]);
 
   const toggle = (id: string) => setOpen((o) => (o === id ? null : id));
 
   const handleLogout = async () => {
     try {
-      await api().auth.logoutUser();
+      await apiOf(client).auth.logoutUser();
     } catch {
       // best-effort - server-side logout may fail if token already expired
     }
-    await clearSession(activeClient());
+    await clearSession(client);
+    clearCachedUserId(client?.accountId);
     // Host names and addresses must not survive on the home screen.
     await resetWidgets();
     setAuthenticated(false);
@@ -175,11 +178,12 @@ export default function Settings() {
     // local JWT), otherwise the still-valid Termix cookie in the browser/WebView
     // lets the next OIDC resume the old account.
     try {
-      await api().auth.logoutUser();
+      await apiOf(client).auth.logoutUser();
     } catch {
       // best-effort - session may already be gone
     }
-    await clearSession(activeClient());
+    await clearSession(client);
+    clearCachedUserId(client?.accountId);
     setAuthenticated(false);
     // Same reason as sign-out: the old server's hosts must not linger on the
     // home screen while the user points the app somewhere else.
@@ -231,7 +235,7 @@ export default function Settings() {
     if (!oldPassword || !newPassword) return;
     setAccountBusy(true);
     try {
-      await api().users.changePassword(oldPassword, newPassword);
+      await apiOf(client).users.changePassword(oldPassword, newPassword);
       toast.success("Password changed");
       closePasswordDialog();
     } catch (e: any) {
@@ -250,7 +254,7 @@ export default function Settings() {
     if (!deletePassword) return;
     setAccountBusy(true);
     try {
-      await api().users.deleteAccount(deletePassword);
+      await apiOf(client).users.deleteAccount(deletePassword);
       closeDeleteDialog();
       await handleLogout();
       toast.success("Account deleted");
