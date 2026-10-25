@@ -107,6 +107,7 @@ export function describeSupport(
   }
   if (server === "none") return "Link a server to use it";
   if (reach) return reach.charAt(0).toUpperCase() + reach.slice(1);
+  if (mode === "webview") return "Opens in the app from the server";
   return mode === "server" ? "Runs on the server" : "Through the server";
 }
 
@@ -133,7 +134,10 @@ export function supportRows(input: SupportInput): SupportRow[] {
   const rows: SupportRow[] = [];
   for (const id of ids) {
     const plugin = input.plugins?.find((p) => p.id === id);
-    const defs = input.registry.forPlugin(id);
+    // A plugin's own web view feature is the plugin itself, not an app screen.
+    const defs = input.registry
+      .forPlugin(id)
+      .filter((def) => def.source !== "webview");
     const { mode, needsNewerApp } = modeFor(defs, plugin, id);
     const row = finish({
       id,

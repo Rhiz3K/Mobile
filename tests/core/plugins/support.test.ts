@@ -149,3 +149,24 @@ test("describeSupport covers the plain cases", () => {
     describeSupport({ mode: "none", onDevice: false, server: "none" }),
   ).toBe("Not in the app yet");
 });
+
+test("plugins that open in a web view say so, and their own feature stays a web view", () => {
+  const rows = supportRows({
+    registry: registry(
+      feature("webview:alerts", {
+        source: "webview",
+        pluginId: "alerts",
+        plugins: ["alerts"],
+      }),
+    ),
+    local: false,
+    plugins: [plugin("alerts"), plugin("homepage", { active: false })],
+  });
+  expect(row(rows, "alerts")).toMatchObject({
+    mode: "webview",
+    section: "server",
+    status: "Opens in the app from the server",
+  });
+  expect(row(rows, "homepage").status).toBe("Off on this server");
+  expect(row(rows, "proxmox").status).toBe("Not on this server");
+});

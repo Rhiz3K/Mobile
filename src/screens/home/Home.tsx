@@ -7,10 +7,10 @@ import { useThemeColor } from "@/contexts/ThemeContext";
 import { useTerminalSessions } from "@/contexts/TerminalSessionsContext";
 import { useAccounts } from "@/core/accounts";
 import { useLiveList, useRepositories } from "@/core/data/hooks";
-import { useDashboardCards } from "@/core/features/hooks";
+import { useDashboardCards, useQuickActions } from "@/core/features/hooks";
 import { HostActionSheet } from "@/screens/hosts/HostActionSheet";
 import type { SSHHost } from "@/types";
-import { Button, EmptyState, Text } from "@/ui";
+import { Button, EmptyState, ListRow, Text } from "@/ui";
 import { isSshHost } from "@/utils/hosts";
 
 /** Pinned hosts, newest name order, SSH first since only they have cards. */
@@ -44,9 +44,11 @@ export default function Home() {
   );
 
   const toHosts = () => router.push("/(tabs)/hosts");
+  const quick = useQuickActions();
 
   return (
     <Screen title="Home">
+      <QuickActions {...quick} />
       {pinned.length === 0 && !hosts.loading ? (
         <EmptyState
           icon={Pin}
@@ -84,6 +86,36 @@ export default function Home() {
         onDelete={toHosts}
       />
     </Screen>
+  );
+}
+
+/** Screens from features and server plugins, above the pinned hosts. */
+function QuickActions({ ctx, actions }: ReturnType<typeof useQuickActions>) {
+  const color = useThemeColor();
+  if (actions.length === 0) return null;
+  return (
+    <View className="px-3 pt-3">
+      <Text
+        weight="medium"
+        className="mb-1.5 px-1 text-[11px] uppercase tracking-wider text-muted-foreground"
+      >
+        From your server
+      </Text>
+      <View className="border border-border">
+        {actions.map((action, index) => {
+          const Icon = action.icon;
+          return (
+            <ListRow
+              key={action.id}
+              index={index}
+              title={action.label}
+              icon={<Icon size={16} color={color("muted-foreground")} />}
+              onPress={() => action.run(ctx)}
+            />
+          );
+        })}
+      </View>
+    </View>
   );
 }
 

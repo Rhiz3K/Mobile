@@ -5,11 +5,12 @@
  *
  * - `app`: the app does it itself, outside any feature (host status dots).
  * - `server`: it works on the server and the app uses the result (sign in,
- *   sync, certificates for SSH logins, alerts).
+ *   sync, certificates for SSH logins).
+ * - `webview`: its screens from the server open in the app (Homepage, Alerts).
  * - `look`: a layout or theme; the app has its own.
  * - `none`: not in the app yet.
  */
-export type CatalogKind = "app" | "server" | "look" | "none";
+export type CatalogKind = "app" | "server" | "webview" | "look" | "none";
 
 export interface CatalogEntry {
   id: string;
@@ -19,37 +20,37 @@ export interface CatalogEntry {
 }
 
 export const OFFICIAL_PLUGINS: CatalogEntry[] = [
-  { id: "acme-ssl", name: "ACME Certificates", kind: "server" },
+  { id: "acme-ssl", name: "ACME Certificates", kind: "webview" },
   { id: "ai", name: "AI Assistant", kind: "none" },
-  { id: "alerts", name: "Alerts", kind: "server" },
-  { id: "audit-tools", name: "Audit Tools", kind: "server" },
-  { id: "automations", name: "Automations", kind: "server" },
+  { id: "alerts", name: "Alerts", kind: "webview" },
+  { id: "audit-tools", name: "Audit Tools", kind: "webview" },
+  { id: "automations", name: "Automations", kind: "webview" },
   { id: "classic-layout", name: "Classic Layout", kind: "look" },
   { id: "classic-themes", name: "Classic Themes", kind: "look" },
-  { id: "cloud-providers", name: "Cloud Providers", kind: "server" },
+  { id: "cloud-providers", name: "Cloud Providers", kind: "webview" },
   { id: "credential-tools", name: "Credential Tools", kind: "none" },
-  { id: "databases", name: "Databases", kind: "none" },
+  { id: "databases", name: "Databases", kind: "webview" },
   { id: "docker", name: "Docker", kind: "none" },
   { id: "file-manager", name: "File Manager", kind: "none" },
-  { id: "fleets", name: "Fleets", kind: "none" },
-  { id: "homepage", name: "Homepage", kind: "none" },
+  { id: "fleets", name: "Fleets", kind: "webview" },
+  { id: "homepage", name: "Homepage", kind: "webview" },
   { id: "host-metrics", name: "Host Metrics", kind: "none" },
   { id: "host-status", name: "Host Status", kind: "app" },
   { id: "hosts-config", name: "Hosts Config", kind: "server" },
   { id: "import-export", name: "Import and Export", kind: "none" },
-  { id: "kubernetes", name: "Kubernetes", kind: "none" },
+  { id: "kubernetes", name: "Kubernetes", kind: "webview" },
   { id: "ldap", name: "LDAP", kind: "server" },
   { id: "login-security", name: "Login Security", kind: "server" },
-  { id: "network-topology", name: "Network Topology", kind: "none" },
+  { id: "network-topology", name: "Network Topology", kind: "webview" },
   { id: "opkssh", name: "OPKSSH", kind: "server" },
-  { id: "proxmox", name: "Proxmox", kind: "none" },
+  { id: "proxmox", name: "Proxmox", kind: "webview" },
   { id: "remote-desktop", name: "Remote Desktop", kind: "none" },
-  { id: "reverse-proxy", name: "Reverse Proxy", kind: "server" },
-  { id: "samba", name: "Samba Shares", kind: "none" },
+  { id: "reverse-proxy", name: "Reverse Proxy", kind: "webview" },
+  { id: "samba", name: "Samba Shares", kind: "webview" },
   { id: "secret-sources", name: "Secret Sources", kind: "server" },
   { id: "serial", name: "Serial", kind: "none" },
   { id: "service-manager", name: "Services", kind: "none" },
-  { id: "session-recording", name: "Session Recording", kind: "server" },
+  { id: "session-recording", name: "Session Recording", kind: "webview" },
   { id: "session-sharing", name: "Session Sharing", kind: "none" },
   { id: "simple-layout", name: "Simple Layout", kind: "look" },
   { id: "snippets", name: "Snippets", kind: "none" },
@@ -68,7 +69,7 @@ export const OFFICIAL_PLUGINS: CatalogEntry[] = [
   { id: "warpgate", name: "Warpgate", kind: "server" },
   { id: "web-endpoint", name: "Web Endpoint", kind: "none" },
   { id: "webauthn", name: "Passkeys", kind: "server" },
-  { id: "workspaces", name: "Workspaces", kind: "none" },
+  { id: "workspaces", name: "Workspaces", kind: "webview" },
 ];
 
 const BY_ID = new Map(OFFICIAL_PLUGINS.map((entry) => [entry.id, entry]));

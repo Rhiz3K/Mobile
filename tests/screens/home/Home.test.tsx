@@ -5,6 +5,7 @@ import Home, { pinnedHosts } from "@/screens/home/Home";
 const mockPush = jest.fn();
 const mockNavigate = jest.fn(async () => null);
 let mockHosts: any[] = [];
+let mockQuick: any[] = [];
 const mockCard = jest.fn((props: any) => (
   <Text>{`card ${props.host.name} ${props.active ? "on" : "off"}`}</Text>
 ));
@@ -35,6 +36,10 @@ jest.mock("@/core/data/hooks", () => ({
   useLiveList: () => ({ data: mockHosts, loading: false }),
 }));
 jest.mock("@/core/features/hooks", () => ({
+  useQuickActions: () => ({
+    ctx: { account: { id: "s1" } },
+    actions: mockQuick,
+  }),
   useDashboardCards: (host: any) =>
     host.enableDocker
       ? [
@@ -66,6 +71,7 @@ const host = (over: object) =>
 beforeEach(() => {
   mockPush.mockClear();
   mockNavigate.mockClear();
+  mockQuick = [];
 });
 
 test("pinned hosts only, in name order", () => {
@@ -95,4 +101,28 @@ test("each pinned host shows its cards, and a card opens its tab", async () => {
     expect.objectContaining({ id: 1 }),
     "docker",
   );
+});
+
+test("quick actions from features show above the hosts and run on tap", async () => {
+  mockHosts = [];
+  const run = jest.fn();
+  mockQuick = [
+    {
+      id: "webview:alerts:alerts",
+      label: "Alerts",
+      icon: () => null,
+      order: 1,
+      run,
+    },
+  ];
+  await render(<Home />);
+  expect(screen.getByText("From your server")).toBeTruthy();
+  fireEvent.press(screen.getByText("Alerts"));
+  expect(run).toHaveBeenCalledWith({ account: { id: "s1" } });
+});
+
+test("no quick actions, no section", async () => {
+  mockHosts = [];
+  await render(<Home />);
+  expect(screen.queryByText("From your server")).toBeNull();
 });

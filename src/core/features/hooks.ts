@@ -69,6 +69,12 @@ export function useSettingsLinks() {
   return useMemo(() => features.settingsLinks(ctx), [ctx]);
 }
 
+/** Things to open from Home, like a server plugin's screens. */
+export function useQuickActions() {
+  const ctx = useFeatureContext();
+  return useMemo(() => ({ ctx, actions: features.quickActions(ctx) }), [ctx]);
+}
+
 export function useKeyboardTabs() {
   const ctx = useSessionFeatureContext();
   return useMemo(() => features.keyboardTabs(ctx), [ctx]);

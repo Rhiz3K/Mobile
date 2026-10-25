@@ -25,6 +25,7 @@ import "../global.css";
 import UpdateRequired from "@/screens/authentication/UpdateRequired";
 import { WidgetDeepLinkHost } from "@/widgets";
 import { registerBuiltInFeatures } from "@/features";
+import { usePluginFrameFeatures } from "@/features/plugin-webview/register";
 import { AccountSwitcher } from "@/screens/accounts/AccountSwitcher";
 import { LabLaunch } from "@/screens/dev/terminal-lab/LabLaunch";
 // Defines the background sync task, which must exist when the app loads.
@@ -41,6 +42,7 @@ function RootLayoutContent() {
     setIsLoading,
   } = useAppContext();
   const accent = useThemeColor()("accent-brand");
+  usePluginFrameFeatures();
 
   if (isLoading) {
     return (

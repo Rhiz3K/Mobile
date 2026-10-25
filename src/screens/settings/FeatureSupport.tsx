@@ -13,7 +13,10 @@ import {
   type SupportRow,
   type SupportSection,
 } from "@/core/plugins";
+import { features } from "@/core/features";
+import { framePlugin } from "@/core/plugins/webview";
 import { EmptyState, ListRow, Tabs, Text } from "@/ui";
+import { toast } from "@/utils/toast";
 import type { ListRowTone } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
 
@@ -27,10 +30,12 @@ function Section({
   label,
   tone,
   rows,
+  onOpen,
 }: {
   label: string;
   tone: ListRowTone;
   rows: SupportRow[];
+  onOpen: (row: SupportRow) => (() => void) | undefined;
 }) {
   if (rows.length === 0) return null;
   return (
@@ -49,6 +54,7 @@ function Section({
             tone={tone}
             title={row.name}
             meta={row.note ? `${row.status} | ${row.note}` : row.status}
+            onPress={onOpen(row)}
           />
         ))}
       </View>
@@ -79,6 +85,26 @@ export default function FeatureSupport() {
   }, [account.id]);
 
   const local = account.kind === "local";
+
+  // A plugin that opens in the app opens from here too.
+  const openRow = (row: SupportRow) => {
+    if (row.mode !== "webview" || row.server !== "on") return undefined;
+    const client = accountStore.client(account.id);
+    const entry = client?.serverPlugins?.find((p) => p.id === row.id);
+    const plugin = entry ? framePlugin(entry, features, "phone") : null;
+    if (!plugin) return undefined;
+    const screen = plugin.views.find((v) => !v.host);
+    return () => {
+      if (!screen) {
+        toast.info(`Open ${plugin.name} from a host's menu.`);
+        return;
+      }
+      router.push({
+        pathname: "/tabs/plugins/[pluginId]",
+        params: { pluginId: plugin.id, view: screen.view, account: account.id },
+      });
+    };
+  };
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
@@ -126,6 +152,7 @@ export default function FeatureSupport() {
               label={section.label}
               tone={section.tone}
               rows={rows.filter((row) => row.section === section.id)}
+              onOpen={openRow}
             />
           ))
         )}
