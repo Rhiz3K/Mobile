@@ -7,6 +7,7 @@ package-lock.json
 assets/xterm/*.html
 assets/guacamole/guacamole-common.js.html
 assets/editor/*.html
+assets/plugin-host/*.html
 
 drizzle
 
