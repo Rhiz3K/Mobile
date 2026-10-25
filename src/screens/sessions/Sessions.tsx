@@ -9,7 +9,6 @@ import {
   View,
   Keyboard,
   Platform,
-  Dimensions,
   BackHandler,
   AppState,
   LayoutAnimation,
@@ -42,7 +41,6 @@ import { SessionMenu } from "@/screens/sessions/SessionMenu";
 import { CompanionPane } from "@/screens/sessions/CompanionPane";
 import { TabSwipeEdge } from "@/screens/sessions/TabSwipeEdge";
 import {
-  canSplit,
   clampRatio,
   partnerAfterActivate,
   splitPartner,
@@ -52,7 +50,7 @@ import type {
   SessionMenuContext,
   SessionMenuItemDef,
 } from "@/core/features/types";
-import { useOrientation } from "@/utils/orientation";
+import { useWindowInfo } from "@/utils/window-class";
 import { getMaxKeyboardHeight, getTabBarHeight } from "@/utils/responsive";
 import {
   addKeyCommandListener,
@@ -85,7 +83,8 @@ export default function Sessions() {
   // Tabs swap to a note when their plugin is turned off, and back.
   useRegistryVersion();
   const router = useRouter();
-  const { height, isLandscape } = useOrientation();
+  const win = useWindowInfo();
+  const { height, isLandscape } = win;
   const isIPad = Platform.OS === "ios" && Platform.isPad;
   const {
     sessions,
@@ -120,9 +119,6 @@ export default function Sessions() {
   const hiddenInputRef = useRef<TerminalImeInputHandle | null>(null);
   // Tab handles by session id. Tabs with "terminal-input" hand out a TerminalHandle.
   const tabRefs = useRef<Record<string, React.RefObject<any>>>({});
-  const [screenDimensions, setScreenDimensions] = useState(
-    Dimensions.get("window"),
-  );
   const [customKeyboardInitialTab, setCustomKeyboardInitialTab] =
     useState<string>("keyboard");
   const compositionActiveRef = useRef(false);
@@ -327,8 +323,7 @@ export default function Sessions() {
   }, [sessions]);
 
   // Panels beside a tab (tablets), by session id.
-  const isTablet =
-    Math.min(screenDimensions.width, screenDimensions.height) >= 600;
+  const isTablet = win.canSplit;
   const [companionFor, setCompanionFor] = useState<Record<string, string>>({});
   const companionsOf = useCallback((session: TerminalSession | undefined) => {
     if (!session) return [];
@@ -379,7 +374,7 @@ export default function Sessions() {
   const [splitWith, setSplitWith] = useState<string | null>(null);
   const [splitRatio, setSplitRatio] = useState(0.5);
   const [stageWidth, setStageWidth] = useState(0);
-  const splitOk = canSplit(screenDimensions.width, screenDimensions.height);
+  const splitOk = win.canSplit;
   const partnerId = splitOk
     ? splitPartner(
         sessions.map((s) => s.id),
@@ -478,19 +473,14 @@ export default function Sessions() {
   }, [sessions.length, isKeyboardVisible, showConnectionsPanel]);
 
   useEffect(() => {
-    const subscription = Dimensions.addEventListener("change", ({ window }) => {
-      setScreenDimensions(window);
-
-      setTimeout(() => {
-        const activeRef = activeSessionId
-          ? tabRefs.current[activeSessionId]
-          : null;
-        activeRef?.current?.fit();
-      }, 300);
-    });
-
-    return () => subscription?.remove();
-  }, [activeSessionId]);
+    const timer = setTimeout(() => {
+      const activeRef = activeSessionId
+        ? tabRefs.current[activeSessionId]
+        : null;
+      activeRef?.current?.fit();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [activeSessionId, win.width, win.height]);
 
   useEffect(() => {
     if (keyboardHeight > 0) {
@@ -528,7 +518,8 @@ export default function Sessions() {
   }, [
     keyboardHeight,
     activeSessionId,
-    screenDimensions,
+    win.width,
+    win.height,
     isCustomKeyboardVisible,
     customKeyboardHeight,
   ]);
@@ -865,7 +856,7 @@ export default function Sessions() {
               <CompanionPane
                 def={def}
                 side={side}
-                screenWidth={screenDimensions.width}
+                screenWidth={win.width}
                 props={{
                   session: activeSession,
                   getHandle: () => sessionHandles.get(activeSession.id),

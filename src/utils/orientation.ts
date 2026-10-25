@@ -1,17 +1,16 @@
-import { useWindowDimensions } from "react-native";
+import { useWindowInfo } from "@/utils/window-class";
 
 export type Orientation = "portrait" | "landscape";
 
 export function useOrientation() {
-  const { width, height } = useWindowDimensions();
-  const isLandscape = width > height;
+  const { width, height, isLandscape, isPortrait } = useWindowInfo();
   const orientation: Orientation = isLandscape ? "landscape" : "portrait";
 
   return {
     width,
     height,
     isLandscape,
-    isPortrait: !isLandscape,
+    isPortrait,
     orientation,
   };
 }
