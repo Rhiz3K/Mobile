@@ -27,6 +27,7 @@ import { WidgetDeepLinkHost } from "@/widgets";
 import { registerBuiltInFeatures } from "@/features";
 import { usePluginFrameFeatures } from "@/features/plugin-webview/register";
 import { AccountSwitcher } from "@/screens/accounts/AccountSwitcher";
+import { CommandPalette } from "@/screens/palette/CommandPalette";
 import { LabLaunch } from "@/screens/dev/terminal-lab/LabLaunch";
 // Defines the background sync task, which must exist when the app loads.
 import "@/core/sync/background";
@@ -88,6 +89,7 @@ function RootLayoutContent() {
           cold starts from a widget. */}
       <WidgetDeepLinkHost />
       <LabLaunch />
+      <CommandPalette />
       <AccountSwitcher />
       <AppLockGate />
       {authFlowVisible ? (

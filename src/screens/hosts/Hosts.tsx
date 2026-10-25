@@ -7,7 +7,7 @@ import {
   Platform,
 } from "react-native";
 import { useState, useCallback, useRef, useMemo, useEffect } from "react";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   RefreshCw,
@@ -154,6 +154,18 @@ export default function Hosts() {
   const [quickConnectOpen, setQuickConnectOpen] = useState(false);
   const [tailscaleDevicesOpen, setTailscaleDevicesOpen] = useState(false);
   const [credentialListOpen, setCredentialListOpen] = useState(false);
+
+  // The palette links here with ?action=new or ?action=quick.
+  const { action } = useLocalSearchParams<{ action?: string }>();
+  useEffect(() => {
+    if (!action) return;
+    if (action === "new") {
+      setFormHost(null);
+      setFormDraft(undefined);
+      setFormOpen(true);
+    } else if (action === "quick") setQuickConnectOpen(true);
+    router.setParams({ action: undefined });
+  }, [action, router]);
 
   const isRefreshingRef = useRef(false);
   const pendingTailscaleFormRef = useRef(false);
