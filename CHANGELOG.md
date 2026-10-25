@@ -110,10 +110,12 @@
 - Telnet hosts connect straight from the phone, with no Termix server needed, and open in the terminal with its key rows and find
 - RDP and VNC hosts connect straight from the phone, with no Termix server needed, through jump hosts and proxies too. Touch and trackpad modes, held mouse buttons, pinch zoom, two finger scroll, hardware keyboards and clipboard paste work, and RDP follows the screen when you rotate. The server's remote desktop view is still used when the host connects through the server
 - A refused RDP or VNC login from the phone asks for the login again right away
-- Settings, What works where lists every feature and plugin, and says if it works on the phone, needs the server, or is off or missing on your server
+- Settings, Plugins lists the plugins on your server with their version, whether they are on, and if they show in the app, in a web view or not at all. Everything lists every feature and plugin and says if it works on the phone or needs the server
+- A plugin made for a newer or older version of the app says to update the app or the plugin, instead of opening a broken screen
 - Server plugins with no phone version, like Homepage, Alerts and Proxmox, open inside the app with the same screens as the web app
-- Plugin screens about a host open from the host's menu as a tab; the others are listed on Home under From your server and in What works where
+- Plugin screens about a host open from the host's menu as a tab; the others are listed on Home under From your server and in Settings, Plugins
 - Plugin screens follow the app's theme, work behind proxies and client certificates, and only reach their own plugin on your server
+- An open tab of a plugin an admin turned off says so, and comes back when the plugin is on again
 
 ### Changed
 
