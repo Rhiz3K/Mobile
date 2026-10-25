@@ -38,7 +38,7 @@ function FolderRow({
       accessibilityLabel={`Folder ${node.name}, ${total} hosts`}
       accessibilityState={{ expanded: open }}
       style={{ marginLeft: row.depth * 14 }}
-      className={`flex-row items-center gap-2 px-2 py-2 active:bg-muted/40 ${
+      className={`flex-row items-center gap-2 px-2 py-2 hover:bg-muted/30 active:bg-muted/40 ${
         striped ? "bg-muted/20" : ""
       }`}
     >

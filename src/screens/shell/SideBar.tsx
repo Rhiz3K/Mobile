@@ -59,7 +59,7 @@ export function SideBar({ state, navigation }: BottomTabBarProps) {
             accessibilityLabel={
               count ? `${tab.label}, ${count} open` : tab.label
             }
-            className="items-center justify-center gap-1 py-3"
+            className="items-center justify-center gap-1 py-3 hover:bg-muted/30"
             style={{
               borderLeftWidth: 2,
               borderLeftColor: focused ? accent : "transparent",

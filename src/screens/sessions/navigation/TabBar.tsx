@@ -22,6 +22,7 @@ import {
   TerminalSession,
 } from "@/contexts/TerminalSessionsContext";
 import { useRouter } from "expo-router";
+import { isSecondaryClick } from "@/ui/ContextMenu";
 import { useOrientation } from "@/utils/orientation";
 import { getTabBarHeight, getButtonSize } from "@/utils/responsive";
 import { useUiColors } from "@/contexts/ThemeContext";
@@ -239,6 +240,11 @@ export default function TabBar({
                       <View
                         className="flex-1 flex-row items-center gap-1.5 px-2"
                         style={{ height: buttonSize }}
+                        onPointerDown={(e) => {
+                          if (isSecondaryClick(e.nativeEvent)) {
+                            onTabMenu?.(session.id);
+                          }
+                        }}
                       >
                         <SessionIcon
                           size={isLandscape ? 12 : 13}

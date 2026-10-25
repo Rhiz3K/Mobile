@@ -74,7 +74,7 @@ export function ListRow({
       disabled={!onPress && !onLongPress}
       accessibilityRole={onPress ? "button" : undefined}
       accessibilityState={{ selected: !!selected }}
-      className={`${compact ? "min-h-9" : "min-h-11"} flex-row items-stretch border-b border-border/40 active:bg-muted/50 ${bg} ${dimmed ? "opacity-60" : ""} ${className ?? ""}`}
+      className={`${compact ? "min-h-9" : "min-h-11"} flex-row items-stretch border-b border-border/40 hover:bg-muted/30 active:bg-muted/50 ${bg} ${dimmed ? "opacity-60" : ""} ${className ?? ""}`}
     >
       <View
         className={`w-[3px] shrink-0 ${selected ? "bg-accent-brand" : color ? "" : STRIPE[tone]}`}

@@ -13,6 +13,12 @@ export type { PopoverAnchor } from "./Popover";
 export { ConfirmProvider, useConfirm } from "./Confirm";
 export type { ConfirmOptions } from "./Confirm";
 export { PromptSheet } from "./PromptSheet";
+export {
+  ContextMenu,
+  isSecondaryClick,
+  useContextMenu,
+  type ContextMenuItem,
+} from "./ContextMenu";
 export { InlineView } from "./InlineView";
 export { ListRow, ListRowAction } from "./ListRow";
 export type { ListRowTone } from "./ListRow";
