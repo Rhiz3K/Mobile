@@ -176,6 +176,8 @@ export class FrameBridge {
         body,
         signal: controller.signal,
       });
+      // Core answers 503 for a plugin that was turned off.
+      if (response.status === 503) void client.refreshEnabledPlugins();
       this.send({
         t: "http.head",
         id,

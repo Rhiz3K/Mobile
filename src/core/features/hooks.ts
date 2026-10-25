@@ -5,7 +5,8 @@ import { features } from "./registry";
 import type { SSHHost } from "@/types";
 import type { Capability, FeatureContext } from "./types";
 
-function useRegistryVersion(): number {
+/** Goes up when a feature is added or removed, like a plugin turned off. */
+export function useRegistryVersion(): number {
   return useSyncExternalStore(
     features.subscribe,
     features.getVersion,

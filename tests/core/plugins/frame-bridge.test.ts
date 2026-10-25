@@ -32,6 +32,7 @@ function setup(reply?: (url: string, init: RequestInit) => Response) {
     sessionHeaders: () => ({ Authorization: "Bearer secret" }),
     proxyHeaders: () => ({ "CF-Access-Client-Id": "id" }),
     usesNativeNetwork: () => false,
+    refreshEnabledPlugins: jest.fn(async () => {}),
     fetch: jest.fn(async (url: string, init: RequestInit) => {
       fetches.push({ url, init });
       return reply
@@ -100,6 +101,24 @@ test("allowed requests go out with the app's login, not the page's", async () =>
   expect(sent[0]).toMatchObject({ t: "http.head", id: "h1", status: 200 });
   expect(bodyOf(sent, "h1")).toBe('{"ok":true}');
   expect(sent.at(-1)).toEqual({ t: "http.end", id: "h1" });
+});
+
+test("a 503 from a turned off plugin reloads the plugin list", async () => {
+  const { bridge, client, sent } = setup(
+    () => new Response(JSON.stringify({ pluginId: "alerts" }), { status: 503 }),
+  );
+  bridge.handle({
+    t: "http",
+    id: "h9",
+    method: "GET",
+    url: "https://termix.example/plugin-api/alerts/items",
+    headers: {},
+    body: { kind: "none" },
+  });
+  await flush();
+  await flush();
+  expect(client.refreshEnabledPlugins).toHaveBeenCalled();
+  expect(sent[0]).toMatchObject({ t: "http.head", id: "h9", status: 503 });
 });
 
 test("refused requests answer 403 without reaching the server", async () => {

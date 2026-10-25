@@ -22,7 +22,8 @@ import { SessionAccountProvider } from "@/core/accounts/session";
 import { LOCAL_ACCOUNT_ID } from "@/core/accounts/types";
 import { useKeyboard } from "@/contexts/KeyboardContext";
 import type { TerminalHandle } from "@/features/terminal/Terminal";
-import { features } from "@/core/features";
+import { features, useRegistryVersion } from "@/core/features";
+import { MissingTab } from "@/screens/sessions/MissingTab";
 import { sessionHandles } from "@/core/sessions/handles";
 import { sessionStatus } from "@/core/sessions/status";
 import { ConnectionsPanel } from "@/screens/sessions/ConnectionsPanel";
@@ -67,6 +68,8 @@ const NO_MODIFIERS = { ctrl: false, alt: false, shift: false };
 export default function Sessions() {
   const ui = useUiColors();
   const insets = useSafeAreaInsets();
+  // Tabs swap to a note when their plugin is turned off, and back.
+  useRegistryVersion();
   const router = useRouter();
   const { height, isLandscape } = useOrientation();
   const isIPad = Platform.OS === "ios" && Platform.isPad;
@@ -675,7 +678,15 @@ export default function Sessions() {
 
   const renderSession = (session: TerminalSession) => {
     const Tab = features.sessionTab(session.type)?.component;
-    if (!Tab) return null;
+    if (!Tab) {
+      return (
+        <MissingTab
+          title={session.title}
+          isVisible={session.id === activeSessionId}
+          onClose={() => handleTabClose(session.id)}
+        />
+      );
+    }
     return (
       <Tab
         ref={tabRefs.current[session.id]}

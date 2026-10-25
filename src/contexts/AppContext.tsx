@@ -23,6 +23,7 @@ import {
   moveServerSecretsForBackground,
 } from "@/core/db/legacy-move";
 import type { AccountClient } from "@/core/api/AccountClient";
+import { refreshPluginLists } from "@/core/plugins/refresh";
 import { getLatestGitHubRelease, isNewerVersion } from "@/core/updates";
 import { linkAccount, sync, SyncError, type LinkOutcome } from "@/core/sync";
 import { updateBackgroundSync } from "@/core/sync/background";
@@ -322,6 +323,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
       validationInProgressRef.current = true;
       lastValidationTimeRef.current = now;
+
+      // Other linked servers' tabs and screens follow their plugins too.
+      void refreshPluginLists(accounts.active().id).catch(() => {});
 
       try {
         const client = accounts.activeClient();
