@@ -79,6 +79,7 @@ export function hostFromRow(row: HostRow): SSHHost {
     folder: row.folder ?? "",
     tags: splitTags(row.tags),
     pin: row.pin,
+    sortOrder: row.sortOrder ?? null,
     authType: row.authType,
     password: row.password ?? undefined,
     key: row.key ?? undefined,

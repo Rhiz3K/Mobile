@@ -389,6 +389,27 @@ export function createHostsApi(c: AccountClient) {
     }
   }
 
+  async function reorderHosts(
+    positions: { id: number; sortOrder: number }[],
+  ): Promise<void> {
+    try {
+      await c.http.host.put("/reorder", { positions });
+    } catch (error) {
+      c.fail(error, "reorder hosts");
+    }
+  }
+
+  async function bulkUpdateHosts(
+    hostIds: number[],
+    updates: { pin?: boolean; folder?: string },
+  ): Promise<void> {
+    try {
+      await c.http.host.patch("/bulk-update", { hostIds, updates });
+    } catch (error) {
+      c.fail(error, "update hosts");
+    }
+  }
+
   async function deleteSSHHost(hostId: number): Promise<any> {
     try {
       const response = await c.http.host.delete(`/db/host/${hostId}`);
@@ -448,6 +469,8 @@ export function createHostsApi(c: AccountClient) {
     createSSHHost,
     updateSSHHost,
     bulkImportSSHHosts,
+    reorderHosts,
+    bulkUpdateHosts,
     deleteSSHHost,
     getSSHHostById,
     exportSSHHostWithCredentials,

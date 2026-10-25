@@ -246,10 +246,11 @@ export function sortHostTree(
       if (b.name === NO_FOLDER) return -1;
       return a.name.localeCompare(b.name);
     }
-    if (key === "default") return 0;
     const ha = (a as Extract<HostTreeNode, { kind: "host" }>).host;
     const hb = (b as Extract<HostTreeNode, { kind: "host" }>).host;
     switch (key) {
+      case "default":
+        return byManualOrder(ha, hb);
       case "name-asc":
         return ha.name.localeCompare(hb.name);
       case "name-desc":
@@ -279,6 +280,92 @@ export function sortHostTree(
       ? { ...node, children: sortHostTree(node.children, key, getStatus) }
       : node,
   );
+}
+
+/** The manual order from a drag, then name for hosts never dragged (like core). */
+export function byManualOrder(a: SSHHost, b: SSHHost): number {
+  const oa = a.sortOrder ?? null;
+  const ob = b.sortOrder ?? null;
+  if (oa !== null && ob !== null && oa !== ob) return oa - ob;
+  if (oa !== null && ob === null) return -1;
+  if (oa === null && ob !== null) return 1;
+  return (a.name || a.ip).localeCompare(b.name || b.ip);
+}
+
+/** One line of the host list: a folder header or a host. */
+export type HostListRow =
+  | {
+      kind: "folder";
+      key: string;
+      depth: number;
+      open: boolean;
+      node: Extract<HostTreeNode, { kind: "folder" }>;
+    }
+  | {
+      kind: "host";
+      key: string;
+      depth: number;
+      host: SSHHost;
+      /** Path of the folder it sits in. */
+      folderPath: string;
+    };
+
+/** The tree as list rows, children only under open folders. */
+export function flattenTree(
+  nodes: HostTreeNode[],
+  expanded: Set<string>,
+  depth = 0,
+  parentPath = "",
+): HostListRow[] {
+  const rows: HostListRow[] = [];
+  for (const node of nodes) {
+    if (isFolder(node)) {
+      const open = expanded.has(node.path);
+      rows.push({ kind: "folder", key: `f:${node.path}`, depth, open, node });
+      if (open) {
+        rows.push(
+          ...flattenTree(node.children, expanded, depth + 1, node.path),
+        );
+      }
+    } else {
+      rows.push({
+        kind: "host",
+        key: `h:${node.host.id}`,
+        depth,
+        host: node.host,
+        folderPath: parentPath,
+      });
+    }
+  }
+  return rows;
+}
+
+/**
+ * New manual order after a drag, or null when the host left its folder.
+ * `before` and `after` are the rows before and after the drag.
+ */
+export function reorderInFolder(
+  before: HostListRow[],
+  after: HostListRow[],
+  movedKey: string,
+): { id: number; sortOrder: number }[] | null {
+  const moved = before.find((r) => r.key === movedKey);
+  if (!moved || moved.kind !== "host") return null;
+  const inFolder = (r: HostListRow) =>
+    r.kind === "host" && r.folderPath === moved.folderPath;
+  const oldIdx = before.flatMap((r, i) => (inFolder(r) ? [i] : []));
+  const newIdx = after.flatMap((r, i) => (inFolder(r) ? [i] : []));
+  const start = newIdx[0];
+  const contiguous = newIdx[newIdx.length - 1] - start + 1 === newIdx.length;
+  // The folder's hosts must stay one block right where they were.
+  const sameSpot = after[start - 1]?.key === before[oldIdx[0] - 1]?.key;
+  if (!contiguous || !sameSpot) return null;
+  const order = newIdx.map((i) => after[i]);
+  if (order.every((r, i) => r.key === before[oldIdx[i]].key)) return null;
+  return order.map((r, sortOrder) => ({
+    id: (r as Extract<HostListRow, { kind: "host" }>).host.id,
+    sortOrder,
+  }));
 }
 
 /** Collect every folder path in the tree (for default "expand all"). */

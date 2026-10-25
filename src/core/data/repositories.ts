@@ -32,7 +32,11 @@ function emptyRepository<T, Draft>(what: string): Repository<T, Draft> {
 /** Where there is no encrypted store (web). Reads are empty, writes refuse. */
 export const emptyRepositories: DataRepositories = {
   source: "none",
-  hosts: emptyRepository("hosts"),
+  hosts: {
+    ...emptyRepository("hosts"),
+    reorder: refuse("hosts"),
+    bulkUpdate: refuse("hosts"),
+  },
   hostFolders: { subscribe: noop, list: async () => [] },
   credentials: emptyRepository("logins"),
   snippets: { ...emptyRepository("snippets"), reorder: refuse("snippets") },

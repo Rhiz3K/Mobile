@@ -157,3 +157,28 @@ test("a linked server that syncs reads its own copy, and shared rows are read on
   localStores.setDriver(null);
   expect(repositoriesFor(account, client).source).toBe("server");
 });
+
+test("a live server reorders and bulk updates hosts through the host routes", async () => {
+  const seen = fakeServer(() => ({ data: {} }));
+  const client = new AccountClient({
+    accountId: "c",
+    serverUrl: "https://t.example",
+    storage: accountStorage("c"),
+  });
+  const repos = repositoriesFor({ id: "c", kind: "server" } as any, client);
+  const changed = jest.fn();
+  repos.hosts.subscribe(changed);
+
+  await repos.hosts.reorder([{ id: 3, sortOrder: 0 }]);
+  await repos.hosts.bulkUpdate([3, 4], { pin: true });
+
+  expect(seen.map((r) => `${r.method} ${r.url}`)).toEqual([
+    "PUT https://t.example/host/reorder",
+    "PATCH https://t.example/host/bulk-update",
+  ]);
+  expect(seen[1].data).toEqual({
+    hostIds: [3, 4],
+    updates: { pin: true },
+  });
+  expect(changed).toHaveBeenCalledTimes(2);
+});

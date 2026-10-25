@@ -24,6 +24,19 @@ export interface Repository<T, Draft> extends Watchable {
   remove(id: number): Promise<void>;
 }
 
+/** Changes several hosts take at once, like the bulk bar on Hosts. */
+export interface HostBulkUpdate {
+  pin?: boolean;
+  /** Empty puts them in no folder. */
+  folder?: string;
+}
+
+export interface HostRepository extends Repository<SSHHost, SSHHostData> {
+  /** Sets the manual order of hosts, like a drag in the list. */
+  reorder(positions: { id: number; sortOrder: number }[]): Promise<void>;
+  bulkUpdate(ids: number[], updates: HostBulkUpdate): Promise<void>;
+}
+
 export interface SnippetRepository extends Repository<
   Snippet,
   Partial<Snippet>
@@ -167,7 +180,7 @@ export interface HostDefaultsRepository extends Watchable {
 export interface DataRepositories {
   /** "local" for the encrypted store on this phone, "server" for the server. */
   source: "local" | "server" | "none";
-  hosts: Repository<SSHHost, SSHHostData>;
+  hosts: HostRepository;
   hostFolders: HostFolderRepository;
   credentials: Repository<Credential, Partial<Credential>>;
   snippets: SnippetRepository;

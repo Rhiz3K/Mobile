@@ -56,6 +56,9 @@ export function serverRepositories(
       create: (draft) => hostChanges.after(hosts.createSSHHost(draft)),
       update: (id, draft) => hostChanges.after(hosts.updateSSHHost(id, draft)),
       remove: (id) => hostChanges.after(hosts.deleteSSHHost(id).then(() => {})),
+      reorder: (positions) => hostChanges.after(hosts.reorderHosts(positions)),
+      bulkUpdate: (ids, updates) =>
+        hostChanges.after(hosts.bulkUpdateHosts(ids, updates)),
     },
     hostFolders: {
       subscribe: hostChanges.subscribe,

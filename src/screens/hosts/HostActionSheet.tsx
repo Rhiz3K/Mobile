@@ -1,7 +1,15 @@
 import { useEffect, useState } from "react";
 import { View, ScrollView } from "react-native";
 import * as Clipboard from "expo-clipboard";
-import { Pencil, Copy, CopyPlus, Trash2 } from "lucide-react-native";
+import {
+  Pencil,
+  Copy,
+  CopyPlus,
+  Trash2,
+  Pin,
+  PinOff,
+  ListChecks,
+} from "lucide-react-native";
 import { SSHHost } from "@/types";
 import type { HostMetrics } from "@/screens/hosts/navigation/Host";
 import { useTerminalSessions } from "@/contexts/TerminalSessionsContext";
@@ -39,6 +47,8 @@ export function HostActionSheet({
   onEdit,
   onClone,
   onDelete,
+  onTogglePin,
+  onSelect,
 }: {
   host: SSHHost | null;
   status: "online" | "offline" | "unknown";
@@ -48,6 +58,10 @@ export function HostActionSheet({
   onEdit: (host: SSHHost) => void;
   onClone: (host: SSHHost) => void;
   onDelete: (host: SSHHost) => void;
+  /** Shows Pin or Unpin. */
+  onTogglePin?: (host: SSHHost) => void;
+  /** Shows Select, which starts multi select with this host. */
+  onSelect?: (host: SSHHost) => void;
 }) {
   const { navigateToSessions } = useTerminalSessions();
   const { ctx, actions } = useHostActions();
@@ -228,6 +242,32 @@ export function HostActionSheet({
             />
           );
         })}
+        {onTogglePin && !host.shared ? (
+          <SheetRow
+            icon={
+              host.pin ? (
+                <PinOff size={18} color={iconColor} />
+              ) : (
+                <Pin size={18} color={iconColor} />
+              )
+            }
+            label={host.pin ? "Unpin" : "Pin to Home"}
+            onPress={() => {
+              onTogglePin(host);
+              onClose();
+            }}
+          />
+        ) : null}
+        {onSelect ? (
+          <SheetRow
+            icon={<ListChecks size={18} color={iconColor} />}
+            label="Select"
+            onPress={() => {
+              onSelect(host);
+              onClose();
+            }}
+          />
+        ) : null}
         <SheetRow
           icon={<Pencil size={18} color={iconColor} />}
           label="Edit Host"

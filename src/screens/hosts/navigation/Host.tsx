@@ -1,7 +1,7 @@
 import { View, Pressable } from "react-native";
-import { Pin, Cpu, MemoryStick } from "lucide-react-native";
+import { Pin, Cpu, MemoryStick, GripVertical } from "lucide-react-native";
 import { SSHHost } from "@/types";
-import { Text } from "@/ui";
+import { Checkbox, Text } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { useHostBadges } from "@/core/features";
 import { isSshActive } from "@/utils/hosts";
@@ -19,7 +19,16 @@ interface HostProps {
   showTags?: boolean;
   /** Even rows get a subtle striped background (matches the web density). */
   striped?: boolean;
+  /** Folder depth, for the indent. */
+  depth?: number;
   onPress: (host: SSHHost) => void;
+  onLongPress?: (host: SSHHost) => void;
+  /** Multi select is on: rows show a checkbox. */
+  selecting?: boolean;
+  selected?: boolean;
+  /** Reorder is on: the grip starts a drag. */
+  onDrag?: () => void;
+  dragging?: boolean;
 }
 
 /** Compact protocol/feature tag (e.g. RDP, VNC, DKR) shown beside a host. */
@@ -73,7 +82,13 @@ export default function Host({
   metrics,
   showTags = true,
   striped = false,
+  depth = 0,
   onPress,
+  onLongPress,
+  selecting = false,
+  selected = false,
+  onDrag,
+  dragging = false,
 }: HostProps) {
   const color = useThemeColor();
   const accent = color("accent-brand") ?? "#f59145";
@@ -93,8 +108,20 @@ export default function Host({
   return (
     <Pressable
       onPress={() => onPress(host)}
+      onLongPress={onLongPress ? () => onLongPress(host) : undefined}
+      accessibilityRole="button"
+      accessibilityLabel={`${host.name}, ${status}`}
+      accessibilityHint={
+        selecting ? undefined : "Opens the terminal. Hold for more."
+      }
+      accessibilityState={selecting ? { selected } : undefined}
+      style={{ marginLeft: depth * 14 }}
       className={`flex-row items-stretch active:bg-muted/40 ${
-        striped ? "bg-muted/20" : "bg-card"
+        dragging || selected
+          ? "bg-muted/50"
+          : striped
+            ? "bg-muted/20"
+            : "bg-card"
       }`}
     >
       {/* Status stripe */}
@@ -102,6 +129,12 @@ export default function Host({
         style={{ backgroundColor: online ? accent : "transparent" }}
         className="w-[3px] shrink-0"
       />
+
+      {selecting ? (
+        <View className="justify-center pl-2.5">
+          <Checkbox checked={selected} onChange={() => onPress(host)} />
+        </View>
+      ) : null}
 
       <View className="min-w-0 flex-1 gap-1 px-2.5 py-2.5">
         {/* Name row */}
@@ -188,6 +221,17 @@ export default function Host({
           </View>
         ) : null}
       </View>
+
+      {onDrag ? (
+        <Pressable
+          onPressIn={onDrag}
+          accessibilityLabel={`Drag ${host.name}`}
+          hitSlop={6}
+          className="justify-center px-3"
+        >
+          <GripVertical size={16} color={color("muted-foreground")} />
+        </Pressable>
+      ) : null}
     </Pressable>
   );
 }

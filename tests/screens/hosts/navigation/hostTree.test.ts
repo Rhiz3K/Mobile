@@ -2,6 +2,9 @@ import {
   DEFAULT_FILTERS,
   applyFilters,
   buildHostTree,
+  flattenTree,
+  reorderInFolder,
+  sortHostTree,
 } from "@/screens/hosts/navigation/hostTree";
 import type { SSHHost } from "@/types";
 
@@ -59,4 +62,67 @@ test("a saved filter for a feature that is gone matches nothing", () => {
       ),
     ),
   ).toEqual([]);
+});
+
+describe("manual order and drag", () => {
+  const unknown = () => "unknown" as const;
+  const list = [
+    host(1, { name: "c", folder: "Prod" }),
+    host(2, { name: "a", folder: "Prod", sortOrder: 1 }),
+    host(3, { name: "b", folder: "Prod", sortOrder: 0 }),
+    host(4, { name: "z", folder: "Prod / Db" }),
+    host(5, { name: "x" }),
+  ];
+  const tree = sortHostTree(buildHostTree(list), "default", unknown);
+  const open = new Set(["Prod", "Prod / Db", "No Folder"]);
+
+  test("default sort follows the manual order, then name", () => {
+    const rows = flattenTree(tree, open);
+    expect(rows.map((r: any) => r.key)).toEqual([
+      "f:Prod",
+      "f:Prod / Db",
+      "h:4",
+      "h:3",
+      "h:2",
+      "h:1",
+      "f:No Folder",
+      "h:5",
+    ]);
+    const db: any = rows.find((r: any) => r.key === "h:4");
+    expect(db.folderPath).toBe("Prod / Db");
+    expect(db.depth).toBe(2);
+  });
+
+  test("closed folders hide their rows", () => {
+    const rows = flattenTree(tree, new Set(["Prod"]));
+    expect(rows.map((r: any) => r.key)).toEqual([
+      "f:Prod",
+      "f:Prod / Db",
+      "h:3",
+      "h:2",
+      "h:1",
+      "f:No Folder",
+    ]);
+  });
+
+  test("a drag inside the folder gives the new order", () => {
+    const before = flattenTree(tree, open);
+    const move = (from: number, to: number) => {
+      const after = [...before];
+      const [row] = after.splice(from, 1);
+      after.splice(to, 0, row);
+      return reorderInFolder(before, after, row.key);
+    };
+    // h:1 to the top of Prod's hosts.
+    expect(move(5, 3)).toEqual([
+      { id: 1, sortOrder: 0 },
+      { id: 3, sortOrder: 1 },
+      { id: 2, sortOrder: 2 },
+    ]);
+    // Into another folder, or above its own subfolder: refused.
+    expect(move(5, 7)).toBeNull();
+    expect(move(3, 1)).toBeNull();
+    // Dropped where it was.
+    expect(move(4, 4)).toBeNull();
+  });
 });

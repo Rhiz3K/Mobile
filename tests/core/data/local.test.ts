@@ -554,3 +554,46 @@ test("metric samples keep one point a minute per host and a week of them", async
   ]);
   expect(await repos.metricSamples.range(b, 0)).toHaveLength(0);
 });
+
+test("hosts reorder and bulk update, and shared copies stay as they are", async () => {
+  const { stores, repos } = setup();
+  const a = await repos.hosts.create({ ...fullHost, name: "a", pin: false });
+  const b = await repos.hosts.create({ ...fullHost, name: "b", pin: false });
+  const db = (await stores.get("local")).db;
+  const shared = db
+    .insert(hostsTable)
+    .values({
+      name: "shared",
+      ip: "10.0.0.9",
+      port: 22,
+      username: "u",
+      authType: "password",
+      syncId: "s-1",
+      sharedSource: JSON.stringify({ owner: "x", permissionLevel: "view" }),
+    } as never)
+    .returning()
+    .get();
+
+  await repos.hosts.reorder([
+    { id: b.id, sortOrder: 0 },
+    { id: a.id, sortOrder: 1 },
+    { id: shared.id, sortOrder: 2 },
+  ]);
+  await repos.hosts.bulkUpdate([a.id, b.id, shared.id], {
+    pin: true,
+    folder: " Lab ",
+  });
+
+  const byName = Object.fromEntries(
+    (await repos.hosts.list()).map((h) => [h.name, h]),
+  );
+  expect(byName.b.sortOrder).toBe(0);
+  expect(byName.a.sortOrder).toBe(1);
+  expect(byName.a.pin).toBe(true);
+  expect(byName.a.folder).toBe("Lab");
+  expect(byName.shared.sortOrder).toBeNull();
+  expect(byName.shared.pin).toBe(false);
+
+  await repos.hosts.bulkUpdate([a.id], { folder: "" });
+  expect((await repos.hosts.get(a.id))?.folder).toBe("");
+});

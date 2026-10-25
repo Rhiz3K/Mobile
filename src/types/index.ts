@@ -35,6 +35,8 @@ export interface SSHHost {
   folder: string;
   tags: string[];
   pin: boolean;
+  /** Manual place in its folder; unset sorts by name. */
+  sortOrder?: number | null;
   authType: AuthType;
   password?: string;
   key?: string;

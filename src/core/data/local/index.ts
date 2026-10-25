@@ -5,6 +5,8 @@ import {
   eq,
   getTableName,
   gte,
+  inArray,
+  isNull,
   lt,
   notInArray,
 } from "drizzle-orm";
@@ -184,6 +186,35 @@ export function localRepositories(
         const current = d.select().from(hosts).where(eq(hosts.id, id)).get();
         if (current) refuseShared(current, "host");
         d.delete(hosts).where(eq(hosts.id, id)).run();
+        touched(hosts);
+      },
+      async reorder(positions) {
+        const d = await db();
+        const at = now();
+        d.transaction((tx) => {
+          for (const { id, sortOrder } of positions) {
+            tx.update(hosts)
+              .set({ sortOrder, updatedAt: at })
+              .where(and(eq(hosts.id, id), isNull(hosts.sharedSource)))
+              .run();
+          }
+        });
+        touched(hosts);
+      },
+      async bulkUpdate(ids, updates) {
+        const set: Partial<typeof hosts.$inferInsert> = { updatedAt: now() };
+        if (updates.pin !== undefined) set.pin = updates.pin;
+        if (updates.folder !== undefined) {
+          set.folder = updates.folder.trim() || null;
+          // A host sits in a folder or under a parent host, never both.
+          set.parentHostId = null;
+        }
+        if (ids.length === 0) return;
+        (await db())
+          .update(hosts)
+          .set(set)
+          .where(and(inArray(hosts.id, ids), isNull(hosts.sharedSource)))
+          .run();
         touched(hosts);
       },
     },
