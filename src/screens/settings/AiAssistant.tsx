@@ -15,6 +15,7 @@ import {
 } from "expo-router";
 import type { BottomTabBarProps } from "expo-router/tabs";
 import { Screen } from "@/components/Screen";
+import { useKeyboard } from "@/contexts/KeyboardContext";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { useFeatureContext } from "@/core/features";
 import { AccessState } from "@/features/ai/components/AccessState";
@@ -36,9 +37,14 @@ export default function AiAssistant({
   const origin = aiOrigin(from);
   const { account, client } = useFeatureContext();
   const chat = useAiChat();
+  const { keyboardHeight, isKeyboardVisible } = useKeyboard();
   const [view, setView] = useState<"list" | "chat">("list");
   const [hosts, setHosts] = useState<Record<number, string>>({});
   const ready = chat.access !== "loading" && chat.access.state === "ready";
+  const keyboardOffset =
+    Platform.OS === "android" && mode === "tab" && isKeyboardVisible
+      ? keyboardHeight
+      : 0;
 
   useEffect(() => {
     setView("list");
@@ -94,7 +100,8 @@ export default function AiAssistant({
   return (
     <KeyboardAvoidingView
       className="flex-1"
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      // Unlike AuthFlow/Sheet, Android hides the tab bar while the keyboard is open, invalidating KAV's saved frame height; offset the composer by keyboardHeight instead.
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <Screen
         title={
@@ -153,7 +160,11 @@ export default function AiAssistant({
                 }
               />
             ) : (
-              <ChatView chat={chat} hostName={(id) => hosts[id]} />
+              <ChatView
+                chat={chat}
+                hostName={(id) => hosts[id]}
+                keyboardOffset={keyboardOffset}
+              />
             )}
           </View>
         )}

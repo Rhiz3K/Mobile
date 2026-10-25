@@ -10,9 +10,14 @@ import { RunView } from "./RunView";
 interface ChatViewProps {
   chat: ReturnType<typeof useAiChat>;
   hostName: (id: number) => string | undefined;
+  keyboardOffset?: number;
 }
 
-export function ChatView({ chat, hostName }: ChatViewProps) {
+export function ChatView({
+  chat,
+  hostName,
+  keyboardOffset = 0,
+}: ChatViewProps) {
   const [text, setText] = useState("");
   const [busyProposals, setBusyProposals] = useState<number[]>([]);
   const scroll = useRef<ScrollView>(null);
@@ -96,7 +101,11 @@ export function ChatView({ chat, hostName }: ChatViewProps) {
           </View>
         ))}
       </ScrollView>
-      <View className="flex-row items-end gap-2 border-t border-border p-3">
+      <View
+        testID="ai-chat-composer"
+        className="flex-row items-end gap-2 border-t border-border p-3"
+        style={{ marginBottom: keyboardOffset }}
+      >
         <Input
           accessibilityLabel="Message"
           placeholder="Ask the AI assistant…"

@@ -1,5 +1,13 @@
 import { act, fireEvent, render } from "@testing-library/react-native";
-import { BackHandler, Linking, Platform } from "react-native";
+import {
+  BackHandler,
+  DeviceEventEmitter,
+  Linking,
+  Platform,
+  StyleSheet,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useKeyboard } from "@/contexts/KeyboardContext";
 import { useFeatureContext } from "@/core/features";
 import type { FeatureContext } from "@/core/features/types";
 import type { AiAccess } from "@/features/ai/access";
@@ -11,11 +19,12 @@ import type { ConfirmOptions } from "@/ui/Confirm";
 
 jest.mock("@/features/ai/useAiChat", () => ({ useAiChat: jest.fn() }));
 jest.mock("@/core/features", () => ({ useFeatureContext: jest.fn() }));
+jest.mock("@/contexts/KeyboardContext", () => ({ useKeyboard: jest.fn() }));
 jest.mock("@/contexts/ThemeContext", () => ({
   useThemeColor: () => () => "#999999",
 }));
 jest.mock("react-native-safe-area-context", () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useSafeAreaInsets: jest.fn(),
 }));
 jest.mock("react-native-reanimated", () =>
   require("react-native-reanimated/mock"),
@@ -103,6 +112,17 @@ beforeEach(() => {
   chat = makeChat();
   jest.mocked(useAiChat).mockReturnValue(chat);
   jest.mocked(useFeatureContext).mockReturnValue(context);
+  jest.mocked(useKeyboard).mockReturnValue({
+    keyboardHeight: 0,
+    isKeyboardVisible: false,
+    showKeyboard: jest.fn(),
+  });
+  jest.mocked(useSafeAreaInsets).mockReturnValue({
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+  });
   mockGetHosts.mockReset().mockResolvedValue([{ id: 7, name: "Production" }]);
   mockConfirm.mockReset().mockResolvedValue(false);
   mockOpenURL.mockReset().mockResolvedValue(undefined);
@@ -240,6 +260,121 @@ afterEach(() => {
   Platform.OS = realOS;
   backListener?.mockRestore();
   backListener = undefined;
+});
+
+test("Android tab composer follows the keyboard context value with a bottom inset", async () => {
+  Platform.OS = "android";
+  jest.mocked(useSafeAreaInsets).mockReturnValue({
+    top: 24,
+    bottom: 24,
+    left: 0,
+    right: 0,
+  });
+  const result = await render(<AiAssistant mode="tab" />);
+  await fireEvent.press(result.getByText("New chat"));
+  expect(result.getByTestId("ai-chat-composer")).toHaveStyle({
+    marginBottom: 0,
+  });
+  await fireEvent(result.root!, "layout", {
+    nativeEvent: { layout: { x: 0, y: 0, width: 360, height: 720 } },
+    persist: jest.fn(),
+  });
+
+  jest.mocked(useKeyboard).mockReturnValue({
+    keyboardHeight: 320,
+    isKeyboardVisible: true,
+    showKeyboard: jest.fn(),
+  });
+  await act(() => {
+    DeviceEventEmitter.emit("keyboardDidShow", {
+      endCoordinates: { screenX: 0, screenY: 480, width: 360, height: 320 },
+      duration: 0,
+      easing: "keyboard",
+    });
+  });
+  await result.rerender(<AiAssistant mode="tab" />);
+  // Hiding BottomBar expands the scene to the screen bottom, including the
+  // navigation area. KAV must leave this height alone.
+  await fireEvent(result.root!, "layout", {
+    nativeEvent: { layout: { x: 0, y: 0, width: 360, height: 800 } },
+    persist: jest.fn(),
+  });
+  const rootStyle = StyleSheet.flatten(result.root!.props.style);
+  expect(rootStyle?.height).toBeUndefined();
+  expect(rootStyle?.paddingBottom).toBeUndefined();
+  // The inset is not subtracted because the hidden tab bar no longer reserves it.
+  expect(result.getByTestId("ai-chat-composer")).toHaveStyle({
+    marginBottom: 320,
+  });
+
+  // ChatView follows the updated context value.
+  jest.mocked(useKeyboard).mockReturnValue({
+    keyboardHeight: 400,
+    isKeyboardVisible: true,
+    showKeyboard: jest.fn(),
+  });
+  await result.rerender(<AiAssistant mode="tab" />);
+  expect(result.getByTestId("ai-chat-composer")).toHaveStyle({
+    marginBottom: 400,
+  });
+
+  jest.mocked(useKeyboard).mockReturnValue({
+    keyboardHeight: 400,
+    isKeyboardVisible: false,
+    showKeyboard: jest.fn(),
+  });
+  await act(() => {
+    DeviceEventEmitter.emit("keyboardDidHide");
+  });
+  await result.rerender(<AiAssistant mode="tab" />);
+  expect(result.getByTestId("ai-chat-composer")).toHaveStyle({
+    marginBottom: 0,
+  });
+});
+
+test("Android stack mode keeps the composer offset at zero with the keyboard visible", async () => {
+  Platform.OS = "android";
+  jest.mocked(useKeyboard).mockReturnValue({
+    keyboardHeight: 320,
+    isKeyboardVisible: true,
+    showKeyboard: jest.fn(),
+  });
+  const result = await render(<AiAssistant mode="stack" />);
+  await fireEvent.press(result.getByText("New chat"));
+  expect(result.getByTestId("ai-chat-composer")).toHaveStyle({
+    marginBottom: 0,
+  });
+});
+
+test("iOS keeps KAV padding without adding an Android composer offset", async () => {
+  Platform.OS = "ios";
+  jest.mocked(useKeyboard).mockReturnValue({
+    keyboardHeight: 320,
+    isKeyboardVisible: true,
+    showKeyboard: jest.fn(),
+  });
+  const result = await render(<AiAssistant mode="tab" />);
+  await fireEvent.press(result.getByText("New chat"));
+  await fireEvent(result.root!, "layout", {
+    nativeEvent: { layout: { x: 0, y: 0, width: 360, height: 800 } },
+    persist: jest.fn(),
+  });
+  await act(() => {
+    DeviceEventEmitter.emit("keyboardWillShow", {
+      endCoordinates: { screenX: 0, screenY: 480, width: 360, height: 320 },
+      duration: 0,
+      easing: "keyboard",
+    });
+  });
+  expect(result.root).toHaveStyle({ paddingBottom: 320 });
+  expect(result.getByTestId("ai-chat-composer")).toHaveStyle({
+    marginBottom: 0,
+  });
+
+  await act(() => {
+    DeviceEventEmitter.emit("keyboardWillHide");
+  });
+  expect(result.root).toHaveStyle({ paddingBottom: 0 });
 });
 
 test.each(["tools", "settings", undefined])(
