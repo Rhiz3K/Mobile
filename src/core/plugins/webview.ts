@@ -4,6 +4,7 @@ import type {
 } from "@/core/api/compat/server-features";
 import type { FeatureRegistry } from "@/core/features/registry";
 import { catalogEntry } from "./catalog";
+import { apiFit, type ApiFit } from "./compat";
 
 /** One plugin view the app can open in a web view. */
 export interface FrameView {
@@ -24,6 +25,8 @@ export interface FramePlugin {
   entry: string;
   frame: PluginFrameInfo;
   views: FrameView[];
+  /** Its engine.api against the app's copy of the SDK. */
+  fit: ApiFit;
 }
 
 interface TabEntry {
@@ -94,6 +97,7 @@ export function framePlugin(
     entry: mobile?.entry ?? "frontend.js",
     frame: plugin.frame,
     views,
+    fit: apiFit(plugin.engine?.api, "webview"),
   };
 }
 

@@ -85,6 +85,7 @@ function signature(plugin: FramePlugin): string {
     plugin.entry,
     plugin.frame.assetVersion,
     plugin.views,
+    plugin.fit,
   ]);
 }
 

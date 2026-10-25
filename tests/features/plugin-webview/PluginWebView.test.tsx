@@ -50,6 +50,7 @@ const plugin: FramePlugin = {
   entry: "frontend.js",
   frame: { css: false, assetVersion: "v1", locales: ["en"], contributes: {} },
   views: [{ view: "alerts", host: false }],
+  fit: "ok",
 };
 
 const client = {
@@ -57,12 +58,12 @@ const client = {
   rootBase: () => "https://termix.example",
 } as unknown as AccountClient;
 
-async function show() {
+async function show(shown: FramePlugin = plugin) {
   await render(
     <ConfirmProvider>
       <PluginWebView
         client={client}
-        plugin={plugin}
+        plugin={shown}
         view={{ view: "alerts" }}
         onShell={jest.fn()}
       />
@@ -104,4 +105,16 @@ test("a failed load explains and can try again", async () => {
     fireEvent.press(screen.getByText("Try again"));
   });
   expect(mockLoad).toHaveBeenCalledTimes(2);
+});
+
+test("a plugin made for a newer plugin API asks to update the app and never loads", async () => {
+  await show({ ...plugin, fit: "update-app" });
+  expect(screen.getByText("Update the app")).toBeTruthy();
+  expect(mockLoad).not.toHaveBeenCalled();
+});
+
+test("a plugin made for an older API major asks to update the plugin", async () => {
+  await show({ ...plugin, fit: "update-plugin" });
+  expect(screen.getByText("Update the plugin")).toBeTruthy();
+  expect(mockLoad).not.toHaveBeenCalled();
 });

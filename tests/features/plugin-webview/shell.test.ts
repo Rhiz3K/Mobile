@@ -29,6 +29,7 @@ const plugin: FramePlugin = {
     { view: "homepage", host: false },
     { view: "homepage-host", host: true },
   ],
+  fit: "ok",
 };
 
 function deps() {

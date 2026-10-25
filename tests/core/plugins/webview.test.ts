@@ -174,3 +174,15 @@ test("labels and strings", () => {
   expect(translate({ nav: {} }, "nav.main")).toBeNull();
   expect(translate(undefined, "nav.main")).toBeNull();
 });
+
+test("a web view plugin carries its engine.api check", () => {
+  const registry = new FeatureRegistry();
+  expect(framePlugin(plugin("alerts"), registry, "phone")?.fit).toBe("ok");
+  expect(
+    framePlugin(
+      plugin("alerts", { engine: { api: "^99.0" } }),
+      registry,
+      "phone",
+    )?.fit,
+  ).toBe("update-app");
+});

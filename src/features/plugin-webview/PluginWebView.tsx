@@ -12,10 +12,11 @@ import { Asset } from "expo-asset";
 import { useNetworkState } from "expo-network";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
 import type { ShouldStartLoadRequest } from "react-native-webview/lib/WebViewTypes";
-import { CloudOff, TriangleAlert } from "lucide-react-native";
+import { CloudOff, Download, TriangleAlert } from "lucide-react-native";
 import { THEME_VARS } from "@/constants/theme";
 import { useTheme, useUiColors } from "@/contexts/ThemeContext";
 import type { AccountClient } from "@/core/api/AccountClient";
+import { fitMessage } from "@/core/plugins/compat";
 import { FrameBridge } from "@/core/plugins/frame-bridge";
 import { loadFrameBundle, type FrameBundle } from "@/core/plugins/frame-bundle";
 import { buildFramePage, frameThemeCss } from "@/core/plugins/frame-page";
@@ -106,11 +107,15 @@ export const PluginWebView = forwardRef<
     );
   }, []);
 
+  const misfit = fitMessage(plugin.fit, plugin.name);
+
   // Code and strings, through the account's client.
   useEffect(() => {
     let alive = true;
     setState({ kind: "loading" });
     setBundle(null);
+    // A plugin made for another plugin API is never loaded.
+    if (misfit) return;
     if (offline) {
       setState({ kind: "offline" });
       return;
@@ -138,6 +143,7 @@ export const PluginWebView = forwardRef<
       alive = false;
     };
     // The view is set once; later changes go to the page as messages.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client, plugin, attempt, offline]);
 
   // The HTML is built once per load so theme and view changes don't reload it.
@@ -285,6 +291,17 @@ export const PluginWebView = forwardRef<
     if (request.navigationType === "click") void openLink(url);
     return false;
   };
+
+  if (misfit) {
+    return (
+      <EmptyState
+        className="flex-1"
+        icon={Download}
+        title={misfit.title}
+        hint={misfit.hint}
+      />
+    );
+  }
 
   if (state.kind === "offline") {
     return (

@@ -18,6 +18,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const sourceDir = join(root, "scripts/plugin-host");
 const protocol = join(root, "src/core/plugins/frame-protocol.ts");
 const out = join(root, "assets/plugin-host/host.js.html");
+const apiOut = join(root, "src/core/plugins/host-api.ts");
 const { findSdk, sharedResolver } = createRequire(import.meta.url)(
   "./plugin-host-sdk.cjs",
 );
@@ -33,6 +34,14 @@ export function pluginHostSourceHash() {
     hash.update(readFileSync(file, "utf8").replace(/\r\n/g, "\n"));
   }
   return hash.digest("hex").slice(0, 16);
+}
+
+/** PLUGIN_API_VERSION from the SDK's built manifest entry. */
+function sdkApiVersion(sdk) {
+  const text = readFileSync(join(sdk, "dist/manifest.js"), "utf8");
+  const match = text.match(/PLUGIN_API_VERSION\s*=\s*"(\d+\.\d+\.\d+)"/);
+  if (!match) throw new Error("No PLUGIN_API_VERSION in the SDK's manifest.js");
+  return match[1];
 }
 
 async function main() {
@@ -65,9 +74,16 @@ async function main() {
   const version = JSON.parse(
     readFileSync(join(sdk, "package.json"), "utf8"),
   ).version;
+  const api = sdkApiVersion(sdk);
   writeFileSync(
     out,
-    `/* termix-plugin-host ${pluginHostSourceHash()} sdk ${version} */\n${code}`,
+    `/* termix-plugin-host ${pluginHostSourceHash()} sdk ${version} api ${api} */\n${code}`,
+  );
+  writeFileSync(
+    apiOut,
+    "// Written by scripts/build-plugin-host.mjs, do not edit.\n\n" +
+      "/** The plugin API of the SDK the plugin host page was built from. */\n" +
+      `export const PLUGIN_HOST_API = "${api}";\n`,
   );
   console.log(`wrote ${out} (${Math.round(code.length / 1024)} KB)`);
 }

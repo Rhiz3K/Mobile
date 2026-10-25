@@ -44,7 +44,13 @@ test("cached lists survive a JSON round trip", () => {
     },
   ]);
   expect(activePlugins(JSON.parse(JSON.stringify(plugins)))).toEqual([
-    { id: "remote-desktop", active: true, protocols: ["rdp"] },
+    {
+      id: "remote-desktop",
+      active: true,
+      enabled: true,
+      state: "active",
+      protocols: ["rdp"],
+    },
   ]);
   expect(activePlugins("nope")).toBeNull();
 });
@@ -65,9 +71,11 @@ test("the full list keeps plugins that are off, with name and mobile info", () =
       id: "databases",
       name: "Databases",
       active: false,
+      enabled: false,
+      state: "disabled",
       mobile: { mode: "webview", views: ["databases"] },
     },
-    { id: "docker", active: true },
+    { id: "docker", active: true, enabled: true, state: "active" },
   ]);
   // The cached copy reads back the same.
   expect(parseServerPlugins(JSON.parse(JSON.stringify(all)))).toEqual(all);
@@ -142,4 +150,25 @@ test("plugins with a web frontend keep what a web view needs, cached or not", ()
   // The cached copy is the parsed list, which must read back the same.
   const [again] = parseServerPlugins(JSON.parse(JSON.stringify([alerts])))!;
   expect(again).toEqual(alerts);
+});
+
+test("state, enabled and engine ranges come through and survive the cache", () => {
+  const [first, second] = parseServerPlugins([
+    {
+      id: "alerts",
+      enabled: true,
+      state: "failed",
+      engine: { api: "^1.13", termix: ">=26.10.6", junk: 1 },
+    },
+    { id: "docker", enabled: false, state: "disabled", engine: { api: 2 } },
+  ])!;
+  expect(first).toMatchObject({
+    active: false,
+    enabled: true,
+    state: "failed",
+    engine: { api: "^1.13", termix: ">=26.10.6" },
+  });
+  expect(second.engine).toBeUndefined();
+  const [again] = parseServerPlugins(JSON.parse(JSON.stringify([first])))!;
+  expect(again).toEqual(first);
 });

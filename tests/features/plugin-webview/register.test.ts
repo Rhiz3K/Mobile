@@ -20,6 +20,7 @@ function plugin(extra: Partial<FramePlugin> = {}): FramePlugin {
       { view: "proxmox-stats", icon: "HardDrive", host: true },
       { view: "nodes", host: false },
     ],
+    fit: "ok",
     ...extra,
   };
 }

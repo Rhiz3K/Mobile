@@ -24,6 +24,12 @@ export interface ServerPlugin {
   version?: string;
   /** Turned on and running. */
   active: boolean;
+  /** Turned on by an admin, even when it did not start. */
+  enabled?: boolean;
+  /** The server's word for it: active, disabled, failed, safe-mode, ... */
+  state?: string;
+  /** The manifest's engine ranges (Termix 26.10.6+). */
+  engine?: { api?: string; termix?: string };
   /** How the plugin shows in the app, from its manifest. */
   mobile?: MobileContribution;
   /** Set when the plugin has a web frontend. */
@@ -51,6 +57,14 @@ function parseFrame(p: any): PluginFrameInfo | undefined {
   return frame;
 }
 
+function parseEngine(raw: any): ServerPlugin["engine"] | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const out: NonNullable<ServerPlugin["engine"]> = {};
+  if (typeof raw.api === "string" && raw.api) out.api = raw.api;
+  if (typeof raw.termix === "string" && raw.termix) out.termix = raw.termix;
+  return out.api || out.termix ? out : undefined;
+}
+
 /**
  * Every plugin the server lists, on or off. Reads the server's `GET /plugins`
  * entries and the app's own cached copies of them.
@@ -72,6 +86,10 @@ export function parseServerPlugins(list: unknown): ServerPlugin[] | null {
           ? p.active
           : p.enabled !== false && (p.state ?? "active") === "active";
       const out: ServerPlugin = { id: p.id, active };
+      if (typeof p.enabled === "boolean") out.enabled = p.enabled;
+      if (typeof p.state === "string" && p.state) out.state = p.state;
+      const engine = parseEngine(p.engine);
+      if (engine) out.engine = engine;
       if (typeof p.name === "string" && p.name) out.name = p.name;
       if (protocols) out.protocols = protocols;
       if (typeof p.version === "string") out.version = p.version;

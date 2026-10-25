@@ -27,6 +27,7 @@ const plugin: FramePlugin = {
     contributes: {},
   },
   views: [{ view: "alerts", host: false }],
+  fit: "ok",
 };
 
 function client(serve: Record<string, string> | Error) {

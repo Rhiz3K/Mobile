@@ -29,9 +29,18 @@ test("the plugin host asset was built from the current source (npm run build:plu
   const header = text.slice(0, text.indexOf("\n"));
   expect(header).toMatch(
     new RegExp(
-      `^/\\* termix-plugin-host ${sourceHash()} sdk \\d+\\.\\d+\\.\\d+ \\*/$`,
+      `^/\\* termix-plugin-host ${sourceHash()} sdk \\d+\\.\\d+\\.\\d+ api \\d+\\.\\d+\\.\\d+ \\*/$`,
     ),
   );
+});
+
+test("the app's plugin API is the one the host page was built with", () => {
+  const text = asset();
+  const api = text.slice(0, text.indexOf("\n")).match(/ api (\S+) /)?.[1];
+  const { PLUGIN_HOST_API } = jest.requireActual(
+    "../../src/core/plugins/host-api",
+  ) as { PLUGIN_HOST_API: string };
+  expect(PLUGIN_HOST_API).toBe(api);
 });
 
 test("the plugin host page loads no scripts or styles from the network", () => {
