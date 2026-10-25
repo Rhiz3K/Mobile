@@ -82,7 +82,8 @@ export function InlineView({
       className="bg-background"
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        // Edge to edge Android no longer resizes for the keyboard.
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >
         <View
