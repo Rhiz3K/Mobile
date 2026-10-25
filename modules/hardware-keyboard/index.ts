@@ -8,11 +8,23 @@ interface KeyCommandEvent {
   alt: boolean;
 }
 
+export interface AppShortcutDef {
+  id: string;
+  input: string;
+  modifiers: ("cmd" | "shift" | "alt" | "ctrl")[];
+  title: string;
+}
+
 interface HardwareKeyboardModule {
   addListener(
     eventName: "onKeyCommand",
     listener: (event: KeyCommandEvent) => void,
   ): EventSubscription;
+  addListener(
+    eventName: "onAppShortcut",
+    listener: (event: { id: string }) => void,
+  ): EventSubscription;
+  setAppShortcuts?(items: AppShortcutDef[]): void;
   setEnabled?(enabled: boolean): void;
 }
 
@@ -32,4 +44,16 @@ export function addKeyCommandListener(
  */
 export function setHardwareKeyboardEnabled(enabled: boolean): void {
   HardwareKeyboard?.setEnabled?.(enabled);
+}
+
+/** Registers app wide shortcuts. iPadOS lists them when Cmd is held. */
+export function setAppShortcuts(items: AppShortcutDef[]): void {
+  HardwareKeyboard?.setAppShortcuts?.(items);
+}
+
+export function addAppShortcutListener(
+  listener: (id: string) => void,
+): EventSubscription | null {
+  if (!HardwareKeyboard) return null;
+  return HardwareKeyboard.addListener("onAppShortcut", (e) => listener(e.id));
 }

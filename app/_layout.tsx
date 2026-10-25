@@ -40,6 +40,8 @@ import { loadUiPrefs } from "@/core/ui-prefs";
 import { registerBuiltInFeatures } from "@/features";
 import { usePluginFrameFeatures } from "@/features/plugin-webview/register";
 import { AccountSwitcher } from "@/screens/accounts/AccountSwitcher";
+import { ShortcutSheet } from "@/screens/shortcuts/ShortcutSheet";
+import { useAppShortcuts } from "@/core/shortcuts/useAppShortcuts";
 import { CommandPalette } from "@/screens/palette/CommandPalette";
 import { LabLaunch } from "@/screens/dev/terminal-lab/LabLaunch";
 // Defines the background sync task, which must exist when the app loads.
@@ -58,6 +60,7 @@ function RootLayoutContent() {
   } = useAppContext();
   const accent = useThemeColor()("accent-brand");
   usePluginFrameFeatures();
+  useAppShortcuts();
 
   if (isLoading) {
     return (
@@ -101,6 +104,7 @@ function RootLayoutContent() {
       <WidgetDeepLinkHost />
       <LabLaunch />
       <CommandPalette />
+      <ShortcutSheet />
       <AccountSwitcher />
       <AppLockGate />
       {welcomeVisible ? (
