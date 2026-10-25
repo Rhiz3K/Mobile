@@ -3,7 +3,7 @@ import { View, ScrollView, Pressable, RefreshControl } from "react-native";
 import { Plug, SquareTerminal, ExternalLink, X } from "lucide-react-native";
 import { features, useFeatureContext } from "@/core/features";
 import { useTerminalSessions } from "@/contexts/TerminalSessionsContext";
-import { Text } from "@/ui";
+import { Text, useConfirm } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { SSHHost } from "@/types";
 import { accounts, api } from "@/core/accounts";
@@ -32,7 +32,15 @@ function restoreTarget(tabType: string) {
   return { type: found.tab.type, opts: found.opts };
 }
 
-function SectionHeader({ label, count }: { label: string; count: number }) {
+function SectionHeader({
+  label,
+  count,
+  action,
+}: {
+  label: string;
+  count: number;
+  action?: React.ReactNode;
+}) {
   return (
     <View className="flex-row items-center gap-2 border-b border-border bg-muted/20 px-4 py-2">
       <Text
@@ -44,6 +52,7 @@ function SectionHeader({ label, count }: { label: string; count: number }) {
       <View className="bg-muted px-1.5 py-0.5">
         <Text className="text-[10px] text-muted-foreground">{count}</Text>
       </View>
+      {action}
     </View>
   );
 }
@@ -154,7 +163,20 @@ export function ConnectionsPanel({ onClose }: { onClose?: () => void }) {
     addSession,
     navigateToSessions,
     forgetBackgroundTab,
+    closeAllSessions,
   } = useTerminalSessions();
+  const confirm = useConfirm();
+
+  const closeAll = async () => {
+    const ok = await confirm({
+      title: `Close all ${sessions.length} tabs?`,
+      description: "Every session ends.",
+      confirmLabel: "Close all",
+    });
+    if (!ok) return;
+    closeAllSessions();
+    onClose?.();
+  };
 
   const [activeSessions, setActiveSessions] = useState<ActiveSessionInfo[]>([]);
   const [hosts, setHosts] = useState<SSHHost[]>([]);
@@ -254,7 +276,24 @@ export function ConnectionsPanel({ onClose }: { onClose?: () => void }) {
     >
       {sessions.length > 0 ? (
         <View>
-          <SectionHeader label="Open" count={sessions.length} />
+          <SectionHeader
+            label="Open"
+            count={sessions.length}
+            action={
+              sessions.length > 1 ? (
+                <Pressable
+                  onPress={closeAll}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  className="px-1 active:opacity-70"
+                >
+                  <Text className="text-[11px] text-destructive">
+                    Close all
+                  </Text>
+                </Pressable>
+              ) : undefined
+            }
+          />
           {sessions.map((s) => {
             const live = sessionByInstance.get(s.instanceId);
             const isLive = features.sessionHas(s.type, "terminal-input")

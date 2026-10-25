@@ -2,11 +2,13 @@ import { useMemo, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
+  Columns2,
   CopyPlus,
   Pencil,
   X,
+  XSquare,
 } from "lucide-react-native";
-import { PromptSheet, Sheet, SheetRow } from "@/ui";
+import { PromptSheet, Sheet, SheetRow, useConfirm } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { accounts, useClient } from "@/core/accounts";
 import { features } from "@/core/features";
@@ -37,6 +39,10 @@ export function SessionMenu({
   companionOpen,
   companionAsTab,
   onCompanion,
+  splitTargets = [],
+  splitOn = false,
+  onSplit,
+  onCloseAll,
 }: {
   session: TerminalSession | null;
   index: number;
@@ -55,10 +61,19 @@ export function SessionMenu({
   /** On phones a panel opens as its own tab instead. */
   companionAsTab?: boolean;
   onCompanion?: (id: string) => void;
+  /** Tabs this one can share the screen with, on large screens. */
+  splitTargets?: TerminalSession[];
+  /** This tab is in split view now. */
+  splitOn?: boolean;
+  /** Puts a tab beside this one, or null to end split view. */
+  onSplit?: (sessionId: string | null) => void;
+  onCloseAll?: () => void;
 }) {
   const color = useThemeColor();
   const client = useClient(session?.accountId ?? null);
+  const confirm = useConfirm();
   const [renaming, setRenaming] = useState(false);
+  const [picking, setPicking] = useState(false);
 
   const ctx = useMemo<SessionMenuContext | null>(() => {
     if (!session) return null;
@@ -86,7 +101,7 @@ export function SessionMenu({
   return (
     <>
       <Sheet
-        visible={session !== null && !renaming}
+        visible={session !== null && !renaming && !picking}
         onClose={onClose}
         title={session ? displayTitle(session) : undefined}
         scroll
@@ -115,6 +130,19 @@ export function SessionMenu({
             onPress={pick(() => onCompanion?.(c.id))}
           />
         ))}
+        {splitOn ? (
+          <SheetRow
+            icon={icon(Columns2)}
+            label="End split view"
+            onPress={pick(() => onSplit?.(null))}
+          />
+        ) : splitTargets.length > 0 && onSplit ? (
+          <SheetRow
+            icon={icon(Columns2)}
+            label="Split view with..."
+            onPress={() => setPicking(true)}
+          />
+        ) : null}
         {items.map((item) => (
           <SheetRow
             key={item.id}
@@ -147,6 +175,39 @@ export function SessionMenu({
           destructive
           onPress={pick(onCloseTab)}
         />
+        {onCloseAll && count > 1 ? (
+          <SheetRow
+            icon={<XSquare size={16} color={color("destructive")} />}
+            label="Close all tabs"
+            destructive
+            onPress={pick(async () => {
+              const ok = await confirm({
+                title: `Close all ${count} tabs?`,
+                description: "Every session ends.",
+                confirmLabel: "Close all",
+              });
+              if (ok) onCloseAll();
+            })}
+          />
+        ) : null}
+      </Sheet>
+      <Sheet
+        visible={picking}
+        onClose={() => setPicking(false)}
+        title="Split view with"
+        scroll
+      >
+        {splitTargets.map((target) => (
+          <SheetRow
+            key={target.id}
+            label={displayTitle(target)}
+            onPress={() => {
+              setPicking(false);
+              onClose();
+              onSplit?.(target.id);
+            }}
+          />
+        ))}
       </Sheet>
       <PromptSheet
         visible={renaming}

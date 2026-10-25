@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import {
   View,
   Keyboard,
@@ -8,6 +14,8 @@ import {
   AppState,
   LayoutAnimation,
   Pressable,
+  PanResponder,
+  StyleSheet,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -33,6 +41,12 @@ import TabBar from "@/screens/sessions/navigation/TabBar";
 import { SessionMenu } from "@/screens/sessions/SessionMenu";
 import { CompanionPane } from "@/screens/sessions/CompanionPane";
 import { TabSwipeEdge } from "@/screens/sessions/TabSwipeEdge";
+import {
+  canSplit,
+  clampRatio,
+  partnerAfterActivate,
+  splitPartner,
+} from "@/screens/sessions/split";
 import { neighborTab, tabNumber } from "@/contexts/session-tabs";
 import type {
   SessionMenuContext,
@@ -87,6 +101,7 @@ export default function Sessions() {
     setResumeData,
     moveSession,
     duplicateSession,
+    closeAllSessions,
     isCustomKeyboardVisible,
     toggleCustomKeyboard,
     lastKeyboardHeight,
@@ -360,6 +375,38 @@ export default function Sessions() {
     [isTablet, companionsOf, addSession],
   );
 
+  // Two tabs side by side on large screens. Kept in memory only.
+  const [splitWith, setSplitWith] = useState<string | null>(null);
+  const [splitRatio, setSplitRatio] = useState(0.5);
+  const [stageWidth, setStageWidth] = useState(0);
+  const splitOk = canSplit(screenDimensions.width, screenDimensions.height);
+  const partnerId = splitOk
+    ? splitPartner(
+        sessions.map((s) => s.id),
+        activeSessionId,
+        splitWith,
+      )
+    : null;
+  const ratioBase = useRef(splitRatio);
+  const ratioNow = useRef(splitRatio);
+  ratioNow.current = splitRatio;
+  const dividerPan = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: () => {
+          ratioBase.current = ratioNow.current;
+        },
+        onPanResponderMove: (_, g) => {
+          if (stageWidth > 0) {
+            setSplitRatio(clampRatio(ratioBase.current + g.dx / stageWidth));
+          }
+        },
+      }),
+    [stageWidth],
+  );
+
   useFocusEffect(
     React.useCallback(() => {
       if (
@@ -529,6 +576,9 @@ export default function Sessions() {
     const session = sessions.find((s) => s.id === sessionId);
     setKeyboardIntentionallyHidden(false);
 
+    setSplitWith((prev) =>
+      partnerAfterActivate(activeSessionId, prev, sessionId),
+    );
     setActiveSession(sessionId);
     setTimeout(() => {
       if (
@@ -691,7 +741,7 @@ export default function Sessions() {
       <Tab
         ref={tabRefs.current[session.id]}
         session={session}
-        isVisible={session.id === activeSessionId}
+        isVisible={session.id === activeSessionId || session.id === partnerId}
         onClose={() => handleTabClose(session.id)}
         onBackendSessionId={(backendId) =>
           setBackendSessionId(session.id, backendId)
@@ -729,16 +779,79 @@ export default function Sessions() {
         }}
       >
         {(() => {
-          const tabs = sessions.map((session) => (
-            <SessionAccountProvider
-              key={session.id}
-              accountId={session.accountId}
+          const leftWidth = Math.round(stageWidth * splitRatio);
+          // Each tab keeps its own wrapper, so starting or ending a split never remounts it.
+          const paneStyle = (id: string) => {
+            const shown = id === activeSessionId || id === partnerId;
+            if (!partnerId || !shown) {
+              return [StyleSheet.absoluteFill, { zIndex: shown ? 1 : 0 }];
+            }
+            const order = sessions.findIndex((s) => s.id === id);
+            const other = sessions.findIndex(
+              (s) => s.id === (id === partnerId ? activeSessionId : partnerId),
+            );
+            const left = order < other;
+            return [
+              {
+                position: "absolute" as const,
+                top: 0,
+                bottom: 0,
+                zIndex: 1,
+                left: left ? 0 : leftWidth + 3,
+                width: left ? leftWidth - 3 : stageWidth - leftWidth - 3,
+              },
+            ];
+          };
+          const tabs = (
+            <View
+              style={{ flex: 1 }}
+              onLayout={(e) => setStageWidth(e.nativeEvent.layout.width)}
             >
-              {renderSession(session)}
-            </SessionAccountProvider>
-          ));
+              {sessions.map((session) => {
+                const shown =
+                  session.id === activeSessionId || session.id === partnerId;
+                return (
+                  <View
+                    key={session.id}
+                    style={paneStyle(session.id)}
+                    pointerEvents={shown ? "auto" : "none"}
+                    onTouchStart={
+                      session.id === partnerId
+                        ? () => handleTabPress(session.id)
+                        : undefined
+                    }
+                  >
+                    <SessionAccountProvider accountId={session.accountId}>
+                      {renderSession(session)}
+                    </SessionAccountProvider>
+                  </View>
+                );
+              })}
+              {partnerId ? (
+                <View
+                  {...dividerPan.panHandlers}
+                  accessibilityRole="adjustable"
+                  accessibilityLabel="Resize split view"
+                  hitSlop={{ left: 8, right: 8 }}
+                  className="items-center justify-center bg-border active:bg-accent-brand"
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    bottom: 0,
+                    left: leftWidth - 3,
+                    width: 6,
+                    zIndex: 2,
+                  }}
+                >
+                  <View className="h-8 w-0.5 bg-muted-foreground/50" />
+                </View>
+              ) : null}
+            </View>
+          );
           const companionId =
-            isTablet && activeSession ? companionFor[activeSession.id] : null;
+            isTablet && activeSession && !partnerId
+              ? companionFor[activeSession.id]
+              : null;
           const def = companionId
             ? companionsOf(activeSession).find((c) => c.id === companionId)
             : null;
@@ -982,6 +1095,22 @@ export default function Sessions() {
         companions={companionsOf(sessions.find((s) => s.id === menuFor))}
         companionOpen={menuFor ? (companionFor[menuFor] ?? null) : null}
         companionAsTab={!isTablet}
+        splitTargets={splitOk ? sessions.filter((s) => s.id !== menuFor) : []}
+        splitOn={
+          !!partnerId && (menuFor === activeSessionId || menuFor === partnerId)
+        }
+        onSplit={(id) => {
+          if (!id) {
+            setSplitWith(null);
+            return;
+          }
+          if (menuFor && menuFor !== activeSessionId) setActiveSession(menuFor);
+          setSplitWith(id);
+        }}
+        onCloseAll={() => {
+          setSplitWith(null);
+          closeAllSessions();
+        }}
         onCompanion={(id) => {
           const session = sessions.find((s) => s.id === menuFor);
           if (session) toggleCompanion(session, id);
