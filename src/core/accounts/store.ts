@@ -1,4 +1,5 @@
 import { AccountClient } from "@/core/api/AccountClient";
+import { clearFrameCache } from "@/core/plugins/frame-bundle";
 import { localStores } from "@/core/db/stores";
 import { AppError } from "@/core/errors";
 import {
@@ -215,6 +216,7 @@ export class AccountStore {
     if (!this.find(id)) throw new AppError("No such account", "NOT_FOUND");
     const client = this.client(id);
     await client?.wipe();
+    clearFrameCache(id);
     await this.wipeLocalData(id);
     this.clients.delete(id);
     this.servers = this.servers.filter((a) => a.id !== id);

@@ -32,6 +32,14 @@ export function fakeFileSystem() {
     get contentUri() {
       return this.uri.replace("file://", "content://fake");
     }
+    get parentDirectory() {
+      return new Directory(parentOf(this.uri));
+    }
+    async text() {
+      const data = files.get(this.uri);
+      if (!data) throw new Error(`missing ${this.uri}`);
+      return new TextDecoder().decode(data);
+    }
     create(_o?: unknown) {
       files.set(this.uri, files.get(this.uri) ?? new Uint8Array(0));
     }
@@ -103,6 +111,12 @@ export function fakeFileSystem() {
         dirs.add(d);
         d = parentOf(d);
       }
+    }
+    delete() {
+      const inside = (uri: string) =>
+        uri === this.uri || uri.startsWith(`${this.uri}/`);
+      for (const d of [...dirs]) if (inside(d)) dirs.delete(d);
+      for (const f of [...files.keys()]) if (inside(f)) files.delete(f);
     }
     list() {
       const out: (File | Directory)[] = [];

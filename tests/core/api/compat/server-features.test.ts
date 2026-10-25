@@ -115,3 +115,31 @@ test("plugin only features are off on older servers", async () => {
   const on = await client("plugin", [{ id: "tailscale" }]);
   expect(on.supports({ plugin: "tailscale", pluginApiOnly: true })).toBe(true);
 });
+
+test("plugins with a web frontend keep what a web view needs, cached or not", () => {
+  const [alerts, sync] = parseServerPlugins([
+    {
+      id: "alerts",
+      enabled: true,
+      state: "active",
+      frontend: true,
+      css: true,
+      assetVersion: "v9",
+      locales: ["en", "de_DE", 3],
+      icon: "Bell",
+      contributes: { tabs: [{ id: "alerts" }] },
+    },
+    { id: "sync", enabled: true, state: "active", frontend: false },
+  ])!;
+  expect(alerts.frame).toEqual({
+    css: true,
+    assetVersion: "v9",
+    locales: ["en", "de_DE"],
+    icon: "Bell",
+    contributes: { tabs: [{ id: "alerts" }] },
+  });
+  expect(sync.frame).toBeUndefined();
+  // The cached copy is the parsed list, which must read back the same.
+  const [again] = parseServerPlugins(JSON.parse(JSON.stringify([alerts])))!;
+  expect(again).toEqual(alerts);
+});

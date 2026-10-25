@@ -3,6 +3,20 @@ import {
   type MobileContribution,
 } from "@/core/plugins/mobile";
 
+/** What a plugin web view needs from the server's plugin list. */
+export interface PluginFrameInfo {
+  /** Lucide icon name from the manifest. */
+  icon?: string;
+  /** A frontend.css sits beside the bundle. */
+  css: boolean;
+  /** Cache key for the bundle; changes when it is rebuilt. */
+  assetVersion: string | null;
+  /** "en" plus the xx_YY names of shipped translations. */
+  locales: string[];
+  /** The manifest's contributes, which the plugin's registrations are checked against. */
+  contributes: Record<string, unknown>;
+}
+
 export interface ServerPlugin {
   id: string;
   name?: string;
@@ -12,6 +26,29 @@ export interface ServerPlugin {
   active: boolean;
   /** How the plugin shows in the app, from its manifest. */
   mobile?: MobileContribution;
+  /** Set when the plugin has a web frontend. */
+  frame?: PluginFrameInfo;
+}
+
+function parseFrame(p: any): PluginFrameInfo | undefined {
+  // Server entries say `frontend`, cached ones keep the parsed `frame`.
+  const raw = p.frame ?? (p.frontend === true ? p : null);
+  if (!raw || typeof raw !== "object") return undefined;
+  const contributes =
+    raw.contributes && typeof raw.contributes === "object"
+      ? (raw.contributes as Record<string, unknown>)
+      : {};
+  const frame: PluginFrameInfo = {
+    css: raw.css === true,
+    assetVersion:
+      typeof raw.assetVersion === "string" ? raw.assetVersion : null,
+    locales: Array.isArray(raw.locales)
+      ? raw.locales.filter((l: unknown): l is string => typeof l === "string")
+      : ["en"],
+    contributes,
+  };
+  if (typeof raw.icon === "string" && raw.icon) frame.icon = raw.icon;
+  return frame;
 }
 
 /**
@@ -40,6 +77,8 @@ export function parseServerPlugins(list: unknown): ServerPlugin[] | null {
       if (typeof p.version === "string") out.version = p.version;
       const mobile = parseMobileContribution(p.contributes?.mobile ?? p.mobile);
       if (mobile) out.mobile = mobile;
+      const frame = parseFrame(p);
+      if (frame) out.frame = frame;
       return out;
     });
 }
