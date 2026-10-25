@@ -9,6 +9,11 @@ import type { SignInOption } from "./methods";
 /** The app's own address the server sends the browser back to. */
 export const APP_CALLBACK_URL = "termix-mobile://oidc-callback";
 
+/** The callback for one sign in, with its flow id in the path. */
+export function callbackUrlFor(flow: string | null): string {
+  return flow ? `${APP_CALLBACK_URL}/${flow}` : APP_CALLBACK_URL;
+}
+
 export interface SecondFactorStep {
   tempToken: string;
   /** Factor ids the user may answer with, like totp or security-key. */
@@ -141,6 +146,7 @@ export async function signInWithForm(
 export async function redirectStartUrl(
   client: AccountClient,
   option: Extract<SignInOption, { kind: "redirect" }>,
+  flow: string | null = null,
 ): Promise<string> {
   if (option.legacy) {
     const res = await client.api.auth.getOIDCAuthorizeUrl(APP_CALLBACK_URL);
@@ -148,7 +154,7 @@ export async function redirectStartUrl(
       throw new AppError("The server sent no sign in address.", "AUTH_FAILED");
     return res.auth_url;
   }
-  const params = new URLSearchParams({ appCallbackUrl: APP_CALLBACK_URL });
+  const params = new URLSearchParams({ appCallbackUrl: callbackUrlFor(flow) });
   if (option.instanceId) params.set("instance", option.instanceId);
   const res = await client.fetch(
     `${client.rootBase()}/users/auth/${encodeURIComponent(option.methodId)}/start?${params.toString()}`,
@@ -170,8 +176,11 @@ export async function redirectStartUrl(
 }
 
 /** The server's own login page, which hands the session back to the app. */
-export function browserSignInUrl(client: AccountClient): string {
-  return `${client.rootBase()}/?return_to=${encodeURIComponent(APP_CALLBACK_URL)}`;
+export function browserSignInUrl(
+  client: AccountClient,
+  flow: string | null = null,
+): string {
+  return `${client.rootBase()}/?return_to=${encodeURIComponent(callbackUrlFor(flow))}`;
 }
 
 /** Answers a second factor with a code, like TOTP or a backup code. */
@@ -201,14 +210,28 @@ export async function verifySecondFactor(
   return finishLoginAnswer(client, status, data);
 }
 
-export type CallbackResult =
+export type CallbackResult = (
   | { kind: "token"; token: string }
   | { kind: "secondFactor"; step: SecondFactorStep }
-  | { kind: "error"; message: string };
+  | { kind: "error"; message: string }
+) & {
+  /** The sign in it belongs to, from the path. Null on old servers. */
+  flow?: string | null;
+};
 
 /** Reads the app link the server sent the browser back to. */
 export function parseCallback(url: string): CallbackResult | null {
+  const result = readCallback(url);
+  if (!result) return null;
+  const path = url.slice(APP_CALLBACK_URL.length).split("?")[0];
+  const flow = /^\/[A-Za-z0-9]{8,64}$/.test(path) ? path.slice(1) : null;
+  return { ...result, flow };
+}
+
+function readCallback(url: string): CallbackResult | null {
   if (!url.startsWith(APP_CALLBACK_URL)) return null;
+  const rest = url.slice(APP_CALLBACK_URL.length);
+  if (rest && !/^[/?]/.test(rest)) return null;
   const at = url.indexOf("?");
   const params: Record<string, string> = {};
   // Hermes' URL does not parse custom schemes well, so split by hand.

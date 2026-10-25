@@ -198,6 +198,8 @@
 - A reverse proxy asking you to sign in again no longer signs you out of Termix
 - A proxy sign in like Authelia or Authentik is kept after the app restarts, and the app asks you to sign in to the proxy again when it runs out instead of making you add the server again (#103)
 - A client certificate (mTLS) is sent on every request, socket and SSH relay, including file uploads and downloads on iPhone and remote desktop through the server (#84)
+- Signing in through the browser keeps your SSO login. Signing out of one server no longer makes the next sign in forget it, and Android uses the system browser after a sign out too, so passkeys work there
+- A sign in link from an older try can no longer finish a sign in, and each link works once
 - Servers behind Cloudflare Access work after you sign in: when Access wants a sign in, the app opens it instead of saying it can't reach Termix (#81)
 - Terminal settings saved on a host in Termix 2.9 and newer are now used on the phone
 - A host with tmux turned on in Termix no longer hangs when the host has more than one tmux session

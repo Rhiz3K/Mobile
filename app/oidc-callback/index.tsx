@@ -3,7 +3,8 @@ import { Redirect, useLocalSearchParams } from "expo-router";
 import { rememberOidcCallback } from "@/utils/oidc-callback";
 import { useAppContext } from "@/contexts/AppContext";
 
-// Route for the `termix-mobile://oidc-callback` deep link.
+// Route for the `termix-mobile://oidc-callback` deep link, and through
+// [flow].tsx for `termix-mobile://oidc-callback/<flow id>`.
 //
 // It renders nothing: the sign-in screen completes the authentication, either
 // through the openAuthSessionAsync result or through its Linking listener. This
@@ -26,7 +27,8 @@ import { useAppContext } from "@/contexts/AppContext";
 // flow at the oidc step to complete it.
 export default function OidcCallback() {
   const { openAuthFlow } = useAppContext();
-  const params = useLocalSearchParams<{
+  const { flow, ...params } = useLocalSearchParams<{
+    flow?: string;
     success?: string;
     token?: string;
     error?: string;
@@ -40,8 +42,9 @@ export default function OidcCallback() {
     )
     .join("&");
 
+  const path = typeof flow === "string" && flow ? `/${flow}` : "";
   rememberOidcCallback(
-    `termix-mobile://oidc-callback${query ? `?${query}` : ""}`,
+    `termix-mobile://oidc-callback${path}${query ? `?${query}` : ""}`,
   );
 
   useEffect(() => {

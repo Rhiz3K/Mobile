@@ -20,10 +20,12 @@ import {
 import { readWebCookies } from "@/modules/termix-net";
 import type { AccountClient } from "@/core/api/AccountClient";
 import { consumeFreshWebSession } from "@/core/api/webSession";
+import { startFlow, takeFlow } from "@/core/accounts/link/flow";
 import {
   APP_CALLBACK_URL,
   browserCanceled,
   browserSignInUrl,
+  callbackUrlFor,
   parseCallback,
   redirectStartUrl,
   type SecondFactorStep,
@@ -77,6 +79,7 @@ export function BrowserStep({
   const usedWebView = useRef(false);
   // Set after a sign out, so the browser doesn't quietly sign the old user in.
   const fresh = useRef(false);
+  const flowId = useRef<string | null>(null);
 
   const finish = useCallback(
     async (token: string) => {
@@ -141,6 +144,14 @@ export function BrowserStep({
       // The same link can arrive from the session, the listener and the route.
       if (isOidcCallbackHandled(link)) return;
       markOidcCallbackHandled(link);
+      // Only the sign in open now, and only once.
+      if (!(await takeFlow(result.flow ?? null))) {
+        toast.error(
+          "Sign in failed",
+          "That sign in link is from an older try. Sign in again.",
+        );
+        return;
+      }
       if (result.kind === "error") {
         toast.error("Sign in failed", result.message);
         return;
@@ -163,7 +174,7 @@ export function BrowserStep({
         // with passkeys. Not ephemeral, so a browser SSO login is reused.
         const result = await WebBrowser.openAuthSessionAsync(
           target,
-          APP_CALLBACK_URL,
+          callbackUrlFor(flowId.current),
           fresh.current ? { preferEphemeralSession: true } : undefined,
         );
         if (result.type === "success" && result.url) {
@@ -218,8 +229,15 @@ export function BrowserStep({
         return;
       }
       await client.clearToken();
-      fresh.current = await consumeFreshWebSession();
+      fresh.current = await consumeFreshWebSession(client.accountId);
       if (fresh.current) setIncognito(true);
+
+      // The web app in place and servers before 2.9 send no flow id back.
+      const plain =
+        mode.kind === "proxy" ||
+        (mode.kind === "redirect" && !!mode.option.legacy);
+      const flow = await startFlow(plain);
+      flowId.current = plain ? null : flow;
 
       if (mode.kind === "proxy") {
         showWebView(client.serverUrl);
@@ -229,19 +247,18 @@ export function BrowserStep({
       try {
         target =
           mode.kind === "browser"
-            ? browserSignInUrl(client)
-            : await redirectStartUrl(client, mode.option);
+            ? browserSignInUrl(client, flowId.current)
+            : await redirectStartUrl(client, mode.option, flowId.current);
       } catch {
         // The web app's own login still covers it.
+        await startFlow(true);
+        flowId.current = null;
         showWebView(client.serverUrl);
         return;
       }
-      // Android Custom Tabs share the browser's cookies and can't start
-      // clean, so a fresh sign in uses a private web view there.
-      if (fresh.current && Platform.OS === "android") {
-        showWebView(target);
-        return;
-      }
+      // Always the system browser, also after a sign out: it keeps the SSO
+      // login and passkeys work there. iOS starts it clean after a sign out;
+      // Android Custom Tabs can't, so the provider decides there.
       setAuthUrl(target);
       setUrl(target);
       await openBrowser(target);

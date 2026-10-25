@@ -248,6 +248,9 @@ test("redirect logins get their address, old servers use the old route", async (
   expect(browserSignInUrl(client)).toBe(
     `https://t.example/?return_to=${encodeURIComponent(APP_CALLBACK_URL)}`,
   );
+  expect(browserSignInUrl(client, "abc12345")).toBe(
+    `https://t.example/?return_to=${encodeURIComponent(`${APP_CALLBACK_URL}/abc12345`)}`,
+  );
 });
 
 test("a TOTP code finishes the login, with the old route on old servers", async () => {
@@ -274,6 +277,7 @@ test("the app link back from the browser is read by hand", () => {
   expect(parseCallback(`${APP_CALLBACK_URL}?token=abc%3D`)).toEqual({
     kind: "token",
     token: "abc=",
+    flow: null,
   });
   expect(
     parseCallback(
@@ -282,10 +286,12 @@ test("the app link back from the browser is read by hand", () => {
   ).toEqual({
     kind: "secondFactor",
     step: { tempToken: "t", factors: ["totp", "security-key"] },
+    flow: null,
   });
   expect(parseCallback(`${APP_CALLBACK_URL}?error=Denied+here`)).toEqual({
     kind: "error",
     message: "Denied here",
+    flow: null,
   });
   expect(parseCallback(APP_CALLBACK_URL)).toMatchObject({ kind: "error" });
 });
