@@ -327,12 +327,10 @@ export default function Settings() {
 
             <Button
               variant="muted"
-              onPress={() =>
-                router.push("/tabs/settings/FeatureSupport" as any)
-              }
+              onPress={() => router.push("/tabs/settings/Plugins" as any)}
               icon={<Blocks size={15} color={color("foreground")} />}
             >
-              What works where
+              Plugins
             </Button>
 
             <Button

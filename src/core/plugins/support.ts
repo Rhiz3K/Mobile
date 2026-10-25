@@ -2,6 +2,7 @@ import type { ServerPlugin } from "@/core/api/compat/server-features";
 import type { FeatureRegistry } from "@/core/features/registry";
 import type { FeatureDef } from "@/core/features/types";
 import { OFFICIAL_PLUGINS, catalogEntry } from "./catalog";
+import { apiFit, type ApiFit } from "./compat";
 
 /**
  * - `native`: the app has its own screens.
@@ -16,9 +17,11 @@ export type SupportMode =
 
 /**
  * Where the plugin is on the account's server: `none` for This device,
- * `unknown` when the server has not said (older servers have everything).
+ * `unknown` when the server has not said (older servers have everything),
+ * `failed` when it is turned on but not running.
  */
-export type ServerState = "on" | "off" | "missing" | "unknown" | "none";
+export type ServerState =
+  "on" | "off" | "failed" | "missing" | "unknown" | "none";
 
 export type SupportSection = "phone" | "server" | "absent";
 
@@ -30,8 +33,16 @@ export interface SupportRow {
   /** Works with no server. */
   onDevice: boolean;
   server: ServerState;
+  /** The server's state word when it is not plain on or off, like safe-mode. */
+  serverDetail?: string;
   /** The plugin asks for an app screen this build does not have. */
   needsNewerApp?: boolean;
+  /** The plugin's engine.api against what the app understands. */
+  fit: ApiFit;
+  /** Version on the server. */
+  version?: string;
+  /** The plugin's engine.api range, when the server sends it. */
+  engineApi?: string;
   note?: string;
   section: SupportSection;
   status: string;
@@ -49,12 +60,21 @@ function onPhone(defs: FeatureDef[]): boolean {
   return defs.some((def) => (def.availableOn ?? ["server"]).includes("local"));
 }
 
+/** On, off, or turned on but not running (failed, safe mode, still loading). */
+export function pluginState(plugin: ServerPlugin): "on" | "off" | "failed" {
+  if (plugin.active) return "on";
+  if (plugin.enabled && plugin.state && plugin.state !== "disabled") {
+    return "failed";
+  }
+  return "off";
+}
+
 function serverState(input: SupportInput, id: string): ServerState {
   if (input.local) return "none";
   if (!input.plugins) return "unknown";
   const plugin = input.plugins.find((p) => p.id === id);
   if (!plugin) return "missing";
-  return plugin.active ? "on" : "off";
+  return pluginState(plugin);
 }
 
 /** What the plugin does in the app, in order: app features, its manifest, the catalog. */
@@ -71,6 +91,12 @@ function modeFor(
   return { mode: catalogEntry(id)?.kind ?? "none" };
 }
 
+/** Only plugins the app talks to have to match its plugin API. */
+function fitFor(mode: SupportMode, plugin: ServerPlugin | undefined): ApiFit {
+  if (mode !== "webview" && mode !== "native") return "ok";
+  return apiFit(plugin?.engine?.api, mode);
+}
+
 /** A locale key needs the plugin's strings, which the app does not load yet. */
 function plainNote(note: string | undefined): string | undefined {
   return note && /\s/.test(note) ? note : undefined;
@@ -80,6 +106,8 @@ function serverWord(state: ServerState): string | null {
   switch (state) {
     case "off":
       return "off on this server";
+    case "failed":
+      return "not running on this server";
     case "missing":
       return "not on this server";
     default:
@@ -89,10 +117,16 @@ function serverWord(state: ServerState): string | null {
 
 /** The plain line under a row's name. */
 export function describeSupport(
-  row: Pick<SupportRow, "mode" | "onDevice" | "server" | "needsNewerApp">,
+  row: Pick<
+    SupportRow,
+    "mode" | "onDevice" | "server" | "needsNewerApp" | "fit"
+  >,
 ): string {
   const { mode, onDevice, server } = row;
-  if (row.needsNewerApp) return "Needs a newer version of the app";
+  if (row.needsNewerApp || row.fit === "update-app") {
+    return "Needs a newer version of the app";
+  }
+  if (row.fit === "update-plugin") return "Update the plugin on the server";
   if (mode === "look") return "The app has its own look";
   if (mode === "none") {
     return server === "on"
@@ -109,6 +143,39 @@ export function describeSupport(
   if (reach) return reach.charAt(0).toUpperCase() + reach.slice(1);
   if (mode === "webview") return "Opens in the app from the server";
   return mode === "server" ? "Runs on the server" : "Through the server";
+}
+
+/** How the plugin shows in the app, in a word or two. */
+export function modeLabel(mode: SupportMode): string {
+  switch (mode) {
+    case "native":
+    case "app":
+      return "In the app";
+    case "webview":
+      return "Web view";
+    case "server":
+      return "On the server";
+    case "look":
+      return "App look";
+    default:
+      return "Not in the app";
+  }
+}
+
+/** The server side state in a word or two. */
+export function stateLabel(row: Pick<SupportRow, "server" | "serverDetail">) {
+  switch (row.server) {
+    case "on":
+      return "On";
+    case "off":
+      return "Off";
+    case "failed":
+      return row.serverDetail === "safe-mode" ? "Safe mode" : "Not running";
+    case "missing":
+      return "Not installed";
+    default:
+      return "";
+  }
 }
 
 function sectionFor(
@@ -139,19 +206,20 @@ export function supportRows(input: SupportInput): SupportRow[] {
       .forPlugin(id)
       .filter((def) => def.source !== "webview");
     const { mode, needsNewerApp } = modeFor(defs, plugin, id);
+    const server = serverState(input, id);
     const row = finish({
       id,
       name: plugin?.name ?? catalogEntry(id)?.name ?? id,
       mode,
       onDevice: mode === "app" || (mode === "native" && onPhone(defs)),
-      server: serverState(input, id),
+      server,
+      serverDetail: server === "failed" ? plugin?.state : undefined,
       needsNewerApp,
+      fit: fitFor(mode, plugin),
+      version: plugin?.version,
+      engineApi: plugin?.engine?.api,
       note: plainNote(plugin?.mobile?.note),
     });
-    // A plugin nobody runs and the app can't show is noise.
-    if (!catalogEntry(id) && row.mode === "none" && row.server !== "on") {
-      continue;
-    }
     rows.push(row);
   }
 
@@ -166,9 +234,58 @@ export function supportRows(input: SupportInput): SupportRow[] {
         mode: "native",
         onDevice: on.includes("local"),
         server: input.local ? "none" : on.includes("server") ? "on" : "missing",
+        fit: "ok",
       }),
     );
   }
 
   return rows.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** A plugin nobody runs and the app can't show, left out of the full list. */
+export function isNoise(row: SupportRow): boolean {
+  return !catalogEntry(row.id) && row.mode === "none" && row.server !== "on";
+}
+
+/** Rows for the plugins the server itself lists, for its Plugins list. */
+export function serverRows(
+  rows: SupportRow[],
+  plugins: ServerPlugin[] | null,
+): SupportRow[] {
+  if (!plugins) return [];
+  const ids = new Set(plugins.map((p) => p.id));
+  return rows.filter((row) => ids.has(row.id));
+}
+
+/** Why a plugin can't open, in plain words. */
+export function unavailableText(entry: ServerPlugin | null): {
+  title: string;
+  hint: string;
+} {
+  if (!entry) {
+    return {
+      title: "Not on this server",
+      hint: "The plugin is not installed on this server.",
+    };
+  }
+  const state = pluginState(entry);
+  if (state === "off") {
+    return {
+      title: "Turned off on the server",
+      hint: "It opens here again when an admin turns it on.",
+    };
+  }
+  if (state === "failed") {
+    return {
+      title: "Not running on the server",
+      hint:
+        entry.state === "safe-mode"
+          ? "The server is in safe mode, so only look plugins run."
+          : "The plugin did not start. An admin can check it in Plugins.",
+    };
+  }
+  return {
+    title: "This plugin is not available",
+    hint: "It is not made for the app.",
+  };
 }

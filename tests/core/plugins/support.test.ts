@@ -1,7 +1,16 @@
 import type { ServerPlugin } from "@/core/api/compat/server-features";
 import { FeatureRegistry } from "@/core/features/registry";
 import type { FeatureDef } from "@/core/features/types";
-import { describeSupport, supportRows } from "@/core/plugins/support";
+import {
+  describeSupport,
+  isNoise,
+  modeLabel,
+  pluginState,
+  serverRows,
+  stateLabel,
+  supportRows,
+  unavailableText,
+} from "@/core/plugins/support";
 
 function registry(...defs: FeatureDef[]) {
   const r = new FeatureRegistry();
@@ -132,21 +141,33 @@ test("a plugin's own mobile info fills in what the app has no screen for", () =>
   expect(row(rows, "quiet-thing").status).toBe(
     "Not in the app yet | on this server",
   );
-  expect(rows.some((r) => r.id === "off-thing")).toBe(false);
+  // Off plugins the app cannot show are left out of the full list only.
+  expect(isNoise(row(rows, "off-thing"))).toBe(true);
+  expect(isNoise(row(rows, "quiet-thing"))).toBe(false);
   // A locale key needs the plugin's strings, so it is not shown.
   expect(row(rows, "labelled").note).toBeUndefined();
 });
 
 test("describeSupport covers the plain cases", () => {
-  const base = { mode: "native" as const, onDevice: true };
+  const base = { mode: "native" as const, onDevice: true, fit: "ok" as const };
   expect(describeSupport({ ...base, server: "missing" })).toBe(
     "Phone only | not on this server",
   );
   expect(
-    describeSupport({ mode: "webview", onDevice: false, server: "missing" }),
+    describeSupport({
+      mode: "webview",
+      onDevice: false,
+      server: "missing",
+      fit: "ok",
+    }),
   ).toBe("Not on this server");
   expect(
-    describeSupport({ mode: "none", onDevice: false, server: "none" }),
+    describeSupport({
+      mode: "none",
+      onDevice: false,
+      server: "none",
+      fit: "ok",
+    }),
   ).toBe("Not in the app yet");
 });
 
@@ -169,4 +190,85 @@ test("plugins that open in a web view say so, and their own feature stays a web 
   });
   expect(row(rows, "homepage").status).toBe("Off on this server");
   expect(row(rows, "proxmox").status).toBe("Not on this server");
+});
+
+test("plugins that are on but not running, and API mismatches, say so", () => {
+  const rows = supportRows({
+    registry: registry(docker),
+    local: false,
+    plugins: [
+      plugin("docker", { engine: { api: "^2.0" } }),
+      plugin("alerts", { engine: { api: "^1.99" }, version: "3.0.0" }),
+      plugin("homepage", { engine: { api: "^0.9" } }),
+      plugin("sso", { engine: { api: "^9.0" } }),
+      plugin("kubernetes", { active: false, enabled: true, state: "failed" }),
+      plugin("fleets", { active: false, enabled: true, state: "safe-mode" }),
+    ],
+  });
+  expect(row(rows, "docker")).toMatchObject({
+    fit: "update-app",
+    status: "Needs a newer version of the app",
+  });
+  expect(row(rows, "alerts")).toMatchObject({
+    fit: "update-app",
+    version: "3.0.0",
+    engineApi: "^1.99",
+  });
+  expect(row(rows, "homepage")).toMatchObject({
+    fit: "update-plugin",
+    status: "Update the plugin on the server",
+  });
+  // The app never talks to server only plugins, so their API is not checked.
+  expect(row(rows, "sso").fit).toBe("ok");
+  expect(row(rows, "kubernetes")).toMatchObject({
+    server: "failed",
+    status: "Not running on this server",
+  });
+  expect(stateLabel(row(rows, "kubernetes"))).toBe("Not running");
+  expect(stateLabel(row(rows, "fleets"))).toBe("Safe mode");
+});
+
+test("serverRows keeps only what the server lists", () => {
+  const plugins = [plugin("docker"), plugin("community-thing")];
+  const rows = supportRows({
+    registry: registry(docker),
+    local: false,
+    plugins,
+  });
+  expect(serverRows(rows, plugins).map((r) => r.id)).toEqual([
+    "community-thing",
+    "docker",
+  ]);
+  expect(serverRows(rows, null)).toEqual([]);
+});
+
+test("labels and the plugin state word", () => {
+  expect(modeLabel("webview")).toBe("Web view");
+  expect(modeLabel("native")).toBe("In the app");
+  expect(modeLabel("look")).toBe("App look");
+  expect(pluginState(plugin("a"))).toBe("on");
+  expect(pluginState(plugin("a", { active: false }))).toBe("off");
+  expect(
+    pluginState(
+      plugin("a", { active: false, enabled: true, state: "disabled" }),
+    ),
+  ).toBe("off");
+  expect(
+    pluginState(plugin("a", { active: false, enabled: true, state: "failed" })),
+  ).toBe("failed");
+});
+
+test("unavailableText says why a plugin can't open", () => {
+  expect(unavailableText(null).title).toBe("Not on this server");
+  expect(unavailableText(plugin("a", { active: false })).title).toBe(
+    "Turned off on the server",
+  );
+  expect(
+    unavailableText(
+      plugin("a", { active: false, enabled: true, state: "safe-mode" }),
+    ).hint,
+  ).toMatch(/safe mode/);
+  expect(unavailableText(plugin("a")).title).toBe(
+    "This plugin is not available",
+  );
 });

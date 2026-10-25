@@ -6,6 +6,7 @@ import { ArrowLeft, Blocks, RotateCw } from "lucide-react-native";
 import { useAccounts, useClient } from "@/core/accounts";
 import { features } from "@/core/features";
 import type { FrameViewTarget, ShellCall } from "@/core/plugins/frame-protocol";
+import { unavailableText } from "@/core/plugins/support";
 import { framePlugin, viewLabel } from "@/core/plugins/webview";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { useTerminalSessions } from "@/contexts/TerminalSessionsContext";
@@ -40,11 +41,16 @@ export default function PluginScreen() {
 
   useEffect(() => client?.subscribe(() => setVersion((n) => n + 1)), [client]);
 
-  const plugin = useMemo(() => {
-    const entry = client?.serverPlugins?.find((p) => p.id === params.pluginId);
-    return entry ? framePlugin(entry, features, device()) : null;
+  const entry = useMemo(
+    () => client?.serverPlugins?.find((p) => p.id === params.pluginId) ?? null,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [client, params.pluginId, version]);
+    [client, params.pluginId, version],
+  );
+  const plugin = useMemo(
+    () => (entry ? framePlugin(entry, features, device()) : null),
+    [entry],
+  );
+  const missing = unavailableText(entry);
 
   const first =
     plugin?.views.find((v) => v.view === params.view) ??
@@ -136,8 +142,8 @@ export default function PluginScreen() {
         <EmptyState
           className="flex-1"
           icon={Blocks}
-          title="This plugin is not available"
-          hint="It may be off on the server, or not made for the app."
+          title={missing.title}
+          hint={missing.hint}
         />
       )}
     </View>
