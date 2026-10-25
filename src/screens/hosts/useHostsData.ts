@@ -205,15 +205,27 @@ export function useHostsData() {
   // throttles and de-dupes, so running on every change is cheap.
   useEffect(() => {
     if (loading) return;
+    // Phone checks fill in for hosts the server does not report on, so the
+    // widgets work with no server at all.
+    const statuses: Record<number, ServerStatus> = { ...serverStatuses };
+    for (const host of hosts) {
+      const phone = phoneStatuses[host.id];
+      if (!statuses[host.id] && phone) {
+        statuses[host.id] = {
+          status: phone,
+          lastChecked: new Date().toISOString(),
+        };
+      }
+    }
     void publishHostSnapshot({
       hosts,
-      statuses: serverStatuses,
+      statuses,
       metrics,
       snippets: snippets ?? undefined,
       serverUrl: activeClient()?.serverUrl ?? null,
       authenticated: true,
     });
-  }, [loading, hosts, serverStatuses, metrics, snippets]);
+  }, [loading, hosts, serverStatuses, phoneStatuses, metrics, snippets]);
 
   const refresh = useCallback(() => {
     if (isRefreshingRef.current) return;

@@ -32,6 +32,7 @@ export {
   saveWidgetPreferences,
   subscribeToWidgetPreferences,
 } from "./preferences";
+export { useWidgetSync } from "./useWidgetSync";
 export { useWidgetDeepLink, parseWidgetLink } from "./useWidgetDeepLink";
 export { WidgetDeepLinkHost } from "./WidgetDeepLinkHost";
 export { RunSnippetSheet } from "./RunSnippetSheet";

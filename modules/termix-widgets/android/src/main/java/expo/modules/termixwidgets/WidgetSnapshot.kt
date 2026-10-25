@@ -107,6 +107,20 @@ data class HostSummary(
   val unknown: Int = 0
 )
 
+/** App theme colors as `#rrggbb`. */
+data class WidgetPalette(
+  val id: String,
+  val isDark: Boolean,
+  val background: String,
+  val surface: String,
+  val card: String,
+  val raised: String,
+  val border: String,
+  val text: String,
+  val textSecondary: String,
+  val textTertiary: String
+)
+
 data class WidgetSnapshot(
   val version: Int,
   val updatedAt: Long,
@@ -115,7 +129,8 @@ data class WidgetSnapshot(
   val server: String,
   val summary: HostSummary,
   val hosts: List<HostEntry>,
-  val snippets: List<SnippetEntry>
+  val snippets: List<SnippetEntry>,
+  val theme: WidgetPalette? = null
 ) {
   companion object {
     /** Payload version this build understands. Mirrors SNAPSHOT_VERSION in TS. */
@@ -206,10 +221,24 @@ data class WidgetSnapshot(
           server = root.optString("server", ""),
           summary = summary,
           hosts = hosts,
-          snippets = snippets
+          snippets = snippets,
+          theme = root.optJSONObject("theme")?.let(::parsePalette)
         )
       }.getOrElse { signedOut() }
     }
+
+    private fun parsePalette(json: JSONObject): WidgetPalette = WidgetPalette(
+      id = json.optString("id", "dark"),
+      isDark = json.optBoolean("isDark", true),
+      background = json.optString("background", "#0c0d0b"),
+      surface = json.optString("surface", "#141513"),
+      card = json.optString("card", "#181917"),
+      raised = json.optString("raised", "#1f201d"),
+      border = json.optString("border", "#2a2a2a"),
+      text = json.optString("text", "#fafafa"),
+      textSecondary = json.optString("textSecondary", "#a4a4a4"),
+      textTertiary = json.optString("textTertiary", "#737373")
+    )
 
     /** Reads a 0-100 metric, treating null/NaN/out-of-range as "unknown". */
     private fun JSONObject.optPercent(key: String): Int? {

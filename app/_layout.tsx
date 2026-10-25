@@ -35,7 +35,7 @@ import { useFonts } from "expo-font";
 import { FONT_MAP, MONO_FONT, MONO_FONT_BOLD } from "@/constants/fonts";
 import "../global.css";
 import UpdateRequired from "@/screens/authentication/UpdateRequired";
-import { WidgetDeepLinkHost } from "@/widgets";
+import { WidgetDeepLinkHost, useWidgetSync } from "@/widgets";
 import { loadUiPrefs } from "@/core/ui-prefs";
 import { registerBuiltInFeatures } from "@/features";
 import { usePluginFrameFeatures } from "@/features/plugin-webview/register";
@@ -61,6 +61,7 @@ function RootLayoutContent() {
   const accent = useThemeColor()("accent-brand");
   usePluginFrameFeatures();
   useAppShortcuts();
+  useWidgetSync();
 
   if (isLoading) {
     return (

@@ -331,11 +331,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
   // Losing authentication (sign-out elsewhere, expired token, server change)
   // must also empty the home-screen widgets - they would otherwise keep showing
-  // host names the user can no longer reach.
+  // host names the user can no longer reach. This device has no sign in, so
+  // its widgets stay filled.
   useEffect(() => {
-    if (isLoading || isAuthenticated) return;
+    if (isLoading || isAuthenticated || active.kind !== "server") return;
     void publishSignedOutSnapshot();
-  }, [isAuthenticated, isLoading]);
+  }, [isAuthenticated, isLoading, active.kind]);
 
   const lastValidationTimeRef = useRef<number>(0);
   const validationInProgressRef = useRef<boolean>(false);
