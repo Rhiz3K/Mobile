@@ -29,6 +29,7 @@ import { useThemeColor } from "@/contexts/ThemeContext";
 import { Badge, Button, FakeSwitch, SettingRow, Text } from "@/ui";
 import { toast } from "@/utils/toast";
 import { ProxySettings } from "@/screens/accounts/ProxySettings";
+import { SavedLoginRow } from "@/screens/accounts/SavedLoginRow";
 import { UnlinkSheet } from "@/screens/accounts/UnlinkSheet";
 import { useSyncFix } from "@/screens/accounts/useSyncFix";
 
@@ -277,6 +278,10 @@ export default function SyncSettings() {
                 </>
               ) : null}
             </>
+          ) : null}
+
+          {client ? (
+            <SavedLoginRow key={client.accountId} client={client} />
           ) : null}
 
           <Section

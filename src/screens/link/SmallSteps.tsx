@@ -56,6 +56,7 @@ export function AddressStep({
             autoComplete="url"
             keyboardType="url"
             textContentType="URL"
+            importantForAutofill="yes"
             editable={!busy}
             leading={<Server size={16} color={muted} />}
             onSubmitEditing={onContinue}
@@ -134,6 +135,7 @@ export function SecondFactorStep({
               keyboardType="number-pad"
               autoComplete="one-time-code"
               textContentType="oneTimeCode"
+              importantForAutofill="yes"
               autoFocus
               editable={!busy}
               onSubmitEditing={submit}

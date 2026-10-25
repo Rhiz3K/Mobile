@@ -1,9 +1,21 @@
-import { fireEvent, render, screen } from "@testing-library/react-native";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react-native";
 import type { AccountClient } from "@/core/api/AccountClient";
 import type { ServerSignIn } from "@/core/accounts/link/methods";
 import { SignInStep, splitOptions } from "@/screens/link/SignInStep";
 import { MergeStep, SecondFactorStep } from "@/screens/link/SmallSteps";
 import { describeCounts } from "@/core/sync";
+import { saveLogin } from "@/core/accounts/saved-login";
+import { accountStorage } from "@/core/storage/kv";
+
+jest.mock("expo-local-authentication", () => ({
+  AuthenticationType: { FINGERPRINT: 1, FACIAL_RECOGNITION: 2 },
+  supportedAuthenticationTypesAsync: jest.fn(async () => [2]),
+}));
 
 jest.mock("@/contexts/ThemeContext", () => ({
   useThemeColor: () => () => "#000000",
@@ -150,4 +162,32 @@ test("the merge summary counts what this phone has", async () => {
   ).toBeTruthy();
   await fireEvent.press(screen.getByText("Replace"));
   expect(onChoose).toHaveBeenCalledWith(false);
+});
+
+test("a saved login signs in with Face ID", async () => {
+  const loginUser = jest.fn(async () => ({}));
+  const saved = {
+    accountId: "s9",
+    storage: accountStorage("s9"),
+    api: { auth: { loginUser } },
+    token: () => "T".repeat(30),
+  } as unknown as AccountClient;
+  await saveLogin(saved, { username: "luke", password: "pw" });
+  const onResult = jest.fn();
+  await render(
+    <SignInStep
+      client={saved}
+      signIn={signIn}
+      onResult={onResult}
+      onRedirect={jest.fn()}
+      onBrowser={jest.fn()}
+      onSignup={jest.fn()}
+      onReset={jest.fn()}
+    />,
+  );
+  await fireEvent.press(await screen.findByText("Sign in with Face ID"));
+  await waitFor(() =>
+    expect(onResult).toHaveBeenCalledWith({ kind: "signedIn" }),
+  );
+  expect(loginUser).toHaveBeenCalledWith("luke", "pw");
 });

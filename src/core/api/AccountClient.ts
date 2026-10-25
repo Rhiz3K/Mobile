@@ -91,12 +91,16 @@ export const SECRET_KEYS = [
   "basicAuth",
   "clientCert",
   "proxyCookies",
+  // The Face ID sign in, see core/accounts/saved-login.
+  "savedLogin",
 ];
 const DATA_KEYS = [
   "apiGeneration",
   "serverPlugins",
   "enabledPlugins",
   "hostOrigins",
+  "savedLoginOn",
+  "savedLoginAsked",
 ];
 
 /**

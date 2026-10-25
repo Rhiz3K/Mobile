@@ -10,6 +10,13 @@ import {
   type LoginResult,
 } from "@/core/accounts/link/login";
 import type { ServerSignIn, SignInOption } from "@/core/accounts/link/methods";
+import {
+  biometricName,
+  clearSavedLogin,
+  hasSavedLogin,
+  readSavedLogin,
+  type SavedLogin,
+} from "@/core/accounts/saved-login";
 import { toast } from "@/utils/toast";
 import { PasswordInput, StepCard, TextLink, errorText } from "./AccountSteps";
 
@@ -44,7 +51,8 @@ export function SignInStep({
 }: {
   client: AccountClient;
   signIn: ServerSignIn;
-  onResult: (result: LoginResult) => void;
+  /** `login` is set after a password sign in, to offer saving it. */
+  onResult: (result: LoginResult, login?: SavedLogin) => void;
   onRedirect: (option: RedirectOption) => void;
   onBrowser: () => void;
   onSignup: () => void;
@@ -61,6 +69,53 @@ export function SignInStep({
   const [busy, setBusy] = useState(false);
   const autoStarted = useRef(false);
   const form = forms.find((f) => formKey(f) === formId) ?? forms[0];
+  // A password kept behind Face ID or a fingerprint for this server.
+  const [saved, setSaved] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!forms.some((f) => f.kind === "password")) return;
+    let live = true;
+    void (async () => {
+      try {
+        if (!(await hasSavedLogin(client))) return;
+        const name = await biometricName();
+        if (live) setSaved(name);
+      } catch {
+        // No saved login.
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [client, forms]);
+
+  const signInSaved = async () => {
+    const login = await readSavedLogin(client);
+    if (!login) {
+      if (!(await hasSavedLogin(client))) setSaved(null);
+      return;
+    }
+    setBusy(true);
+    try {
+      onResult(
+        await signInWithPassword(client, login.username, login.password),
+      );
+    } catch (e: any) {
+      const status = e?.status ?? e?.response?.status;
+      if (status === 401 || status === 403) {
+        await clearSavedLogin(client);
+        setSaved(null);
+        toast.error(
+          "The saved login no longer works",
+          "Sign in with your password.",
+        );
+      } else {
+        toast.error(errorText(e, "Sign in failed"));
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
 
   // An admin can make one provider start on its own, like the web login.
   useEffect(() => {
@@ -83,7 +138,12 @@ export function SignInStep({
         form.kind === "password"
           ? await signInWithPassword(client, username, password)
           : await signInWithForm(client, form, username, password);
-      onResult(result);
+      onResult(
+        result,
+        form.kind === "password"
+          ? { username: username.trim(), password }
+          : undefined,
+      );
     } catch (e: any) {
       if (e?.code === "PROXY_AUTH_GATE") {
         toast.error(
@@ -102,6 +162,16 @@ export function SignInStep({
   const nothing = forms.length === 0 && redirects.length === 0;
   return (
     <View className="w-full max-w-md gap-4">
+      {saved ? (
+        <Button
+          size="lg"
+          loading={busy}
+          onPress={() => void signInSaved()}
+          icon={<Fingerprint size={16} color={color("primary-foreground")} />}
+        >
+          {`Sign in with ${saved}`}
+        </Button>
+      ) : null}
       {form ? (
         <StepCard>
           {forms.length > 1 ? (
@@ -126,6 +196,7 @@ export function SignInStep({
               autoCorrect={false}
               autoComplete="username"
               textContentType="username"
+              importantForAutofill="yes"
               editable={!busy}
             />
           </Field>

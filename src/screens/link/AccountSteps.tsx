@@ -69,6 +69,7 @@ export function PasswordInput({
       autoCorrect={false}
       autoComplete={newPassword ? "new-password" : "current-password"}
       textContentType={newPassword ? "newPassword" : "password"}
+      importantForAutofill="yes"
       editable={editable}
       onSubmitEditing={onSubmitEditing}
       returnKeyType="go"
@@ -152,6 +153,7 @@ export function SignupStep({
           autoCorrect={false}
           autoComplete="username-new"
           textContentType="username"
+          importantForAutofill="yes"
           editable={!busy}
         />
       </Field>

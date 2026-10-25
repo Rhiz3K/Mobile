@@ -10,6 +10,14 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ArrowLeft, Server, X } from "lucide-react-native";
 import { InlineView, Text } from "@/ui";
+import { useConfirm } from "@/ui/Confirm";
+import {
+  biometricName,
+  markOffered,
+  saveLogin,
+  shouldOfferSave,
+  type SavedLogin,
+} from "@/core/accounts/saved-login";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { useAppContext } from "@/contexts/AppContext";
 import { accounts, accountLabel } from "@/core/accounts";
@@ -91,6 +99,8 @@ export default function LinkFlow() {
   // A new server stays pending until it signs in, and is dropped on cancel.
   const pendingId = useRef<string | null>(null);
   const linkedId = useRef<string | null>(null);
+  const passwordLogin = useRef<SavedLogin | null>(null);
+  const confirm = useConfirm();
 
   const host = (client?.serverUrl ?? address).replace(/^https?:\/\//, "");
 
@@ -179,6 +189,31 @@ export default function LinkFlow() {
     setProxyOpen(true);
   };
 
+  // After a full sign in with a password, offer to keep it behind biometrics.
+  const offerSave = useCallback(
+    async (target: AccountClient) => {
+      const login = passwordLogin.current;
+      passwordLogin.current = null;
+      if (!login || !(await shouldOfferSave(target).catch(() => false))) return;
+      await markOffered(target);
+      const name = await biometricName();
+      const yes = await confirm({
+        title: `Use ${name} to sign in next time?`,
+        description: `If this server signs you out, sign in again with ${name} instead of typing your password. The password stays on this phone.`,
+        confirmLabel: `Use ${name}`,
+        cancelLabel: "Not now",
+        destructive: false,
+      });
+      if (!yes) return;
+      try {
+        await saveLogin(target, login);
+      } catch {
+        toast.error("Could not save the login");
+      }
+    },
+    [confirm],
+  );
+
   const signedIn = useCallback(async () => {
     if (!client) return;
     const id = client.accountId;
@@ -212,9 +247,11 @@ export default function LinkFlow() {
       void sync.firstSync(id, false);
     }
     closeAuthFlow();
-  }, [client, closeAuthFlow, finishSignIn]);
+    void offerSave(client);
+  }, [client, closeAuthFlow, finishSignIn, offerSave]);
 
-  const onResult = (result: LoginResult) => {
+  const onResult = (result: LoginResult, login?: SavedLogin) => {
+    if (login) passwordLogin.current = login;
     if (result.kind === "secondFactor") {
       setFactor(result.step);
       setStep("factor");
@@ -244,6 +281,7 @@ export default function LinkFlow() {
   const chooseMerge = (merge: boolean) => {
     if (linkedId.current) void sync.firstSync(linkedId.current, merge);
     closeAuthFlow();
+    if (client) void offerSave(client);
   };
 
   const serverName = client
