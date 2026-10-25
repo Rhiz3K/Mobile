@@ -8,6 +8,8 @@ export { FakeSwitch, Checkbox } from "./Switch";
 export { SettingRow } from "./SettingRow";
 export { AccordionSection } from "./Accordion";
 export { Sheet, SheetBody, SheetRow } from "./Sheet";
+export { Popover } from "./Popover";
+export type { PopoverAnchor } from "./Popover";
 export { ConfirmProvider, useConfirm } from "./Confirm";
 export type { ConfirmOptions } from "./Confirm";
 export { PromptSheet } from "./PromptSheet";
