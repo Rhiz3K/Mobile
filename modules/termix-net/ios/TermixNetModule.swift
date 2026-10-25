@@ -7,7 +7,16 @@ struct NetRequest: Record {
   @Field var method: String = "GET"
   @Field var headers: [String: String] = [:]
   @Field var body: String? = nil
+  @Field var bodyBase64: String? = nil
   @Field var timeoutMs: Double = 30000
+  @Field var binary: Bool = false
+}
+
+extension NetRequest {
+  var bodyData: Data? {
+    if let bodyBase64 { return Data(base64Encoded: bodyBase64) }
+    return body?.data(using: .utf8)
+  }
 }
 
 struct NetCookie: Record {
@@ -51,7 +60,7 @@ public class TermixNetModule: Module {
     }
 
     AsyncFunction("request") { (request: NetRequest, promise: Promise) in
-      self.net.request(url: request.url, method: request.method, headers: request.headers, body: request.body,
+      self.net.request(url: request.url, method: request.method, headers: request.headers, body: request.bodyData,
                        timeoutMs: request.timeoutMs) { result in
         switch result {
         case .success(let response):
@@ -63,7 +72,8 @@ public class TermixNetModule: Module {
     }
 
     Function("startStream") { (id: String, request: NetRequest) in
-      self.net.startStream(id: id, url: request.url, method: request.method, headers: request.headers, body: request.body)
+      self.net.startStream(id: id, url: request.url, method: request.method, headers: request.headers,
+                           body: request.bodyData, binary: request.binary)
     }
 
     Function("cancelStream") { (id: String) in

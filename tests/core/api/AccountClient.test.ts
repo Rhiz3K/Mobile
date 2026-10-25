@@ -307,6 +307,21 @@ test("on iOS with a certificate, requests go through the native module", async (
   expect(net.requests[0].headers.Authorization).toBe("Bearer tok");
 });
 
+test("on iOS with a certificate, relay sockets use the native socket", async () => {
+  const net = fakeNet({ nativeRequests: true });
+  const c = client();
+  await c.setProxy({ customHeaders: [{ name: "X-Proxy", value: "1" }] });
+  await c.setClientCert({ base64: "AAAA", passphrase: "pw", name: null });
+  c.openSocket("wss://termix.example/plugin-ws/core/ssh-relay", [
+    "termix.jwt.t",
+  ]);
+  const [, url, protocols, headers] = (net.openSocket as jest.Mock).mock
+    .calls[0];
+  expect(url).toBe("wss://termix.example/plugin-ws/core/ssh-relay");
+  expect(protocols).toEqual(["termix.jwt.t"]);
+  expect(headers["X-Proxy"]).toBe("1");
+});
+
 test("wipe removes every saved secret and the certificate", async () => {
   const net = fakeNet();
   const c = client();

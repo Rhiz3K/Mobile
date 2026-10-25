@@ -17,7 +17,11 @@ export interface NetRequest {
   method?: string;
   headers?: Record<string, string>;
   body?: string | null;
+  /** A binary body, base64. Wins over `body`. */
+  bodyBase64?: string | null;
   timeoutMs?: number;
+  /** Streams only: send chunks as base64 instead of text. */
+  binary?: boolean;
 }
 
 export interface NetResponse {
@@ -169,7 +173,9 @@ export function nativeRequest(request: NetRequest): Promise<NetResponse> {
     method: request.method ?? "GET",
     headers: request.headers ?? {},
     body: request.body ?? null,
+    bodyBase64: request.bodyBase64 ?? null,
     timeoutMs: request.timeoutMs ?? 30000,
+    binary: false,
   });
 }
 
@@ -249,7 +255,9 @@ export function nativeStream(
     method: request.method ?? "GET",
     headers: request.headers ?? {},
     body: request.body ?? null,
+    bodyBase64: request.bodyBase64 ?? null,
     timeoutMs: 0,
+    binary: request.binary ?? false,
   });
   return () => {
     if (!streams.delete(id)) return;
