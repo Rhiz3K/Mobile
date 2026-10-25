@@ -5,10 +5,11 @@ import { HEIGHTS } from "@/constants/tokens";
 
 /**
  * Screen - top-level themed container with safe-area top padding and an
- * optional header (title + actions). Used by Hosts / Tools / Settings.
+ * optional header (title + actions).
  */
 export function Screen({
   title,
+  titleNode,
   subtitle,
   headerLeft,
   headerRight,
@@ -17,6 +18,8 @@ export function Screen({
   overlay,
 }: {
   title?: string;
+  /** Drawn in place of the title, like the account switcher. */
+  titleNode?: React.ReactNode;
   subtitle?: string;
   headerLeft?: React.ReactNode;
   headerRight?: React.ReactNode;
@@ -30,7 +33,7 @@ export function Screen({
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
-      {title && !scrollableHeader ? (
+      {(title || titleNode) && !scrollableHeader ? (
         <View
           style={{ minHeight: HEIGHTS.header }}
           className="flex-row items-center justify-between border-b border-border px-3 py-2"
@@ -39,9 +42,11 @@ export function Screen({
             <View className="mr-3 shrink-0">{headerLeft}</View>
           ) : null}
           <View className="min-w-0 flex-1">
-            <Text weight="bold" className="text-title text-foreground">
-              {title}
-            </Text>
+            {titleNode ?? (
+              <Text weight="bold" className="text-title text-foreground">
+                {title}
+              </Text>
+            )}
             {subtitle ? (
               <Text className="mt-0.5 text-meta text-muted-foreground">
                 {subtitle}

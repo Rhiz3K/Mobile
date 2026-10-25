@@ -1,6 +1,6 @@
 import { Tabs, usePathname } from "expo-router";
 import { useTerminalSessions } from "@/contexts/TerminalSessionsContext";
-import { CustomTabBar } from "@/components/CustomTabBar";
+import { BottomBar, TABS } from "@/screens/shell/BottomBar";
 
 export default function TabLayout() {
   const { sessions } = useTerminalSessions();
@@ -11,13 +11,16 @@ export default function TabLayout() {
 
   return (
     <Tabs
-      tabBar={hideTabBar ? () => null : (props) => <CustomTabBar {...props} />}
+      tabBar={hideTabBar ? () => null : (props) => <BottomBar {...props} />}
       screenOptions={{ headerShown: false }}
     >
-      <Tabs.Screen name="home" options={{ title: "Home" }} />
-      <Tabs.Screen name="hosts" options={{ title: "Hosts" }} />
-      <Tabs.Screen name="sessions" options={{ title: "Sessions" }} />
-      <Tabs.Screen name="settings" options={{ title: "Settings" }} />
+      {TABS.map((tab) => (
+        <Tabs.Screen
+          key={tab.name}
+          name={tab.name}
+          options={{ title: tab.label }}
+        />
+      ))}
     </Tabs>
   );
 }
