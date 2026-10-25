@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { View, Pressable } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { AppState, Keyboard, View, Pressable } from "react-native";
 import { Lock, Fingerprint, Delete, ChevronLeft } from "lucide-react-native";
 import { useAppLock } from "@/contexts/AppLockContext";
 import { Text } from "@/ui";
@@ -23,9 +23,9 @@ interface LockScreenProps {
 
 /**
  * Full-screen 4-digit PIN gate. Used both as the app-lock overlay (default
- * mode) and as a re-auth screen in Settings (verify mode via props). Biometrics
- * are opt-in: the user taps the fingerprint button - they are never prompted
- * automatically, and the OS device passcode is never offered as a fallback.
+ * mode) and as a re-auth screen in Settings (verify mode via props). The app
+ * lock overlay asks for biometrics once per return to the app, after the
+ * keyboard is gone. The OS device passcode is never offered as a fallback.
  */
 export function LockScreen({
   title = "Termix Locked",
@@ -35,13 +35,40 @@ export function LockScreen({
   onSuccess,
   onCancel,
 }: LockScreenProps = {}) {
-  const { hasBiometrics, unlockWithBiometrics, unlockWithPin } = useAppLock();
+  const {
+    hasBiometrics,
+    unlockWithBiometrics,
+    unlockWithPin,
+    resumes,
+    pinWaitMs,
+  } = useAppLock();
   const color = useThemeColor();
   const [pin, setPin] = useState("");
   const [error, setError] = useState(false);
 
   const verifyPin = onVerifyPin ?? unlockWithPin;
   const biometric = onBiometric ?? unlockWithBiometrics;
+
+  // The keyboard must never sit over the pad, and the prompt waits for it.
+  const overlay = !onVerifyPin && !onBiometric;
+  const prompting = useRef(false);
+  useEffect(() => {
+    if (!overlay) return;
+    Keyboard.dismiss();
+    setPin("");
+    if (!hasBiometrics) return;
+    const t = setTimeout(async () => {
+      if (prompting.current || AppState.currentState !== "active") return;
+      prompting.current = true;
+      try {
+        await unlockWithBiometrics();
+      } finally {
+        prompting.current = false;
+      }
+    }, 400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [overlay, resumes, hasBiometrics]);
 
   useEffect(() => {
     if (pin.length !== 4) return;
@@ -58,8 +85,9 @@ export function LockScreen({
     });
   }, [pin, verifyPin, onSuccess]);
 
+  const waiting = overlay && pinWaitMs > 0;
   const press = (d: string) => {
-    if (pin.length < 4) setPin((p) => p + d);
+    if (!waiting && pin.length < 4) setPin((p) => p + d);
   };
 
   const handleBiometric = async () => {
@@ -88,7 +116,9 @@ export function LockScreen({
         {title}
       </Text>
       <Text className="mb-6 mt-1 text-xs text-muted-foreground">
-        {subtitle}
+        {waiting
+          ? `Too many tries. Wait ${Math.ceil(pinWaitMs / 1000)} seconds`
+          : subtitle}
       </Text>
 
       {/* PIN dots */}

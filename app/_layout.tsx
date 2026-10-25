@@ -1,4 +1,9 @@
+import { useEffect } from "react";
 import { Stack } from "expo-router";
+import {
+  allowScreenCaptureAsync,
+  preventScreenCaptureAsync,
+} from "expo-screen-capture";
 import { AppProvider, useAppContext } from "@/contexts/AppContext";
 import { TerminalSessionsProvider } from "@/contexts/TerminalSessionsContext";
 import { TerminalCustomizationProvider } from "@/contexts/TerminalCustomizationContext";
@@ -13,7 +18,13 @@ import { AppLockProvider, useAppLock } from "@/contexts/AppLockContext";
 import { LockScreen } from "@/components/LockScreen";
 import LinkFlow from "@/screens/link/LinkFlow";
 import Welcome from "@/screens/onboarding/Welcome";
-import { View, Text, ActivityIndicator, TouchableOpacity } from "react-native";
+import {
+  View,
+  Text,
+  ActivityIndicator,
+  TouchableOpacity,
+  Platform,
+} from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Toaster } from "@/ui/Toast";
@@ -106,9 +117,20 @@ function RootLayoutContent() {
 }
 
 function AppLockGate() {
-  const { enabled, locked } = useAppLock();
-  if (!enabled || !locked) return null;
-  return <LockScreen />;
+  const { enabled, locked, covered, hideInSwitcher } = useAppLock();
+  // Android hides the recents thumbnail with the secure flag; iOS uses the cover below.
+  const secure = enabled && hideInSwitcher && Platform.OS === "android";
+  useEffect(() => {
+    if (!secure) return;
+    preventScreenCaptureAsync("termix-lock").catch(() => {});
+    return () => {
+      allowScreenCaptureAsync("termix-lock").catch(() => {});
+    };
+  }, [secure]);
+  if (!enabled) return null;
+  if (locked) return <LockScreen />;
+  if (covered) return <View className="absolute inset-0 z-50 bg-background" />;
+  return null;
 }
 
 function ThemedStatusBar() {

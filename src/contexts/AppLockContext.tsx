@@ -3,32 +3,56 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
+  useReducer,
   useRef,
   useState,
 } from "react";
-import { AppState, type AppStateStatus } from "react-native";
+import { AppState, Keyboard, type AppStateStatus } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
 import { localStores } from "@/core/db/stores";
 import { DEVICE_ONLY } from "@/core/storage/kv";
+import {
+  DEFAULT_LOCK_DELAY_MS,
+  NO_PIN_LIMIT,
+  initialLockState,
+  lockReducer,
+  pinFailed,
+  pinWaitLeft,
+  runLockHooks,
+  shouldCover,
+  type LockAppState,
+  type PinLimit,
+} from "@/core/lock";
 
 /**
  * App Lock - optional biometric / PIN gate when the app is opened or returns
- * from background. Addresses Support issues #496 / #338 (account security on
- * mobile). The PIN is stored in the OS secure store; the enabled flag in
- * AsyncStorage.
+ * from background. The PIN is stored in the OS secure store; the flags in
+ * AsyncStorage. The when-to-lock rules live in `core/lock/machine`.
  */
 
 export const APP_LOCK_ENABLED_KEY = "appLockEnabled";
+export const APP_LOCK_DELAY_KEY = "appLockDelayMs";
+export const APP_LOCK_HIDE_KEY = "appLockHideInSwitcher";
 const ENABLED_KEY = APP_LOCK_ENABLED_KEY;
 const PIN_KEY = "appLockPin"; // SecureStore
-const LOCK_DELAY_MS = 15_000; // re-lock if backgrounded longer than this
 
 interface AppLockContextValue {
   enabled: boolean;
   locked: boolean;
   hasBiometrics: boolean;
+  /** Goes up each time the user comes back while locked. */
+  resumes: number;
+  /** True when the screen must be hidden (locked, or leaving with hide on). */
+  covered: boolean;
+  delayMs: number;
+  setDelayMs: (ms: number) => Promise<void>;
+  hideInSwitcher: boolean;
+  setHideInSwitcher: (on: boolean) => Promise<void>;
+  /** Milliseconds left before a PIN can be tried again, 0 when open. */
+  pinWaitMs: number;
   /** Enable app lock with a numeric PIN (biometrics used when available). */
   enable: (pin: string) => Promise<void>;
   /**
@@ -47,32 +71,46 @@ interface AppLockContextValue {
   unlockWithBiometrics: () => Promise<boolean>;
   /** Attempt unlock via PIN; unlocks on success. Returns success. */
   unlockWithPin: (pin: string) => Promise<boolean>;
+  /** Swap the PIN after checking the old one. */
+  changePin: (oldPin: string, newPin: string) => Promise<boolean>;
 }
 
 const AppLockContext = createContext<AppLockContextValue | null>(null);
 
+function toLockApp(s: AppStateStatus): LockAppState {
+  return s === "active" || s === "background" ? s : "inactive";
+}
+
 export function AppLockProvider({ children }: { children: React.ReactNode }) {
-  const [enabled, setEnabled] = useState(false);
-  const [locked, setLocked] = useState(false);
+  const [state, dispatch] = useReducer(lockReducer, undefined, () =>
+    initialLockState(toLockApp(AppState.currentState)),
+  );
   const [hasBiometrics, setHasBiometrics] = useState(false);
+  const [hideInSwitcher, setHide] = useState(false);
   const [ready, setReady] = useState(false);
-  const backgroundedAt = useRef<number | null>(null);
-  const appState = useRef(AppState.currentState);
+  const [limit, setLimit] = useState<PinLimit>(NO_PIN_LIMIT);
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     (async () => {
-      const [isEnabled, hw, enrolled] = await Promise.all([
+      const [isEnabled, delay, hide, hw, enrolled] = await Promise.all([
         AsyncStorage.getItem(ENABLED_KEY),
+        AsyncStorage.getItem(APP_LOCK_DELAY_KEY),
+        AsyncStorage.getItem(APP_LOCK_HIDE_KEY),
         LocalAuthentication.hasHardwareAsync().catch(() => false),
         LocalAuthentication.isEnrolledAsync().catch(() => false),
       ]);
-      const on = isEnabled === "true";
-      setEnabled(on);
+      const parsed = delay == null ? NaN : Number(delay);
+      dispatch({
+        type: "delay",
+        ms: Number.isFinite(parsed) ? parsed : DEFAULT_LOCK_DELAY_MS,
+      });
+      setHide(hide === "true");
       // Only treat biometrics as available when the device has a sensor AND a
       // biometric is actually enrolled - otherwise the fingerprint button would
       // appear but do nothing.
       setHasBiometrics(!!hw && !!enrolled);
-      if (on) setLocked(true); // lock on cold start
+      dispatch({ type: "start", enabled: isEnabled === "true" });
       setReady(true);
     })();
   }, []);
@@ -80,38 +118,58 @@ export function AppLockProvider({ children }: { children: React.ReactNode }) {
   // Local data keys are only read while the app is unlocked.
   useEffect(() => {
     if (!ready) return;
-    if (locked) localStores.lock();
+    if (state.locked) localStores.lock();
     else localStores.unlock();
-  }, [ready, locked]);
+  }, [ready, state.locked]);
 
-  // Re-lock when returning from background after the delay.
   useEffect(() => {
     const sub = AppState.addEventListener("change", (next: AppStateStatus) => {
-      const prev = appState.current;
-      appState.current = next;
-      if (!enabled) return;
-      if (next.match(/inactive|background/)) {
-        backgroundedAt.current = Date.now();
-      } else if (prev.match(/inactive|background/) && next === "active") {
-        const elapsed = Date.now() - (backgroundedAt.current ?? 0);
-        if (elapsed >= LOCK_DELAY_MS) setLocked(true);
-      }
+      dispatch({ type: "app", state: toLockApp(next), now: Date.now() });
     });
     return () => sub.remove();
-  }, [enabled]);
+  }, []);
+
+  // Let go of the keyboard when locking and on every return while locked, so
+  // it never sits over the pad.
+  useEffect(() => {
+    if (!state.enabled || !state.locked) return;
+    runLockHooks();
+    Keyboard.dismiss();
+  }, [state.enabled, state.locked, state.resumes]);
+
+  // Tick while a PIN wait is running so the pad can show it.
+  useEffect(() => {
+    if (pinWaitLeft(limit, Date.now()) === 0) return;
+    const t = setInterval(() => {
+      const n = Date.now();
+      setNow(n);
+      if (pinWaitLeft(limit, n) === 0) clearInterval(t);
+    }, 1000);
+    setNow(Date.now());
+    return () => clearInterval(t);
+  }, [limit]);
+
+  const setDelayMs = useCallback(async (ms: number) => {
+    await AsyncStorage.setItem(APP_LOCK_DELAY_KEY, String(ms));
+    dispatch({ type: "delay", ms });
+  }, []);
+
+  const setHideInSwitcher = useCallback(async (on: boolean) => {
+    await AsyncStorage.setItem(APP_LOCK_HIDE_KEY, on ? "true" : "false");
+    setHide(on);
+  }, []);
 
   const enable = useCallback(async (pin: string) => {
     await SecureStore.setItemAsync(PIN_KEY, pin, DEVICE_ONLY);
     await AsyncStorage.setItem(ENABLED_KEY, "true");
-    setEnabled(true);
-    setLocked(false);
+    setLimit(NO_PIN_LIMIT);
+    dispatch({ type: "enable" });
   }, []);
 
   const disable = useCallback(async () => {
     await SecureStore.deleteItemAsync(PIN_KEY, DEVICE_ONLY).catch(() => {});
     await AsyncStorage.setItem(ENABLED_KEY, "false");
-    setEnabled(false);
-    setLocked(false);
+    dispatch({ type: "disable" });
   }, []);
 
   // Prompt biometrics without changing lock state. Device-passcode fallback is
@@ -121,12 +179,17 @@ export function AppLockProvider({ children }: { children: React.ReactNode }) {
     try {
       const enrolled = await LocalAuthentication.isEnrolledAsync();
       if (!enrolled) return false;
-      const res = await LocalAuthentication.authenticateAsync({
-        promptMessage: "Unlock Termix",
-        disableDeviceFallback: true,
-        cancelLabel: "Use PIN",
-      });
-      return res.success;
+      dispatch({ type: "bioStart" });
+      try {
+        const res = await LocalAuthentication.authenticateAsync({
+          promptMessage: "Unlock Termix",
+          disableDeviceFallback: true,
+          cancelLabel: "Use PIN",
+        });
+        return res.success;
+      } finally {
+        dispatch({ type: "bioEnd" });
+      }
     } catch {
       return false;
     }
@@ -134,42 +197,82 @@ export function AppLockProvider({ children }: { children: React.ReactNode }) {
 
   const unlockWithBiometrics = useCallback(async () => {
     const ok = await authenticateBiometrics();
-    if (ok) setLocked(false);
+    if (ok) dispatch({ type: "unlock" });
     return ok;
   }, [authenticateBiometrics]);
 
+  const limitRef = useRef(limit);
+  limitRef.current = limit;
+
   const verifyPin = useCallback(async (pin: string) => {
+    if (pinWaitLeft(limitRef.current, Date.now()) > 0) return false;
     const stored = await SecureStore.getItemAsync(PIN_KEY, DEVICE_ONLY).catch(
       () => null,
     );
-    return !!stored && stored === pin;
+    const ok = !!stored && stored === pin;
+    if (ok) setLimit(NO_PIN_LIMIT);
+    else setLimit((l) => pinFailed(l, Date.now()));
+    return ok;
   }, []);
 
   const unlockWithPin = useCallback(
     async (pin: string) => {
       const ok = await verifyPin(pin);
-      if (ok) setLocked(false);
+      if (ok) dispatch({ type: "unlock" });
       return ok;
     },
     [verifyPin],
   );
 
+  const changePin = useCallback(
+    async (oldPin: string, newPin: string) => {
+      if (!(await verifyPin(oldPin))) return false;
+      await SecureStore.setItemAsync(PIN_KEY, newPin, DEVICE_ONLY);
+      return true;
+    },
+    [verifyPin],
+  );
+
+  const value = useMemo<AppLockContextValue>(
+    () => ({
+      enabled: state.enabled,
+      locked: state.locked,
+      hasBiometrics,
+      resumes: state.resumes,
+      covered: shouldCover(state, hideInSwitcher),
+      delayMs: state.delayMs,
+      setDelayMs,
+      hideInSwitcher,
+      setHideInSwitcher,
+      pinWaitMs: pinWaitLeft(limit, now),
+      enable,
+      disable,
+      verifyPin,
+      authenticateBiometrics,
+      unlockWithBiometrics,
+      unlockWithPin,
+      changePin,
+    }),
+    [
+      state,
+      hasBiometrics,
+      hideInSwitcher,
+      limit,
+      now,
+      setDelayMs,
+      setHideInSwitcher,
+      enable,
+      disable,
+      verifyPin,
+      authenticateBiometrics,
+      unlockWithBiometrics,
+      unlockWithPin,
+      changePin,
+    ],
+  );
+
   return (
-    <AppLockContext.Provider
-      value={{
-        enabled,
-        locked,
-        hasBiometrics,
-        enable,
-        disable,
-        verifyPin,
-        authenticateBiometrics,
-        unlockWithBiometrics,
-        unlockWithPin,
-      }}
-    >
-      {children}
-    </AppLockContext.Provider>
+    <AppLockContext.Provider value={value}>{children}</AppLockContext.Provider>
   );
 }
 

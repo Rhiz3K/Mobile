@@ -42,6 +42,7 @@ import { useSessionAccountId } from "@/core/accounts/session";
 import { useSessionRepositories } from "@/core/data/hooks";
 import { formatConnectionLog } from "@/core/sessions/log";
 import { sessionLifecycle } from "@/core/sessions/lifecycle";
+import { onAppLocked } from "@/core/lock";
 import { statusFromConnection } from "@/core/sessions/status";
 import { ConnectionBanner } from "./ConnectionBanner";
 import { ConnectionLogSheet } from "./ConnectionLogSheet";
@@ -187,6 +188,9 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
         ),
       [config, hostConfig.terminalConfig, resolvedTheme, fontScale],
     );
+
+    // The terminal keeps its own keyboard, so the app lock has to ask it to let go.
+    useEffect(() => onAppLocked(() => nativeRef.current?.blur()), []);
 
     useEffect(() => {
       onBackgroundColorChange?.(settings.colors.background);
