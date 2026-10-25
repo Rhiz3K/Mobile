@@ -40,16 +40,28 @@
 - Delete local data from Settings
 - Open a terminal to hosts on This device with no Termix server: password, key, keyboard-interactive and TOTP, certificates, jump hosts, proxies and port knocking
 - Host keys of hosts on This device are checked and saved on the phone, with a warning when a key changes
-- PuTTY keys loaded in the host or login editor are changed to OpenSSH format
+- PuTTY keys loaded or pasted in the host or login editor are changed to OpenSSH format
 - Pick per host whether a linked server's host connects from the phone, through the server, or automatically
 - A failed connection says what went wrong and what to try, with buttons to try again or connect the other way
 - Features that need a Termix server say so, with a button to connect the host through the server
 - A linked server keeps its own copy on the phone and syncs hosts, logins, snippets and settings both ways, also in the background
 - Hosts of a linked server work offline and can connect from the phone
-- The first time you link a server, merge This device's hosts into it or start with only the server's data
+- The first time you link a server, merge This device's hosts into it or start with only the server's data. The choice says how many hosts, logins and snippets the phone has
 - Unlink a server and keep a copy of your own hosts, logins and snippets on This device, or delete them from the phone
 - Pick what syncs for each server, and see changes the server kept over yours with a button to keep yours
 - Sign in through the browser, which works with passkeys and security keys (needs Termix 26.10.6 or newer)
+- A welcome screen on a new install: use the app with no server, link a server, or import hosts and backups. Each choice says what it does
+- Link a server by its name alone: https is added, and the address is checked before anything is saved
+- Sign in with every login your server lists: password, LDAP, each SSO provider, TOTP and backup codes, and passkeys or security keys in the browser
+- SSO uses the login your phone's browser already has, so it doesn't ask again
+- Hosts can have a color and an icon, which sync with Termix (needs Termix 26.10.6 or newer)
+- Pick jump hosts in the host editor and change their order
+- On a linked server the host editor shows simple settings of plugins the app has no screen for, like Databases or Session Recording
+- Make Ed25519 and ECDSA keys on the phone with an optional passphrase, and RSA keys through the server's Credential Tools plugin
+- Keys are checked as you type, with the key type, fingerprint and whether the passphrase opens it
+- A login's certificate shows who it is for, when it expires and whether it fits the key
+- Test connection in the host and login editors logs in from the phone without saving
+- The host and login editors ask before you leave with unsaved changes
 - Servers behind a reverse proxy: extra headers, Cloudflare service tokens, basic auth, client certificates and the proxy's own sign in page
 - When a server signs you out, the Hosts screen says why and offers the quickest fix
 - A new native terminal that is faster, scrolls smoothly and stays responsive when a program prints a lot
@@ -144,7 +156,9 @@
 - The theme picker shows the same swatches as Termix
 - Buttons, inputs, switches, tabs, lists and toasts now look the same as in Termix
 - Popups are now sheets that slide up from the bottom, and confirmations use them instead of system alerts
-- The host, credential, file and key editors open in place with a back button instead of as popups
+- The host, login, file and key editors open in place with a back button instead of as popups
+- The host editor is one page with sections for each protocol and feature instead of tabs, and tags are added one at a time
+- Credentials are called logins everywhere in the app
 - The iOS app icon, including the dark and tinted versions, now uses the same logo as Termix on the web and desktop
 - Needs iOS 16.4 or newer
 - A terminal that fails to connect stays open with the error instead of closing
