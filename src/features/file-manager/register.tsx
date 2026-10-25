@@ -94,6 +94,17 @@ export const fileManagerFeature: FeatureDef = {
       run: (_host, ctx) => ctx.openSession(FILES_TAB_TYPE),
     },
   ],
+  tools: [
+    {
+      id: "files",
+      label: "Files",
+      description: "Browse, edit and move files",
+      icon: FolderSearch,
+      order: 10,
+      tabType: FILES_TAB_TYPE,
+      isAvailable: (host) => filesOn(host),
+    },
+  ],
   hostToggles: [
     {
       key: "enableFileManager",

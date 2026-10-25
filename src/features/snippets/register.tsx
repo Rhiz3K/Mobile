@@ -13,12 +13,13 @@ export const snippetsFeature: FeatureDef = {
   keyboardTabs: [
     { id: "snippets", label: "SNIPPETS", order: 10, component: SnippetsBar },
   ],
-  settingsLinks: [
+  tools: [
     {
       id: "snippets",
       label: "Snippets",
+      description: "Saved commands to run on any host",
       icon: FileText,
-      order: 40,
+      order: 20,
       href: "/tabs/settings/Snippets",
     },
   ],

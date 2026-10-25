@@ -235,3 +235,35 @@ test("dashboard cards come from available features, filtered per host and ordere
   const host = { id: 1 } as any;
   expect(r.dashboardCards(host, local).map((c) => c.id)).toEqual(["a", "b"]);
 });
+
+test("tools come sorted from available features only", async () => {
+  const r = new FeatureRegistry();
+  const tool = (id: string, order: number) => ({
+    id,
+    label: id,
+    icon: Dummy,
+    order,
+  });
+  r.register(
+    feature("files", {
+      availableOn: ["local", "server"],
+      tools: [{ ...tool("files", 20), tabType: "files" }],
+    }),
+  );
+  r.register(
+    feature("snippets", {
+      availableOn: ["local", "server"],
+      tools: [{ ...tool("snippets", 10), href: "/snippets" }],
+    }),
+  );
+  r.register(
+    feature("docker", {
+      requires: { plugin: "docker" },
+      tools: [tool("docker", 5)],
+    }),
+  );
+
+  expect(r.tools(local).map((t) => t.id)).toEqual(["snippets", "files"]);
+  const server = await serverCtx([]);
+  expect(r.tools(server).map((t) => t.id)).toEqual(["snippets", "files"]);
+});

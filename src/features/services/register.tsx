@@ -4,6 +4,9 @@ import { isSshHost } from "@/utils/hosts";
 import { Services } from "./Services";
 import { ServicesCard } from "./ServicesCard";
 
+const servicesOn = (host: Parameters<typeof isSshHost>[0]) =>
+  isSshHost(host) && !!host.enableServices;
+
 function ServicesTab({ session, isVisible }: SessionTabProps) {
   return <Services host={session.host} isVisible={isVisible} />;
 }
@@ -35,8 +38,19 @@ export const servicesFeature: FeatureDef = {
       icon: Cog,
       group: "connect",
       order: 35,
-      isAvailable: (host) => isSshHost(host) && !!host.enableServices,
+      isAvailable: servicesOn,
       run: (_host, ctx) => ctx.openSession("services"),
+    },
+  ],
+  tools: [
+    {
+      id: "services",
+      label: "Services",
+      description: "Start, stop and read logs",
+      icon: Cog,
+      order: 40,
+      tabType: "services",
+      isAvailable: servicesOn,
     },
   ],
   dashboardCards: [

@@ -245,6 +245,22 @@ export interface SettingsLinkDef {
   href: string;
 }
 
+/**
+ * A row on the Tools tab. With `tabType` it asks for a host and opens that
+ * tab on it; with `href` it opens a screen.
+ */
+export interface ToolDef {
+  id: string;
+  label: string;
+  description?: string;
+  icon: FeatureIcon;
+  order: number;
+  tabType?: string;
+  /** Hosts the picker lists. Unset means every host. */
+  isAvailable?: (host: SSHHost) => boolean;
+  href?: string;
+}
+
 export interface QuickActionDef {
   id: string;
   label: string;
@@ -401,6 +417,7 @@ export interface FeatureDef {
   hostFilters?: HostFilterDef[];
   settingsLinks?: SettingsLinkDef[];
   quickActions?: QuickActionDef[];
+  tools?: ToolDef[];
   keyboardTabs?: KeyboardTabDef[];
   sessionMenuItems?: SessionMenuItemDef[];
   companions?: CompanionDef[];

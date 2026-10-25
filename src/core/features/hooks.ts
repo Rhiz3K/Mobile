@@ -76,6 +76,12 @@ export function useQuickActions() {
   return useMemo(() => ({ ctx, actions: features.quickActions(ctx) }), [ctx]);
 }
 
+/** Rows for the Tools tab. */
+export function useTools() {
+  const ctx = useFeatureContext();
+  return useMemo(() => features.tools(ctx), [ctx]);
+}
+
 export function useKeyboardTabs() {
   const ctx = useSessionFeatureContext();
   return useMemo(() => features.keyboardTabs(ctx), [ctx]);

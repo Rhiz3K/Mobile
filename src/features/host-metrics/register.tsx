@@ -45,6 +45,8 @@ const MetricsTab = forwardRef<ServerStatsHandle, SessionTabProps>(
 );
 MetricsTab.displayName = "MetricsTab";
 
+const metricsOn = (host: SSHHost) => isSshHost(host) && metricsAllowed(host);
+
 export const hostMetricsFeature: FeatureDef = {
   id: "host-metrics",
   plugins: ["host-metrics"],
@@ -74,7 +76,7 @@ export const hostMetricsFeature: FeatureDef = {
       title: "Metrics",
       order: 10,
       tabType: "stats",
-      isAvailable: (host) => isSshHost(host) && metricsAllowed(host),
+      isAvailable: metricsOn,
       component: MetricsCard,
     },
   ],
@@ -85,8 +87,19 @@ export const hostMetricsFeature: FeatureDef = {
       icon: Server,
       group: "connect",
       order: 50,
-      isAvailable: (host) => isSshHost(host) && metricsAllowed(host),
+      isAvailable: metricsOn,
       run: (_host, ctx) => ctx.openSession("stats"),
+    },
+  ],
+  tools: [
+    {
+      id: "host-metrics",
+      label: "Host Metrics",
+      description: "CPU, memory, disk and network",
+      icon: Server,
+      order: 50,
+      tabType: "stats",
+      isAvailable: metricsOn,
     },
   ],
 };

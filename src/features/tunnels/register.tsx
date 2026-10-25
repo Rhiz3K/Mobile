@@ -25,6 +25,11 @@ const TunnelsTab = forwardRef<TunnelManagerHandle, SessionTabProps>(
 );
 TunnelsTab.displayName = "TunnelsTab";
 
+const tunnelsOn = (host: Parameters<typeof isSshHost>[0]) =>
+  isSshHost(host) &&
+  !!host.enableTunnel &&
+  (host.tunnelConnections?.length ?? 0) > 0;
+
 export const tunnelsFeature: FeatureDef = {
   id: "tunnels",
   plugins: ["tunnels"],
@@ -51,11 +56,19 @@ export const tunnelsFeature: FeatureDef = {
       icon: Network,
       group: "connect",
       order: 40,
-      isAvailable: (host) =>
-        isSshHost(host) &&
-        !!host.enableTunnel &&
-        (host.tunnelConnections?.length ?? 0) > 0,
+      isAvailable: tunnelsOn,
       run: (_host, ctx) => ctx.openSession("tunnel"),
+    },
+  ],
+  tools: [
+    {
+      id: "tunnels",
+      label: "Tunnels",
+      description: "Start and stop saved tunnels",
+      icon: Network,
+      order: 60,
+      tabType: "tunnel",
+      isAvailable: tunnelsOn,
     },
   ],
   hostToggles: [

@@ -8,6 +8,9 @@ function DockerTab({ session, isVisible }: SessionTabProps) {
   return <Docker host={session.host} isVisible={isVisible} />;
 }
 
+const dockerOn = (host: Parameters<typeof isSshHost>[0]) =>
+  isSshHost(host) && !!host.enableDocker;
+
 export const dockerFeature: FeatureDef = {
   id: "docker",
   plugins: ["docker"],
@@ -35,8 +38,19 @@ export const dockerFeature: FeatureDef = {
       icon: Box,
       group: "connect",
       order: 30,
-      isAvailable: (host) => isSshHost(host) && !!host.enableDocker,
+      isAvailable: dockerOn,
       run: (_host, ctx) => ctx.openSession("docker"),
+    },
+  ],
+  tools: [
+    {
+      id: "docker",
+      label: "Docker",
+      description: "Containers, logs and stats",
+      icon: Box,
+      order: 30,
+      tabType: "docker",
+      isAvailable: dockerOn,
     },
   ],
   dashboardCards: [
@@ -45,7 +59,7 @@ export const dockerFeature: FeatureDef = {
       title: "Docker",
       order: 20,
       tabType: "docker",
-      isAvailable: (host) => isSshHost(host) && !!host.enableDocker,
+      isAvailable: dockerOn,
       component: DockerCard,
     },
   ],

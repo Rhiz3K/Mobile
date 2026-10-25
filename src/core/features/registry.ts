@@ -190,6 +190,10 @@ export class FeatureRegistry {
     return this.collect(ctx, (d) => d.quickActions).sort(byOrder);
   }
 
+  tools(ctx: FeatureContext) {
+    return this.collect(ctx, (d) => d.tools).sort(byOrder);
+  }
+
   keyboardTabs(ctx: FeatureContext) {
     return this.collect(ctx, (d) => d.keyboardTabs).sort(byOrder);
   }
