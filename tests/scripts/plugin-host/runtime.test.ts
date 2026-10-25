@@ -22,8 +22,13 @@ Object.assign(globalThis, {
   WritableStream: web.WritableStream,
   Blob: require("node:buffer").Blob,
 });
-const { Headers, Request, Response } = require("undici");
-Object.assign(globalThis, { Headers, Request, Response });
+// Get Node's fetch and matching abort classes outside Jest's jsdom sandbox.
+Object.assign(
+  globalThis,
+  require("node:vm").runInThisContext(
+    "({ Headers, Request, Response, AbortController, AbortSignal })",
+  ),
+);
 
 const workspace = path.join(__dirname, "../../../..");
 const { findSdk } = require("../../../scripts/plugin-host-sdk.cjs");

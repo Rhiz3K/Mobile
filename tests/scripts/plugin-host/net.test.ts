@@ -6,7 +6,7 @@ import type {
   PageMessage,
 } from "../../../src/core/plugins/frame-protocol";
 
-// jsdom leaves out the fetch types; the WebView has them. Set before undici loads.
+// jsdom leaves out these web APIs; the WebView has them.
 const util = require("node:util");
 const web = require("node:stream/web");
 Object.assign(globalThis, {
@@ -17,8 +17,13 @@ Object.assign(globalThis, {
   WritableStream: web.WritableStream,
   Blob: require("node:buffer").Blob,
 });
-const { Headers, Request, Response } = require("undici");
-Object.assign(globalThis, { Headers, Request, Response });
+// Get Node's fetch and matching abort classes outside Jest's jsdom sandbox.
+Object.assign(
+  globalThis,
+  require("node:vm").runInThisContext(
+    "({ Headers, Request, Response, AbortController, AbortSignal })",
+  ),
+);
 
 const { base64ToBytes, bytesToBase64, createNet } =
   require("../../../scripts/plugin-host/net") as typeof import("../../../scripts/plugin-host/net");
