@@ -51,13 +51,9 @@ interface AppContextType {
   hasServerConfigured: boolean;
 
   /**
-   * Points the sign in flow at a server: reuses the account for that URL, or
-   * the active one if it never signed in, otherwise adds a new account. The
-   * account becomes active.
+   * Call once the active account has a session: links it for sync. Null
+   * when nothing was linked.
    */
-  linkServer: (serverUrl: string) => Promise<AccountClient>;
-  /** Call once the active account has a session. */
-  /** Links the signed in server for sync. Null when nothing was linked. */
   finishSignIn: () => Promise<LinkOutcome | null>;
 
   /** Account switcher sheet. */
@@ -351,25 +347,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     return () => subscription.remove();
   }, [isAuthenticated, setAuthenticated]);
 
-  const linkServer = useCallback(async (serverUrl: string) => {
-    const url = serverUrl.trim().replace(/\/+$/, "");
-    const current = accounts.active();
-    let account = accounts.findByUrl(url);
-    if (
-      !account &&
-      isServerAccount(current) &&
-      current.status === "signed_out"
-    ) {
-      account = await accounts.update(current.id, { serverUrl: url });
-    }
-    account ??= await accounts.add(url);
-    await accounts.setActive(account.id);
-    const client = accounts.client(account.id)!;
-    await client.load();
-    await client.refreshServerApi();
-    return client;
-  }, []);
-
   const finishSignIn = useCallback(async (): Promise<LinkOutcome | null> => {
     const current = accounts.active();
     const client = accounts.activeClient();
@@ -407,7 +384,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         isLoading,
         setIsLoading,
         hasServerConfigured: isServerAccount(active),
-        linkServer,
         finishSignIn,
         accountSwitcherVisible,
         openAccountSwitcher,

@@ -11,7 +11,7 @@ import {
 } from "@/contexts/ThemeContext";
 import { AppLockProvider, useAppLock } from "@/contexts/AppLockContext";
 import { LockScreen } from "@/components/LockScreen";
-import AuthFlow from "@/screens/authentication/AuthFlow";
+import LinkFlow from "@/screens/link/LinkFlow";
 import { View, Text, ActivityIndicator, TouchableOpacity } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -94,7 +94,7 @@ function RootLayoutContent() {
       <AppLockGate />
       {authFlowVisible ? (
         <View className="absolute inset-0 bg-background">
-          <AuthFlow />
+          <LinkFlow />
         </View>
       ) : null}
     </View>

@@ -163,3 +163,36 @@ function parentsFirst(rows: SyncRow[]): SyncRow[] {
 export function hasOwnData(db: LocalDb): boolean {
   return COPY_TYPES.some((type) => adapterFor(type).list(context(db)).size > 0);
 }
+
+export interface OwnDataCounts {
+  hosts: number;
+  logins: number;
+  snippets: number;
+  folders: number;
+}
+
+/** How much Merge would copy, for the summary before the choice. */
+export function ownDataCounts(db: LocalDb): OwnDataCounts {
+  const size = (type: CopyType) => adapterFor(type).list(context(db)).size;
+  return {
+    hosts: size("hosts"),
+    logins: size("sshCredentials"),
+    snippets: size("snippets"),
+    folders: size("sshFolders") + size("snippetFolders"),
+  };
+}
+
+/** "12 hosts, 3 logins and 5 snippets", leaving out what is zero. */
+export function describeCounts(counts: OwnDataCounts): string {
+  const parts = [
+    [counts.hosts, "host"],
+    [counts.logins, "login"],
+    [counts.snippets, "snippet"],
+    [counts.folders, "folder"],
+  ]
+    .filter(([n]) => (n as number) > 0)
+    .map(([n, word]) => `${n} ${word}${n === 1 ? "" : "s"}`);
+  if (parts.length === 0) return "nothing yet";
+  if (parts.length === 1) return parts[0];
+  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+}

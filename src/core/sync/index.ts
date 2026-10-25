@@ -11,9 +11,11 @@ export {
   linkAccount,
   mergeThisDevice,
   thisDeviceHasData,
+  thisDeviceCounts,
   unlinkAccount,
 } from "./link";
 export type { LinkOutcome } from "./link";
+export { describeCounts, type OwnDataCounts } from "./copy";
 export {
   asServerHost,
   hostStatusesByLocalId,

@@ -105,3 +105,39 @@ test("a saved active id that no longer exists falls back to This device", async 
   await s.init();
   expect(s.active().id).toBe(LOCAL_ACCOUNT_ID);
 });
+
+test("a pending server stays out of lists until it is confirmed", async () => {
+  const s = store();
+  await s.init();
+  const pending = await s.add("https://p.example", { pending: true });
+  expect(s.list().map((a) => a.id)).toEqual([LOCAL_ACCOUNT_ID]);
+  expect(s.findByUrl("https://p.example")).toBeNull();
+  expect(s.findPending("https://p.example/")?.id).toBe(pending.id);
+  expect(s.client(pending.id)).not.toBeNull();
+  await s.confirm(pending.id);
+  expect(s.list().map((a) => a.id)).toEqual([LOCAL_ACCOUNT_ID, pending.id]);
+  expect(s.find(pending.id)).not.toHaveProperty("pending");
+});
+
+test("a dropped or left over pending server is wiped", async () => {
+  const wiped: string[] = [];
+  let n = 0;
+  const make = () =>
+    new AccountStore({
+      newId: () => `id${++n}`,
+      wipeLocalData: async (id) => {
+        wiped.push(id);
+      },
+    });
+  const s = make();
+  await s.init();
+  const a = await s.add("https://a.example", { pending: true });
+  await s.discardPending(a.id);
+  expect(s.find(a.id)).toBeNull();
+  const b = await s.add("https://b.example", { pending: true });
+  // The app closed mid link; the next start drops it.
+  const again = make();
+  await again.init();
+  expect(again.find(b.id)).toBeNull();
+  expect(wiped).toEqual([a.id, b.id]);
+});
