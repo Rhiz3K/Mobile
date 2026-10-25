@@ -597,3 +597,21 @@ test("hosts reorder and bulk update, and shared copies stay as they are", async 
   await repos.hosts.bulkUpdate([a.id], { folder: "" });
   expect((await repos.hosts.get(a.id))?.folder).toBe("");
 });
+
+test("a host's color and icon round trip and stay when an edit leaves them out", async () => {
+  const { repos } = setup();
+  const saved = await repos.hosts.create({
+    ...fullHost,
+    color: "#22c55e",
+    icon: "database",
+  });
+  expect(saved).toMatchObject({ color: "#22c55e", icon: "database" });
+  const kept = await repos.hosts.update(saved.id, { ...fullHost });
+  expect(kept).toMatchObject({ color: "#22c55e", icon: "database" });
+  const cleared = await repos.hosts.update(saved.id, {
+    ...fullHost,
+    color: null,
+    icon: null,
+  });
+  expect(cleared).toMatchObject({ color: null, icon: null });
+});

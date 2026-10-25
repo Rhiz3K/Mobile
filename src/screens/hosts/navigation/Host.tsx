@@ -1,7 +1,7 @@
 import { View, Pressable } from "react-native";
 import { Pin, Cpu, MemoryStick, GripVertical } from "lucide-react-native";
 import { SSHHost } from "@/types";
-import { Checkbox, Text } from "@/ui";
+import { Checkbox, LookIcon, Text, isLookColor, lookIcon } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { useHostBadges } from "@/core/features";
 import { isSshActive } from "@/utils/hosts";
@@ -147,6 +147,17 @@ export default function Host({
             }}
             className="h-1.5 w-1.5 shrink-0 rounded-full"
           />
+          {lookIcon(host.icon) || isLookColor(host.color) ? (
+            <LookIcon
+              name={host.icon}
+              size={12}
+              color={
+                isLookColor(host.color)
+                  ? host.color
+                  : (color("muted-foreground") ?? "#9ca3af")
+              }
+            />
+          ) : null}
           <Text
             weight="medium"
             className="shrink text-[13px] text-foreground"

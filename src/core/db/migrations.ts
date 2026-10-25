@@ -27,4 +27,9 @@ export const migrations: Migration[] = [
     name: "0003_metric_samples",
     sql: "CREATE TABLE `metric_samples` (\n\t`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,\n\t`host_sync_id` text NOT NULL,\n\t`ts` integer NOT NULL,\n\t`cpu` real,\n\t`mem` real,\n\t`disk` real,\n\t`rx` real,\n\t`tx` real\n);\n--> statement-breakpoint\nCREATE INDEX `idx_metric_samples_host_ts` ON `metric_samples` (`host_sync_id`,`ts`);",
   },
+  {
+    version: 5,
+    name: "0004_outgoing_timeslip",
+    sql: "ALTER TABLE `ssh_data` ADD `color` text;--> statement-breakpoint\nALTER TABLE `ssh_data` ADD `icon` text;",
+  },
 ];

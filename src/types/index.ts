@@ -81,6 +81,10 @@ export interface SSHHost {
   enableServices?: boolean;
   sshPort?: number;
   notes?: string;
+  /** Hex color like #3b82f6, synced with the server. */
+  color?: string | null;
+  /** Lucide icon name. */
+  icon?: string | null;
   guacamoleConfig?: string | Record<string, unknown> | null;
   // Remote desktop (Guacamole) protocol fields
   rdpAuthType?: "direct" | "credential" | "none";
@@ -155,6 +159,8 @@ export interface SSHHostData {
   enableDocker?: boolean;
   enableServices?: boolean;
   notes?: string;
+  color?: string | null;
+  icon?: string | null;
   macAddress?: string;
   /** Vault plugin profile for hosts that sign in with Vault. */
   vaultProfileId?: number | null;

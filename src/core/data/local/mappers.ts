@@ -93,6 +93,8 @@ export function hostFromRow(row: HostRow): SSHHost {
       .map((item) => ({ hostId: Number(item?.hostId) }))
       .filter((item) => Number.isFinite(item.hostId)),
     notes: row.notes ?? "",
+    color: row.color ?? null,
+    icon: row.icon ?? null,
     enableSsh: row.enableSsh,
     sshPort: row.sshPort ?? row.port,
     statusCheckEnabled: row.statusCheckEnabled,
@@ -212,6 +214,9 @@ export function hostToRow(
     forceKeyboardInteractive: data.forceKeyboardInteractive ? "true" : "false",
     jumpHosts: json(data.jumpHosts ?? []),
     notes: data.notes ?? "",
+    color:
+      data.color !== undefined ? orNull(data.color) : (current?.color ?? null),
+    icon: data.icon !== undefined ? orNull(data.icon) : (current?.icon ?? null),
     enableSsh: anyProtocol ? Boolean(data.enableSsh) : true,
     sshPort: port,
     statusCheckEnabled:

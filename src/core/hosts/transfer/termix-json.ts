@@ -34,6 +34,8 @@ export interface ImportRow {
   tags: string[];
   pin: boolean;
   notes?: string;
+  color?: string;
+  icon?: string;
   authType: string;
   password?: string;
   key?: string;
@@ -158,6 +160,8 @@ export function normalizeRow(
     tags: tagList(raw.tags),
     pin: raw.pin === true,
     notes: text(raw.notes),
+    color: text(raw.color),
+    icon: text(raw.icon),
     authType,
     password,
     key,
@@ -378,6 +382,8 @@ function hostRow(
     tags: host.tags ?? [],
     pin: !!host.pin,
     notes: host.notes || null,
+    color: host.color || null,
+    icon: host.icon || null,
     pluginSettings: scrubSecrets(host.pluginSettings ?? {}),
     protocolAuth: share ? {} : (host.protocolAuth ?? {}),
   };

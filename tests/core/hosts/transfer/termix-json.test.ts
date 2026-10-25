@@ -261,3 +261,17 @@ test("other protocols export without ssh fields", () => {
   );
   expect(out.hosts[0]).not.toHaveProperty("authType");
 });
+
+test("color and icon go out in an export and come back in", () => {
+  const out = buildExport(
+    [host({ color: "#3b82f6", icon: "server-cog" })],
+    [],
+    {
+      share: true,
+    },
+  );
+  const row = out.hosts[0] as Record<string, unknown>;
+  expect(row).toMatchObject({ color: "#3b82f6", icon: "server-cog" });
+  const back = normalizeRow(row, 0) as ImportRow;
+  expect(back).toMatchObject({ color: "#3b82f6", icon: "server-cog" });
+});
