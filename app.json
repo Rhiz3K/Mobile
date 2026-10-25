@@ -191,7 +191,8 @@
             "multipleShareMimeTypes": ["*/*"]
           }
         }
-      ]
+      ],
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true,
