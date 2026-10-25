@@ -17,8 +17,8 @@ export function PrivacyNoteControl() {
     <View className="py-3">
       <Text className="text-meta text-muted-foreground">
         Hosts, logins and snippets are kept in an encrypted file on this phone.
-        Termix does not send usage data from the app. A linked server only gets
-        what you let it sync.
+        Usage statistics are off unless you turn them on below. A linked server
+        only gets what you let it sync.
       </Text>
     </View>
   );

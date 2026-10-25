@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react-native";
 import { registerBuiltInFeatures } from "@/features";
+import { ConfirmProvider } from "@/ui";
 import Settings from "@/screens/settings/Settings";
 import { resetStorage } from "../../helpers/http";
 
@@ -63,7 +64,11 @@ beforeEach(async () => {
 
 describe("Settings", () => {
   it("lists the sections", async () => {
-    await render(<Settings />);
+    await render(
+      <ConfirmProvider>
+        <Settings />
+      </ConfirmProvider>,
+    );
     for (const title of [
       "Accounts and sync",
       "Appearance",
@@ -77,7 +82,11 @@ describe("Settings", () => {
   });
 
   it("filters while you type and opens a result", async () => {
-    await render(<Settings />);
+    await render(
+      <ConfirmProvider>
+        <Settings />
+      </ConfirmProvider>,
+    );
     await fireEvent.changeText(
       screen.getByLabelText("Search settings"),
       "logs",
@@ -88,7 +97,11 @@ describe("Settings", () => {
   });
 
   it("says when nothing matches", async () => {
-    await render(<Settings />);
+    await render(
+      <ConfirmProvider>
+        <Settings />
+      </ConfirmProvider>,
+    );
     await fireEvent.changeText(
       screen.getByLabelText("Search settings"),
       "zzzz",

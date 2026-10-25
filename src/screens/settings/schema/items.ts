@@ -35,6 +35,11 @@ import {
   HideSwitcherControl,
   LockDelayControl,
 } from "../controls/SecurityControls";
+import {
+  UsagePreviewControl,
+  UsageResetIdControl,
+  UsageStatsControl,
+} from "../controls/AnalyticsControls";
 import { WidgetsControl } from "../controls/WidgetsControl";
 import type { SettingsItemDef } from "./types";
 
@@ -284,9 +289,39 @@ export const SETTINGS_ITEMS: SettingsItemDef[] = [
     Control: ClearRecentControl,
   },
   {
+    id: "usage-stats",
+    section: "privacy",
+    label: "Share anonymous usage statistics",
+    description: "A short report once a day. No hosts, names or addresses",
+    keywords: ["telemetry", "analytics", "stats", "posthog", "tracking"],
+    order: 25,
+    icon: Database,
+    Control: UsageStatsControl,
+  },
+  {
+    id: "usage-preview",
+    section: "privacy",
+    label: "Next report",
+    description: "See exactly what would be sent",
+    keywords: ["telemetry", "analytics", "preview"],
+    order: 26,
+    icon: Database,
+    Control: UsagePreviewControl,
+  },
+  {
+    id: "usage-reset-id",
+    section: "privacy",
+    label: "Reset install id",
+    description: "Future reports will look like a new install",
+    keywords: ["telemetry", "analytics", "id"],
+    order: 27,
+    icon: Database,
+    Control: UsageResetIdControl,
+  },
+  {
     id: "usage-statistics",
     section: "privacy",
-    label: "Usage statistics",
+    label: "Server usage statistics",
     description: "Telemetry settings on your server",
     keywords: ["telemetry", "analytics", "stats"],
     order: 30,

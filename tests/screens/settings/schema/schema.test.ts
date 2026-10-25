@@ -130,7 +130,7 @@ describe("searchSettings", () => {
   it("finds by label, keyword and description", () => {
     expect(top("theme")[0]).toBe("theme");
     expect(top("face id")).toContain("app-lock");
-    expect(top("telemetry")).toEqual([]);
+    expect(top("telemetry")).toContain("usage-stats");
     expect(top("import")).toContain("link:host-transfer");
   });
 

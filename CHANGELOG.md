@@ -151,6 +151,7 @@
 - App wide keyboard shortcuts on iPad (Cmd K, Cmd /, Cmd Opt 1 to 4, Cmd ,) and on Android (Ctrl Shift K, /, N, comma and Ctrl Alt 1 to 4) with a shortcut sheet in Settings, Keyboard
 - Hover highlights and right click menus for mouse and trackpad
 - Home screen widgets work with no server, show hosts and snippets from this device and follow the app theme
+- Share anonymous usage statistics to help improve the app: off until you answer the first-run question, with a switch, a preview of the next report and an id reset in Settings
 
 ### Changed
 
