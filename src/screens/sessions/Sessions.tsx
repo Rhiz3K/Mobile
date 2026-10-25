@@ -38,6 +38,7 @@ import { Screen } from "@/components/Screen";
 import { Text } from "@/ui";
 import TabBar from "@/screens/sessions/navigation/TabBar";
 import { SessionMenu } from "@/screens/sessions/SessionMenu";
+import { keyBarHeight } from "@/features/terminal/keys/compact";
 import { shellLayout } from "@/screens/shell/layout";
 import { HostsPane } from "@/screens/sessions/HostsPane";
 import { CompanionPane } from "@/screens/sessions/CompanionPane";
@@ -146,7 +147,7 @@ export default function Sessions() {
   const SESSION_TAB_BAR_HEIGHT = getTabBarHeight(isLandscape) + 2;
   const CUSTOM_KEYBOARD_TAB_HEIGHT = 36;
 
-  const KEYBOARD_BAR_HEIGHT = isLandscape ? 48 : 52;
+  const KEYBOARD_BAR_HEIGHT = keyBarHeight(isLandscape, win.isShort);
   // When the system keyboard is dismissed the keyboard bar reserves the
   // home-indicator safe area below its keys. The TabBar floats directly on top
   // of the bar, so it must be lifted by the keys' height PLUS that same

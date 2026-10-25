@@ -3,11 +3,12 @@ import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { ChevronsUpDown } from "lucide-react-native";
 import { Sheet, SheetRow, Text } from "@/ui";
 import { useUiColors } from "@/contexts/ThemeContext";
-import { useOrientation } from "@/utils/orientation";
+import { useWindowInfo } from "@/utils/window-class";
 import type { TerminalInputHandle } from "@/core/features/types";
 import type { SSHHost } from "@/types";
 import { useKeyPrefs } from "./KeyPrefsContext";
 import { KeyView } from "./KeyView";
+import { compactKeySize } from "./compact";
 import { useKeyLayout } from "./useKeyLayout";
 import { useKeyPad } from "./useKeyPad";
 
@@ -31,7 +32,7 @@ export default function KeyRowBar({
   onCommand?: (id: string) => void;
 }) {
   const ui = useUiColors();
-  const { isLandscape } = useOrientation();
+  const { isLandscape, isShort } = useWindowInfo();
   const { settings } = useKeyPrefs();
   const { layout } = useKeyLayout(host);
   const [rowIndex, setRowIndex] = useState(0);
@@ -93,7 +94,7 @@ export default function KeyRowBar({
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{
           paddingHorizontal: 8,
-          paddingVertical: isLandscape ? 6 : 8,
+          paddingVertical: isShort ? 3 : isLandscape ? 6 : 8,
           alignItems: "center",
           gap: isLandscape ? 4 : 6,
         }}
@@ -116,7 +117,14 @@ export default function KeyRowBar({
                 key={`${key.id}-${ki}`}
                 def={key}
                 mods={pad.mods}
-                settings={settings}
+                settings={
+                  isShort
+                    ? {
+                        ...settings,
+                        keySize: compactKeySize(settings.keySize, true),
+                      }
+                    : settings
+                }
                 onPress={pad.press}
               />
             ))}
