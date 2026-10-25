@@ -265,6 +265,8 @@ export interface CredentialData {
   publicKey?: string;
   keyPassword?: string;
   keyType?: string;
+  /** Empty clears the saved certificate. */
+  certPublicKey?: string;
 }
 
 // ============================================================================

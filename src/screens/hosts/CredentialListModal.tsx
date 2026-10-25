@@ -28,7 +28,7 @@ import {
 } from "@/ui";
 import { useThemeColor } from "@/contexts/ThemeContext";
 import { toast } from "@/utils/toast";
-import CredentialForm from "@/screens/hosts/CredentialForm";
+import CredentialEditor from "@/screens/hosts/credentials/CredentialEditor";
 import { useRepositories } from "@/core/data/hooks";
 
 export default function CredentialListModal({
@@ -59,7 +59,7 @@ export default function CredentialListModal({
     try {
       setCredentials(await repos.credentials.list());
     } catch (e: any) {
-      toast.error(e?.message || "Failed to load credentials");
+      toast.error(e?.message || "Could not load logins");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -107,7 +107,7 @@ export default function CredentialListModal({
       toast.success(`Deleted "${deleteTarget.name}"`);
       setDeleteTarget(null);
     } catch (e: any) {
-      toast.error(e?.message || "Failed to delete credential");
+      toast.error(e?.message || "Could not delete the login");
     } finally {
       setDeleting(false);
     }
@@ -118,7 +118,7 @@ export default function CredentialListModal({
       <InlineView
         open={visible}
         onClose={onClose}
-        title="Credentials"
+        title="Logins"
         scroll={false}
         bare
         actions={
@@ -135,7 +135,7 @@ export default function CredentialListModal({
         {/* Search bar */}
         <View className="border-b border-border px-3 py-2.5">
           <Input
-            placeholder="Search credentials…"
+            placeholder="Search logins"
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoCapitalize="none"
@@ -156,7 +156,7 @@ export default function CredentialListModal({
           <View className="flex-1 items-center justify-center gap-3">
             <ActivityIndicator color={color("accent-brand")} />
             <Text className="text-sm text-muted-foreground">
-              Loading credentials…
+              Loading logins...
             </Text>
           </View>
         ) : (
@@ -175,13 +175,13 @@ export default function CredentialListModal({
                 icon={KeyRound}
                 title={
                   searchQuery.trim()
-                    ? "No credentials match your search"
-                    : "No credentials yet"
+                    ? "No logins match your search"
+                    : "No logins yet"
                 }
                 action={
                   !searchQuery.trim() ? (
                     <Button variant="default" size="sm" onPress={openCreate}>
-                      Add credential
+                      Add login
                     </Button>
                   ) : undefined
                 }
@@ -235,7 +235,7 @@ export default function CredentialListModal({
         tone="destructive"
         visible={deleteTarget !== null}
         onClose={() => setDeleteTarget(null)}
-        title="Delete Credential"
+        title="Delete login"
         description={`"${deleteTarget?.name}" will be permanently deleted. Hosts using it will lose their saved credentials.`}
         icon={<Trash2 size={16} color={color("destructive")} />}
         footer={
@@ -260,7 +260,7 @@ export default function CredentialListModal({
       />
 
       {/* Create / edit form stacked on top */}
-      <CredentialForm
+      <CredentialEditor
         visible={formOpen}
         credential={formCredential}
         onClose={() => setFormOpen(false)}
