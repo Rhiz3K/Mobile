@@ -75,3 +75,59 @@ test("a cursor-mode sequence split across reads still counts", () => {
   mode.feed("1h");
   expect(mode.application).toBe(true);
 });
+
+test("Meta uses the same parameter as the native encoder", () => {
+  expect(
+    encodeCursorKey("ArrowRight", { meta: true, cursorApplication: true }),
+  ).toBe("\x1b[1;9C");
+  expect(
+    encodeCursorKey("ArrowRight", {
+      shift: true,
+      meta: true,
+      cursorApplication: true,
+    }),
+  ).toBe("\x1b[1;10C");
+  expect(
+    encodeCursorKey("ArrowRight", {
+      shift: true,
+      ctrl: true,
+      alt: true,
+      meta: true,
+      cursorApplication: true,
+    }),
+  ).toBe("\x1b[1;16C");
+});
+
+test("a second ESC restarts the sequence, so ESC ESC c clears DECCKM", () => {
+  const mode = new CursorKeyMode();
+  mode.feed("\x1b[?1h");
+  expect(mode.application).toBe(true);
+  mode.feed("\x1b\x1bc");
+  expect(mode.application).toBe(false);
+  mode.feed("\x1b\x1b[?1h");
+  expect(mode.application).toBe(true);
+});
+
+test("a replaced connection drops application cursor keys", () => {
+  const mode = new CursorKeyMode();
+  const first = {};
+  const next = {};
+  mode.noteConnection(first);
+  mode.feed("\x1b[?1h");
+  expect(mode.application).toBe(true);
+  mode.noteConnection(first);
+  expect(mode.application).toBe(true);
+  mode.noteConnection(next);
+  expect(mode.application).toBe(false);
+  expect(
+    encodeCursorKey("ArrowRight", { cursorApplication: mode.application }),
+  ).toBe("\x1b[C");
+});
+
+test("reset drops DECCKM for a new shell", () => {
+  const mode = new CursorKeyMode();
+  mode.feed("\x1b[?1h");
+  expect(mode.application).toBe(true);
+  mode.reset();
+  expect(mode.application).toBe(false);
+});

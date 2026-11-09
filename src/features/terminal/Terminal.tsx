@@ -539,7 +539,13 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
           transportRef.current = kind;
           onTransportResolved?.(kind);
         },
-        onConnected: ({ fromBackground, isReattach }) => {
+        onConnected: ({ fromBackground, isReattach, resumed }) => {
+          // A new shell is in normal cursor mode. Reattach keeps the program
+          // that had already turned DECCKM on.
+          if (resumed && !isReattach) {
+            cursorMode.current.reset();
+            if (!XTERM_FALLBACK) nativeRef.current?.write("\x1b[?1l");
+          }
           const firstTime = !connectedBefore.current;
           connectedBefore.current = true;
           // RelayShell clears before the server replays a reattached screen.
@@ -647,6 +653,8 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
     const [viewKey, setViewKey] = useState(0);
     const firstConn = useRef(true);
     useEffect(() => {
+      // The view is new; the tracker is not. Drop the previous session's mode.
+      cursorMode.current.noteConnection(conn);
       if (firstConn.current) {
         firstConn.current = false;
         return;

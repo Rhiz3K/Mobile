@@ -9,22 +9,22 @@ import org.junit.Test
 class CursorKeysTest {
   @Test
   fun rightArrowIsSs3OnlyWhileDecckmIsOn() {
-    assertEquals("\u001b[C", CursorKeys.sequence("ArrowRight", false, false, false, false))
-    assertEquals("\u001bOC", CursorKeys.sequence("ArrowRight", false, false, false, true))
-    assertEquals("\u001bOA", CursorKeys.sequence("ArrowUp", false, false, false, true))
-    assertEquals("\u001bOB", CursorKeys.sequence("ArrowDown", false, false, false, true))
-    assertEquals("\u001bOD", CursorKeys.sequence("ArrowLeft", false, false, false, true))
-    assertEquals("\u001bOH", CursorKeys.sequence("Home", false, false, false, true))
-    assertNull(CursorKeys.sequence("Home", false, false, false, false))
-    assertNull(CursorKeys.sequence("Tab", false, false, false, true))
+    assertEquals("\u001b[C", CursorKeys.sequence("ArrowRight", false, false, false, false, false))
+    assertEquals("\u001bOC", CursorKeys.sequence("ArrowRight", false, false, false, false, true))
+    assertEquals("\u001bOA", CursorKeys.sequence("ArrowUp", false, false, false, false, true))
+    assertEquals("\u001bOB", CursorKeys.sequence("ArrowDown", false, false, false, false, true))
+    assertEquals("\u001bOD", CursorKeys.sequence("ArrowLeft", false, false, false, false, true))
+    assertEquals("\u001bOH", CursorKeys.sequence("Home", false, false, false, false, true))
+    assertNull(CursorKeys.sequence("Home", false, false, false, false, false))
+    assertNull(CursorKeys.sequence("Tab", false, false, false, false, true))
   }
 
   @Test
   fun modifiersUseTheXtermParameter() {
-    assertEquals("\u001b[1;2C", CursorKeys.sequence("ArrowRight", true, false, false, true))
-    assertEquals("\u001b[1;5C", CursorKeys.sequence("ArrowRight", false, true, false, false))
-    assertEquals("\u001b[1;3D", CursorKeys.sequence("ArrowLeft", false, false, true, false))
-    assertEquals("\u001b[1;6C", CursorKeys.sequence("ArrowRight", true, true, false, true))
+    assertEquals("\u001b[1;2C", CursorKeys.sequence("ArrowRight", true, false, false, false, true))
+    assertEquals("\u001b[1;5C", CursorKeys.sequence("ArrowRight", false, true, false, false, false))
+    assertEquals("\u001b[1;3D", CursorKeys.sequence("ArrowLeft", false, false, true, false, false))
+    assertEquals("\u001b[1;6C", CursorKeys.sequence("ArrowRight", true, true, false, false, true))
   }
 
   @Test
@@ -57,6 +57,31 @@ class CursorKeysTest {
     assertFalse(keys.isApplication())
     keys.feed("1h".toByteArray())
     assertTrue(keys.isApplication())
+  }
+
+  @Test
+  fun metaIsTheSameParameterTheNativeEncoderUses() {
+    assertEquals("\u001b[1;9C", CursorKeys.sequence("ArrowRight", false, false, false, true, true))
+    assertEquals("\u001b[1;10C", CursorKeys.sequence("ArrowRight", true, false, false, true, true))
+    assertEquals("\u001b[1;16C", CursorKeys.sequence("ArrowRight", true, true, true, true, true))
+  }
+
+  @Test
+  fun aSecondEscapeStillResetsDecckm() {
+    val keys = CursorKeys()
+    keys.feed("\u001b[?1h".toByteArray())
+    assertTrue(keys.isApplication())
+    keys.feed("\u001b\u001bc".toByteArray())
+    assertFalse(keys.isApplication())
+  }
+
+  @Test
+  fun resetDropsApplicationCursorKeysForANewSession() {
+    val keys = CursorKeys()
+    keys.feed("\u001b[?1h".toByteArray())
+    assertTrue(keys.isApplication())
+    keys.reset()
+    assertFalse(keys.isApplication())
   }
 
   @Test

@@ -50,11 +50,14 @@ internal class CursorKeys {
     }
     when (phase) {
       Phase.GROUND -> if (code == 0x1b) phase = Phase.ESC
-      Phase.ESC -> {
-        if (code == 0x5b) {
+      Phase.ESC -> when (code) {
+        // ESC ESC c is a reset. Dropping the second ESC would leave DECCKM on.
+        0x1b -> Unit
+        0x5b -> {
           phase = Phase.CSI
           clearCsi()
-        } else {
+        }
+        else -> {
           if (code == 0x63) application = false
           phase = Phase.GROUND
         }
@@ -118,10 +121,13 @@ internal class CursorKeys {
       shift: Boolean,
       ctrl: Boolean,
       alt: Boolean,
+      meta: Boolean,
       application: Boolean,
     ): String? {
       val letter = PAD[name] ?: return null
-      val mod = (if (shift) 1 else 0) + (if (alt) 2 else 0) + (if (ctrl) 4 else 0)
+      // Same parameter the native encoder uses: 1 + shift + 2*alt + 4*ctrl + 8*meta.
+      val mod = (if (shift) 1 else 0) + (if (alt) 2 else 0) + (if (ctrl) 4 else 0) +
+        (if (meta) 8 else 0)
       if (mod == 0) {
         if (application) return "\u001bO$letter"
         return if (name in ARROWS) "\u001b[$letter" else null

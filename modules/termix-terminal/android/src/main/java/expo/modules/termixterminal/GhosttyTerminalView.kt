@@ -806,8 +806,9 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
     consumeSticky()
     ime.reset()
     // While DECCKM is on, arrows are ours: less wants SS3, and a keyboard
-    // that committed ESC [ C has to be rewritten the same way.
-    val forced = CursorKeys.sequence(name, shift, ctrl, alt, application)
+    // that committed ESC [ C has to be rewritten the same way. The key row
+    // has no Meta key; hardware Meta is handled with the key event.
+    val forced = CursorKeys.sequence(name, shift, ctrl, alt, false, application)
     if (forced != null && (application || shift || ctrl || alt)) {
       sendBytes(forced.toByteArray(Charsets.UTF_8))
       return
@@ -1849,14 +1850,16 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
     }
     val unshifted = event.getUnicodeChar(0)
     if (action != 0) {
+      val metaHeld = (metaState and KeyEvent.META_META_ON) != 0
       val arrow = CursorKeys.sequence(
         arrowName(event.keyCode) ?: "",
         metaState and KeyEvent.META_SHIFT_ON != 0,
         metaState and KeyEvent.META_CTRL_ON != 0,
         metaState and KeyEvent.META_ALT_ON != 0,
+        metaHeld,
         cursorKeys.isApplication(),
       )
-      val modified = (metaState and
+      val modified = metaHeld || (metaState and
         (KeyEvent.META_SHIFT_ON or KeyEvent.META_CTRL_ON or KeyEvent.META_ALT_ON)) != 0
       val force = arrow != null && (cursorKeys.isApplication() || modified)
       if (force && arrow != null) {

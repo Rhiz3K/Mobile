@@ -12,6 +12,8 @@ export interface CursorModifiers {
   shift?: boolean;
   ctrl?: boolean;
   alt?: boolean;
+  /** Super / Android Meta. Same bit the native encoder uses. */
+  meta?: boolean;
   /** DEC private mode 1, application cursor keys. */
   cursorApplication?: boolean;
 }
@@ -29,10 +31,13 @@ const CURSOR_PAD: Record<string, string> = {
   End: "F",
 };
 
-/** xterm modifier parameter: 1 + shift + 2*alt + 4*ctrl. */
+/** xterm modifier parameter: 1 + shift + 2*alt + 4*ctrl + 8*meta. */
 function modifierParameter(options: CursorModifiers): number {
   return (
-    (options.shift ? 1 : 0) + (options.alt ? 2 : 0) + (options.ctrl ? 4 : 0)
+    (options.shift ? 1 : 0) +
+    (options.alt ? 2 : 0) +
+    (options.ctrl ? 4 : 0) +
+    (options.meta ? 8 : 0)
   );
 }
 
@@ -87,10 +92,13 @@ type Phase = "ground" | "esc" | "csi";
 /**
  * Tracks DECCKM from PTY output. `ESC [ ? 1 h` sets it (including when 1 is
  * one of several private modes) and `ESC [ ? 1 l` clears it. `ESC c` resets.
+ * A second ESC starts that sequence over, so `ESC ESC c` still resets.
  */
 export class CursorKeyMode {
   application = false;
   private phase: Phase = "ground";
+  /** Connection the current mode belongs to. A different one starts clean. */
+  private connection: object | undefined;
   private privateMode = false;
   private params: number[] = [];
   private current = 0;
@@ -101,6 +109,17 @@ export class CursorKeyMode {
     this.application = false;
     this.phase = "ground";
     this.clearCsi();
+  }
+
+  /**
+   * The view is replaced when its connection is. DECCKM belonged to the
+   * previous session, so a new normal-mode shell must not keep sending SS3.
+   */
+  noteConnection(connection: object) {
+    if (this.connection !== undefined && this.connection !== connection) {
+      this.reset();
+    }
+    this.connection = connection;
   }
 
   feed(data: string) {
@@ -126,6 +145,8 @@ export class CursorKeyMode {
       return;
     }
     if (this.phase === "esc") {
+      // ESC ESC c is a reset. Dropping the second ESC would leave DECCKM on.
+      if (code === 0x1b) return;
       if (code === 0x5b) {
         this.phase = "csi";
         this.clearCsi();
