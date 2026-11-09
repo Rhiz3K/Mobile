@@ -44,7 +44,11 @@
                 case 3:
                     beginTouchSelection(at: point, selectAll: false, selectLine: true)
                 case 2:
-                    if sendTabForDoubleTap(at: point) {
+                    // A long press calls this with a synthetic two-tap so the
+                    // word is selected. That recognizer is not installed here,
+                    // so it must keep selecting when a real double tap sends Tab.
+                    let realDoubleTap = touchSelection.tapRecognizers.contains { $0 === gesture }
+                    if realDoubleTap, sendTabForDoubleTap(at: point) {
                         _ = sendKey(.tab)
                     } else {
                         beginTouchSelection(at: point, selectAll: false)

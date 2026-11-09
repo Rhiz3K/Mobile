@@ -47,6 +47,19 @@ export interface DoubleTapState {
 }
 
 /**
+ * A long press on iOS reuses the two-tap selector to select a word. Only the
+ * installed double-tap recognizer may send Tab.
+ */
+export function doubleTapFromRecognizer(
+  installedDoubleTap: boolean,
+  enabled: boolean,
+  state: DoubleTapState,
+): boolean {
+  if (!installedDoubleTap) return false;
+  return doubleTapAction(enabled, state) === "tab";
+}
+
+/**
  * What a finished double tap should do.
  * "tab" sends Tab and skips word selection. "default" is today's double tap.
  */
@@ -84,6 +97,8 @@ export interface PointerEvent {
   y: number;
   /** Fingers down. A second finger is a pinch or a scroll, not a tap. */
   pointers?: number;
+  /** This tap dismissed a text selection. The next tap must not send Tab. */
+  dismissedSelection?: boolean;
 }
 
 export interface GestureEffect {
@@ -116,6 +131,7 @@ export function effectsForTouches(
   let moved = false;
   let pointers = 1;
   let lastTap: PointSample | null = null;
+  let lastDismissed = false;
 
   for (const event of events) {
     const count = event.pointers ?? 1;
@@ -139,6 +155,7 @@ export function effectsForTouches(
     if (event.phase === "cancel") {
       down = null;
       lastTap = null;
+      lastDismissed = false;
       effects.push(NONE);
       continue;
     }
@@ -153,6 +170,7 @@ export function effectsForTouches(
       duration < LONG_PRESS_MS;
     if (!tap) {
       lastTap = null;
+      lastDismissed = false;
       down = null;
       moved = false;
       pointers = 1;
@@ -161,15 +179,22 @@ export function effectsForTouches(
     }
 
     const paired = tapsAreDouble(lastTap, sample);
-    if (paired && doubleTapAction(enabled, state) === "tab") {
+    const action = doubleTapAction(enabled, {
+      ...state,
+      selecting: state.selecting || lastDismissed,
+    });
+    if (paired && action === "tab") {
       effects.push({ tab: true, singleTap: false, platformDoubleTap: false });
       lastTap = null;
+      lastDismissed = false;
     } else if (paired) {
       effects.push({ tab: false, singleTap: false, platformDoubleTap: true });
       lastTap = null;
+      lastDismissed = false;
     } else {
       effects.push({ tab: false, singleTap: true, platformDoubleTap: false });
       lastTap = sample;
+      lastDismissed = event.dismissedSelection === true;
     }
     down = null;
     moved = false;
@@ -189,6 +214,7 @@ export function xtermDoubleTapPrelude(enabled: boolean): string {
     `var termixDoubleTapMs = ${DOUBLE_TAP_MS};`,
     `var termixDoubleTapSlop = ${DOUBLE_TAP_SLOP};`,
     "var termixLastPlainTap = null;",
+    "function termixForgetPlainTap() { termixLastPlainTap = null; }",
     "function termixPlainTapSendsTab(t, x, y, mouse, selecting) {",
     "  if (mouse || selecting) { termixLastPlainTap = null; return false; }",
     "  var first = termixLastPlainTap;",

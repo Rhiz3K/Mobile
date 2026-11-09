@@ -11,13 +11,14 @@ final class TermixGhosttyView: UITerminalView {
   /// Opt-in: a double tap sends Tab instead of selecting the word.
   var doubleTapSendsTab = false
 
-  override func sendTabForDoubleTap(at _: CGPoint) -> Bool {
+  override func sendTabForDoubleTap(at point: CGPoint) -> Bool {
     guard doubleTapSendsTab else { return false }
-    // A program that wants the clicks, or a selection already showing, keeps
-    // the double tap it has today. A single tap still opens links and toggles
-    // the keyboard; that recognizer waits until this one fails.
+    // A program that wants the clicks, a link, or a selection already showing
+    // keeps the double tap it has today. A single tap still opens links and
+    // toggles the keyboard; that recognizer waits until this one fails.
     if surface?.isMouseCaptured == true { return false }
     if hasTouchSelection { return false }
+    if owner?.link(at: point) != nil { return false }
     return true
   }
 

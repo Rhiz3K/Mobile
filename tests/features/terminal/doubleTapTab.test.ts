@@ -6,6 +6,7 @@ import {
   TAB_KEY,
   TAP_SLOP,
   doubleTapAction,
+  doubleTapFromRecognizer,
   effectsForTouches,
   tapsAreDouble,
   xtermDoubleTapPrelude,
@@ -41,6 +42,15 @@ describe("doubleTapAction", () => {
   test("a clean double tap sends Tab when the setting is on", () => {
     expect(doubleTapAction(true, clear)).toBe("tab");
     expect(TAB_KEY).toBe("\t");
+  });
+
+  test("a long press that reuses the two-tap selector does not send Tab", () => {
+    expect(doubleTapFromRecognizer(false, true, clear)).toBe(false);
+    expect(doubleTapFromRecognizer(true, true, clear)).toBe(true);
+    expect(doubleTapFromRecognizer(true, true, { ...clear, link: true })).toBe(
+      false,
+    );
+    expect(doubleTapFromRecognizer(true, false, clear)).toBe(false);
   });
 
   test("mouse, a link, or a selection keep the terminal's double tap", () => {
@@ -151,6 +161,39 @@ describe("effectsForTouches", () => {
     }
   });
 
+  test("a tap that dismisses a selection does not make the next tap Tab", () => {
+    const effects = ups(
+      effectsForTouches(
+        [
+          { phase: "down", t: 0, x: 0, y: 0 },
+          { phase: "up", t: 30, x: 0, y: 0, dismissedSelection: true },
+          ...press(2, 1, 140),
+        ],
+        true,
+      ),
+    );
+    expect(effects[1]).toMatchObject({
+      tab: false,
+      platformDoubleTap: true,
+    });
+  });
+
+  test("tap, cancel, tap does not send Tab", () => {
+    const effects = ups(
+      effectsForTouches(
+        [
+          ...press(0, 0, 0),
+          { phase: "down", t: 80, x: 1, y: 1 },
+          { phase: "cancel", t: 90, x: 1, y: 1 },
+          ...press(1, 1, 160),
+        ],
+        true,
+      ),
+    );
+    expect(effects.every((e) => !e.tab)).toBe(true);
+    expect(effects.filter((e) => e.singleTap)).toHaveLength(2);
+  });
+
   test("a cancelled press does not pair with the next tap", () => {
     const effects = ups(
       effectsForTouches(
@@ -221,6 +264,22 @@ describe("xterm page script", () => {
     expect(asks(false, taps)).toEqual([false, false, false, false]);
     expect(asks(true, taps, true)).toEqual([false, false, false, false]);
     expect(asks(true, taps, false, true)).toEqual([false, false, false, false]);
+  });
+
+  test("a cancelled tap is forgotten, so the next tap is not Tab", () => {
+    const context: { results?: boolean[] } = {};
+    vm.createContext(context);
+    vm.runInContext(
+      `${xtermDoubleTapPrelude(true)}
+      var results = [];
+      results.push(termixPlainTapSendsTab(0, 0, 0, false, false));
+      termixForgetPlainTap();
+      results.push(termixPlainTapSendsTab(200, 1, 1, false, false));
+      termixPlainTapSendsTab(400, 0, 0, false, true);
+      results.push(termixPlainTapSendsTab(500, 0, 0, false, false));`,
+      context,
+    );
+    expect(context.results).toEqual([false, false, false]);
   });
 
   test("a far second tap is not Tab", () => {

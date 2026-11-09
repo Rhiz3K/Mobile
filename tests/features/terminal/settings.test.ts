@@ -5,6 +5,7 @@ import {
   resolveTerminalColors,
   resolveTerminalSettings,
   terminalFont,
+  xtermTerminalConfig,
 } from "@/features/terminal/settings";
 
 const FAMILIES = [
@@ -168,6 +169,21 @@ describe("resolveTerminalSettings", () => {
         "dark",
       ).doubleTapTab,
     ).toBe(true);
+  });
+
+  test("the xterm config keeps a host from turning double tap on", () => {
+    const merged = xtermTerminalConfig(
+      { fontSize: 16 },
+      { doubleTapTab: true, theme: "dracula", fontSize: 20 },
+    );
+    expect(merged.doubleTapTab).toBe(false);
+    expect(merged.theme).toBe("dracula");
+    expect(merged.fontSize).toBe(20);
+    expect(
+      xtermTerminalConfig({ doubleTapTab: true }, { doubleTapTab: false })
+        .doubleTapTab,
+    ).toBe(true);
+    expect(xtermTerminalConfig({}, undefined).doubleTapTab).toBe(false);
   });
 
   test("links open directly only when asked", () => {

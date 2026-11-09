@@ -48,6 +48,13 @@ describe("double tap sends Tab on Android", () => {
     expect(doubleTap).toMatch(/sendNamedKey\("Tab", false\)/);
     expect(doubleTap).toMatch(/nativeSelectWord/);
     expect(doubleTap).toMatch(/mouseTracking/);
+    // The first tap clears a selection before this runs, so that fact is kept.
+    expect(doubleTap).toMatch(/selectionDismissedThisTap/);
+  });
+
+  it("remembers a tap that dismissed a selection", () => {
+    const single = body(kotlin, /override fun onSingleTapUp\(/);
+    expect(single).toMatch(/selectionDismissedThisTap = true/);
   });
 
   it("leaves a single tap on the keyboard", () => {
@@ -72,12 +79,22 @@ describe("double tap sends Tab on iOS", () => {
       /beginTouchSelection\(at: point, selectAll: false\)/,
     );
     expect(handler).toMatch(/toggleSoftwareKeyboard\(\)/);
+    // Tab only for the installed double-tap recognizer.
+    expect(handler).toMatch(/tapRecognizers.contains/);
   });
 
-  it("stays off for mouse tracking and an existing selection", () => {
+  it("a long press still selects by handing in a synthetic two-tap", () => {
+    const press = body(swiftView, /func selectOnLongPress\(/);
+    expect(press).toMatch(/SyntheticTap\(point: point, taps: 2\)/);
+    expect(press).toMatch(/handleSelectionTap:/);
+    expect(press).not.toMatch(/sendKey/);
+  });
+
+  it("stays off for mouse tracking, a link, and an existing selection", () => {
     const decide = body(swiftView, /override func sendTabForDoubleTap\(/);
     expect(decide).toMatch(/doubleTapSendsTab/);
     expect(decide).toMatch(/isMouseCaptured/);
     expect(decide).toMatch(/hasTouchSelection/);
+    expect(decide).toMatch(/link\(at: point\)/);
   });
 });

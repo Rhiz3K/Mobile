@@ -226,6 +226,8 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
   var doubleTapTab = false
   /** The first tap of a pair opened a link, so the second must not send Tab. */
   private var linkOpenedThisTap = false
+  /** The first tap dismissed a selection, so the second must not send Tab. */
+  private var selectionDismissedThisTap = false
   private var lastBellAt = 0L
   private var flashUntil = 0L
   private var tone: ToneGenerator? = null
@@ -276,9 +278,13 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
       override fun onSingleTapUp(e: MotionEvent): Boolean {
         linkOpenedThisTap = false
         if (selectionMode || actionMode != null) {
+          // Cleared before onDoubleTap, so remember it. A second tap that
+          // only finished dismissing the selection must not send Tab.
+          selectionDismissedThisTap = true
           clearSelection()
           return true
         }
+        selectionDismissedThisTap = false
         // A link opens on tap unless the program wants the mouse (tmux, vim); then the long press
         // menu has Open link.
         if (!mouseTracking) {
@@ -302,8 +308,10 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
       override fun onDoubleTap(e: MotionEvent): Boolean {
         if (handle == 0L || finished) return false
         val link = linkOpenedThisTap || linkAt(e.x, e.y) != null
+        val selecting = selectionMode || selectionDismissedThisTap
         linkOpenedThisTap = false
-        if (DoubleTapTab.sendsTab(doubleTapTab, mouseTracking, link, selectionMode)) {
+        selectionDismissedThisTap = false
+        if (DoubleTapTab.sendsTab(doubleTapTab, mouseTracking, link, selecting)) {
           sendNamedKey("Tab", false)
           return true
         }
@@ -321,6 +329,7 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
 
       override fun onLongPress(e: MotionEvent) {
         linkOpenedThisTap = false
+        selectionDismissedThisTap = false
         if (handle == 0L || finished || scaleDetector.isInProgress) return
         lastPressCol = colAt(e.x)
         lastPressRow = rowAt(e.y)
@@ -347,6 +356,7 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
         distanceY: Float
       ): Boolean {
         linkOpenedThisTap = false
+        selectionDismissedThisTap = false
         if (handle == 0L || scaleDetector.isInProgress) return false
         scrollAccum += distanceY
         val deltaRows = (scrollAccum / cellHeight).toInt()

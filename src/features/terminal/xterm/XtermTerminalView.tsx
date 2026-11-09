@@ -752,6 +752,8 @@ export const XtermTerminalView = forwardRef<XtermTerminalApi, Props>(
         try { e.preventDefault(); } catch(e2) {}
         const isTap = !hasMoved && Date.now() - touchStartTime < 400;
         if (isTap) endSelection();
+        // Dismissing a selection is not the first half of a Tab gesture.
+        termixForgetPlainTap();
         return;
       }
       // Forward a plain tap as a left click to TUIs that enabled mouse
@@ -805,6 +807,7 @@ export const XtermTerminalView = forwardRef<XtermTerminalApi, Props>(
 
     terminalElement.addEventListener('touchcancel', () => {
       multiTouchSeen = true;
+      termixForgetPlainTap();
       if (longPressTimeout) {
         clearTimeout(longPressTimeout);
         longPressTimeout = null;
