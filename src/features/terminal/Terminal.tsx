@@ -50,6 +50,7 @@ import {
   MAX_FONT_SIZE,
   MIN_FONT_SIZE,
   resolveTerminalSettings,
+  xtermTerminalConfig,
 } from "./settings";
 import { TERMINAL_SHORTCUTS, nextFontSize } from "./shortcuts";
 import {
@@ -862,11 +863,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
               <XtermTerminalView
                 key={`xterm-${hostConfig.id}-${viewKey}`}
                 ref={xtermRef}
-                config={{
-                  ...MOBILE_DEFAULT_TERMINAL_CONFIG,
-                  ...config,
-                  ...hostConfig.terminalConfig,
-                }}
+                config={xtermTerminalConfig(config, hostConfig.terminalConfig)}
                 colors={settings.colors}
                 fontFamily={settings.fontFamily}
                 fontSize={settings.fontSize}

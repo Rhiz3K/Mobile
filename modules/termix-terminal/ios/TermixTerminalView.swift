@@ -8,6 +8,19 @@ import UIKit
 final class TermixGhosttyView: UITerminalView {
   weak var owner: TermixTerminalView?
   private var lastTouchPoint: CGPoint?
+  /// Opt-in: a double tap sends Tab instead of selecting the word.
+  var doubleTapSendsTab = false
+
+  override func sendTabForDoubleTap(at point: CGPoint) -> Bool {
+    guard doubleTapSendsTab else { return false }
+    // A program that wants the clicks, a link, or a selection already showing
+    // keeps the double tap it has today. A single tap still opens links and
+    // toggles the keyboard; that recognizer waits until this one fails.
+    if surface?.isMouseCaptured == true { return false }
+    if hasTouchSelection { return false }
+    if owner?.link(at: point) != nil { return false }
+    return true
+  }
 
   override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
     lastTouchPoint = touches.first?.location(in: self)
@@ -398,6 +411,10 @@ class TermixTerminalView: ExpoView {
 
   func setAccentColor(_ color: String?) {
     terminalView.tintColor = color.flatMap(UIColor.init(hex:))
+  }
+
+  func setDoubleTapTab(_ on: Bool) {
+    terminalView.doubleTapSendsTab = on
   }
 
   private func baseConfiguration() -> TerminalConfiguration {

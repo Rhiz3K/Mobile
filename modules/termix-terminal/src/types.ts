@@ -82,6 +82,11 @@ export interface TerminalViewProps {
   bell?: TerminalBell;
   /** iPad keyboards: Option sends Alt. */
   optionAsMeta?: boolean;
+  /**
+   * A double tap sends Tab instead of selecting a word. Off by default.
+   * Long press still selects, and a single tap still focuses the keyboard.
+   */
+  doubleTapTab?: boolean;
   /** Selection handles and similar accents. */
   accentColor?: string;
   /** Bytes the user typed or the terminal answered, base64. */

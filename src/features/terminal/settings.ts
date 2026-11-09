@@ -2,6 +2,7 @@ import {
   TERMINAL_THEMES,
   type TerminalThemeColors,
 } from "@/constants/terminal-themes";
+import { MOBILE_DEFAULT_TERMINAL_CONFIG } from "@/constants/terminal-config";
 import type { TerminalConfig } from "@/types";
 import type {
   TerminalBell,
@@ -143,6 +144,8 @@ export interface TerminalSettings {
   scrollback: number;
   bell: TerminalBell;
   optionAsMeta: boolean;
+  /** A double tap sends Tab. Off keeps word selection on that gesture. */
+  doubleTapTab: boolean;
   linkPolicy: "confirm" | "direct";
 }
 
@@ -181,7 +184,25 @@ export function resolveTerminalSettings(
       haptics: user.haptics ?? true,
     },
     optionAsMeta: user.optionAsMeta ?? false,
+    // A phone gesture. A host's terminal settings do not turn it on.
+    doubleTapTab: user.doubleTapTab ?? false,
     linkPolicy: merged.linkClickBehavior === "direct" ? "direct" : "confirm",
+  };
+}
+
+/**
+ * The config the xterm fallback reads. Host values still win for the look.
+ * Double tap stays the phone's own choice, same as `resolveTerminalSettings`.
+ */
+export function xtermTerminalConfig(
+  user: Partial<TerminalConfig>,
+  host?: Partial<TerminalConfig>,
+): Partial<TerminalConfig> {
+  return {
+    ...MOBILE_DEFAULT_TERMINAL_CONFIG,
+    ...user,
+    ...(host ?? {}),
+    doubleTapTab: user.doubleTapTab ?? false,
   };
 }
 
