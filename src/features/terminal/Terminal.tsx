@@ -84,6 +84,7 @@ import {
   TmuxWindowsSheet,
   type PickSession,
 } from "./tmux/TmuxSheets";
+import { CursorKeyMode } from "./keys/cursor";
 import { controlCode } from "./keys/dispatch";
 import { useKeyLayout } from "./keys/useKeyLayout";
 import type { TerminalSearchResult } from "@/modules/termix-terminal";
@@ -172,6 +173,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
     const { config, updateFontSize } = useTerminalCustomization();
     const nativeRef = useRef<TerminalViewApi>(null);
     const xtermRef = useRef<XtermTerminalApi>(null);
+    const cursorMode = useRef(new CursorKeyMode());
     const connRef = useRef<HostConnection | null>(null);
     const sizeRef = useRef<{ cols: number; rows: number } | null>(null);
     const connectedOnce = useRef(false);
@@ -556,6 +558,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
           }
         },
         onData: (data) => {
+          cursorMode.current.feed(data);
           watcherRef.current?.feed(data);
           if (XTERM_FALLBACK) xtermRef.current?.write(data);
           else nativeRef.current?.write(data);
@@ -832,6 +835,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
         isSelecting: () =>
           XTERM_FALLBACK ? (xtermRef.current?.isSelecting() ?? false) : false,
         keyTarget: () => (XTERM_FALLBACK ? null : keyTarget),
+        cursorApplication: () => cursorMode.current.application,
         command: runCommand,
         getCwd: () => connRef.current?.getCwd() ?? Promise.resolve(null),
       }),

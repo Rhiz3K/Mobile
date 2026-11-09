@@ -80,6 +80,7 @@ import {
   translateCommittedText,
   translateSpecialKeyEvent,
 } from "@/features/terminal/keyboard/terminalInputMapping";
+import { normalizeCommittedArrows } from "@/features/terminal/keys/cursor";
 import { useUiColors } from "@/contexts/ThemeContext";
 import { XTERM_FALLBACK } from "@/features/terminal/fallback";
 import { SHOWCASE } from "@/showcase/enabled";
@@ -260,7 +261,10 @@ export default function Sessions() {
         return;
       }
 
-      const translatedText = translateCommittedText(text, NO_MODIFIERS);
+      const translatedText = normalizeCommittedArrows(
+        translateCommittedText(text, NO_MODIFIERS),
+        !!activeRef.current.cursorApplication?.(),
+      );
       if (translatedText) {
         activeRef.current.sendInput(translatedText);
       }
@@ -281,7 +285,12 @@ export default function Sessions() {
         return;
       }
 
-      const translatedKey = translateSpecialKeyEvent(event);
+      const translatedKey = translateSpecialKeyEvent({
+        ...event,
+        cursorApplication:
+          event.cursorApplication ||
+          !!getActiveTerminalRef()?.current?.cursorApplication?.(),
+      });
       if (!translatedKey) {
         return;
       }

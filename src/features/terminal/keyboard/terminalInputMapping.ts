@@ -1,3 +1,5 @@
+import { encodeCursorKey } from "@/features/terminal/keys/cursor";
+
 export type TerminalInputSource = "native-ime" | "ios-keycommand";
 
 export type TerminalInputModifiers = {
@@ -9,6 +11,8 @@ export type TerminalInputModifiers = {
 export type TerminalSpecialKeyEvent = TerminalInputModifiers & {
   key: string;
   source: TerminalInputSource;
+  /** DECCKM, when the caller knows the terminal turned it on. */
+  cursorApplication?: boolean;
 };
 
 export type TerminalSpecialKeyRecord = {
@@ -42,13 +46,6 @@ const SPECIAL_KEY_MAP: Record<string, string> = {
   F10: "\x1b[21~",
   F11: "\x1b[23~",
   F12: "\x1b[24~",
-};
-
-const SHIFT_ARROW_MAP: Record<string, string> = {
-  ArrowUp: "\x1b[1;2A",
-  ArrowDown: "\x1b[1;2B",
-  ArrowRight: "\x1b[1;2C",
-  ArrowLeft: "\x1b[1;2D",
 };
 
 function normalizeKey(key: string) {
@@ -113,9 +110,13 @@ export function translateSpecialKeyEvent(
     return shift ? "\x1b[Z" : "\t";
   }
 
-  if (shift && SHIFT_ARROW_MAP[key]) {
-    return SHIFT_ARROW_MAP[key];
-  }
+  const cursor = encodeCursorKey(key, {
+    shift,
+    ctrl,
+    alt,
+    cursorApplication: event.cursorApplication,
+  });
+  if (cursor) return cursor;
 
   return SPECIAL_KEY_MAP[key] || null;
 }
