@@ -145,7 +145,29 @@ describe("resolveTerminalSettings", () => {
       bell: { style: "none", haptics: true },
       linkPolicy: "confirm",
       optionAsMeta: false,
+      doubleTapTab: false,
     });
+  });
+
+  test("double tap sends Tab only when the phone turns it on", () => {
+    expect(resolveTerminalSettings({}, undefined, "dark").doubleTapTab).toBe(
+      false,
+    );
+    expect(
+      resolveTerminalSettings({ doubleTapTab: true }, undefined, "dark")
+        .doubleTapTab,
+    ).toBe(true);
+    // A host's terminal settings cannot switch a gesture on the phone.
+    expect(
+      resolveTerminalSettings({}, { doubleTapTab: true }, "dark").doubleTapTab,
+    ).toBe(false);
+    expect(
+      resolveTerminalSettings(
+        { doubleTapTab: true },
+        { doubleTapTab: false },
+        "dark",
+      ).doubleTapTab,
+    ).toBe(true);
   });
 
   test("links open directly only when asked", () => {

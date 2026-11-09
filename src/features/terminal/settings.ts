@@ -143,6 +143,8 @@ export interface TerminalSettings {
   scrollback: number;
   bell: TerminalBell;
   optionAsMeta: boolean;
+  /** A double tap sends Tab. Off keeps word selection on that gesture. */
+  doubleTapTab: boolean;
   linkPolicy: "confirm" | "direct";
 }
 
@@ -181,6 +183,8 @@ export function resolveTerminalSettings(
       haptics: user.haptics ?? true,
     },
     optionAsMeta: user.optionAsMeta ?? false,
+    // A phone gesture. A host's terminal settings do not turn it on.
+    doubleTapTab: user.doubleTapTab ?? false,
     linkPolicy: merged.linkClickBehavior === "direct" ? "direct" : "confirm",
   };
 }

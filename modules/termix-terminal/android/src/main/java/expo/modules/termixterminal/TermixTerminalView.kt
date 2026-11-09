@@ -67,6 +67,10 @@ class TermixTerminalView(context: Context, appContext: AppContext) :
 
   fun setBell(style: String?, haptics: Boolean) = terminal.setBell(style, haptics)
 
+  fun setDoubleTapTab(on: Boolean) {
+    terminal.doubleTapTab = on
+  }
+
   fun setAccentColor(color: String?) = terminal.setHandleColor(color)
 
   fun setPromptWatch(on: Boolean) {

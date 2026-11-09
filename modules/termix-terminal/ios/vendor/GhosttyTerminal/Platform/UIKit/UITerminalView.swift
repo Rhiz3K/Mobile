@@ -84,7 +84,8 @@
 
         /// Terminal-local touch selection and the native edit menu on iOS, on by default.
         /// Single tap clears selection or a menu, otherwise clicks and toggles the keyboard.
-        /// Double tap selects a word, triple tap selects a row.
+        /// Double tap selects a word, unless `sendTabForDoubleTap(at:)` returns true.
+        /// Triple tap selects a row.
         /// Selection gestures and menus leave keyboard visibility unchanged.
         /// Long press opens the menu; one finger extends a selection and two fingers scroll locally.
         /// Set false to opt out: no touch selection at all, a tap clicks and toggles the keyboard.
@@ -101,6 +102,10 @@
                 #endif
             }
         }
+
+        /// A host returns true to send Tab on a double tap instead of selecting
+        /// the word. Long press, scrolling, triple tap and a single tap never ask.
+        open func sendTabForDoubleTap(at _: CGPoint) -> Bool { false }
 
         /// Shows the system text loupe over the moving endpoint while a finger
         /// drags a selection handle or extends a selection, on by default.

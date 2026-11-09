@@ -44,7 +44,11 @@
                 case 3:
                     beginTouchSelection(at: point, selectAll: false, selectLine: true)
                 case 2:
-                    beginTouchSelection(at: point, selectAll: false)
+                    if sendTabForDoubleTap(at: point) {
+                        _ = sendKey(.tab)
+                    } else {
+                        beginTouchSelection(at: point, selectAll: false)
+                    }
                 default:
                     if touchSelection.range != nil {
                         dismissTouchSelection()

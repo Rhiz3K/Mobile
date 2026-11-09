@@ -222,6 +222,10 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
   private var bellSound = false
   private var bellVisual = false
   private var haptics = true
+  /** Opt-in: a double tap sends Tab instead of selecting the word. */
+  var doubleTapTab = false
+  /** The first tap of a pair opened a link, so the second must not send Tab. */
+  private var linkOpenedThisTap = false
   private var lastBellAt = 0L
   private var flashUntil = 0L
   private var tone: ToneGenerator? = null
@@ -270,6 +274,7 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
       override fun onDown(e: MotionEvent) = true
 
       override fun onSingleTapUp(e: MotionEvent): Boolean {
+        linkOpenedThisTap = false
         if (selectionMode || actionMode != null) {
           clearSelection()
           return true
@@ -279,6 +284,7 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
         if (!mouseTracking) {
           val link = linkAt(e.x, e.y)
           if (link != null) {
+            linkOpenedThisTap = true
             onLink?.invoke(link)
             return true
           }
@@ -292,8 +298,16 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
       }
 
       // A double tap selects the word, like a long press without the drag.
+      // With the setting on it sends Tab instead, and leaves that word alone.
       override fun onDoubleTap(e: MotionEvent): Boolean {
-        if (handle == 0L || finished || mouseTracking) return false
+        if (handle == 0L || finished) return false
+        val link = linkOpenedThisTap || linkAt(e.x, e.y) != null
+        linkOpenedThisTap = false
+        if (DoubleTapTab.sendsTab(doubleTapTab, mouseTracking, link, selectionMode)) {
+          sendNamedKey("Tab", false)
+          return true
+        }
+        if (mouseTracking) return false
         lastPressCol = colAt(e.x)
         lastPressRow = rowAt(e.y)
         pressLink = linkAt(e.x, e.y)
@@ -306,6 +320,7 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
       }
 
       override fun onLongPress(e: MotionEvent) {
+        linkOpenedThisTap = false
         if (handle == 0L || finished || scaleDetector.isInProgress) return
         lastPressCol = colAt(e.x)
         lastPressRow = rowAt(e.y)
@@ -331,6 +346,7 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
         distanceX: Float,
         distanceY: Float
       ): Boolean {
+        linkOpenedThisTap = false
         if (handle == 0L || scaleDetector.isInProgress) return false
         scrollAccum += distanceY
         val deltaRows = (scrollAccum / cellHeight).toInt()

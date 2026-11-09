@@ -23,6 +23,7 @@ import { useUiColors } from "@/contexts/ThemeContext";
 import type { TerminalConfig } from "@/types";
 import type { TerminalThemeColors } from "@/constants/terminal-themes";
 import { loadXtermAssets } from "../loadXtermAssets";
+import { xtermDoubleTapPrelude } from "../doubleTapTab";
 
 // The xterm fonts for the family names the native view uses.
 const XTERM_FONTS: Record<string, string> = {
@@ -300,6 +301,7 @@ export const XtermTerminalView = forwardRef<XtermTerminalApi, Props>(
         window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'input', data: data }));
       }
     }
+    ${xtermDoubleTapPrelude(terminalConfig.doubleTapTab === true)}
     terminal.onData(forwardTerminalInput);
     terminal.onBinary(forwardTerminalInput);
 
@@ -760,6 +762,16 @@ export const XtermTerminalView = forwardRef<XtermTerminalApi, Props>(
       const isPlainTap = !hasMoved && !multiTouchSeen && !wheelSentThisGesture &&
         (!e.touches || e.touches.length === 0) &&
         Date.now() - touchStartTime < 400;
+      // A double tap sends Tab only when the setting is on. A scroll, a long
+      // press and a selection drag are not plain taps, so they stay as they are.
+      // Mouse tracking keeps the click below.
+      if (isPlainTap && termixPlainTapSendsTab(Date.now(), touchStartX, touchStartY,
+          terminal.modes.mouseTrackingMode !== 'none', false)) {
+        try { e.preventDefault(); } catch (e2) {}
+        forwardTerminalInput('\\t');
+        return;
+      }
+      if (!isPlainTap) termixLastPlainTap = null;
       if (isPlainTap && terminal.modes.mouseTrackingMode !== 'none') {
         try { e.preventDefault(); } catch(e2) {}
         sendTapClick(touchStartX, touchStartY);

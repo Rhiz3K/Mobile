@@ -38,6 +38,9 @@ class TermixTerminalModule : Module() {
       Prop("surfaceVisible") { _: TermixTerminalView, _: Boolean? -> }
       // iOS only; Android reads Alt from the keyboard itself.
       Prop("optionAsMeta") { _: TermixTerminalView, _: Boolean? -> }
+      Prop("doubleTapTab") { view: TermixTerminalView, on: Boolean? ->
+        view.setDoubleTapTab(on == true)
+      }
 
       Prop("theme") { view: TermixTerminalView, theme: TerminalThemeRecord? ->
         view.setTheme(theme)

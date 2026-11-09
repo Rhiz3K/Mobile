@@ -55,6 +55,10 @@ public class TermixTerminalModule: Module {
         view.update { $0.optionAsMeta = value ?? false }
       }
 
+      Prop("doubleTapTab") { (view: TermixTerminalView, on: Bool?) in
+        view.setDoubleTapTab(on ?? false)
+      }
+
       Prop("accentColor") { (view: TermixTerminalView, color: String?) in
         view.setAccentColor(color)
       }
