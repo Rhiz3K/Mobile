@@ -8,6 +8,9 @@ import {
   doubleTapAction,
   doubleTapFromRecognizer,
   effectsForTouches,
+  stepSecondTap,
+  type SecondTapEvent,
+  type SecondTapState,
   tapsAreDouble,
   xtermDoubleTapPrelude,
   type DoubleTapState,
@@ -58,6 +61,86 @@ describe("doubleTapAction", () => {
     expect(doubleTapAction(true, { ...clear, link: true })).toBe("default");
     expect(doubleTapAction(true, { ...clear, selecting: true })).toBe(
       "default",
+    );
+  });
+});
+
+function replaySecondTap(
+  events: SecondTapEvent[],
+  enabled = true,
+  context: DoubleTapState = clear,
+) {
+  let state: SecondTapState | null = null;
+  return events.map((event) => {
+    const step = stepSecondTap(state, event, enabled, context);
+    state = step.state;
+    return step.tab;
+  });
+}
+
+describe("stepSecondTap", () => {
+  test("Tab is sent when the second press lifts, not when it goes down", () => {
+    expect(
+      replaySecondTap([
+        { phase: "down", x: 0, y: 0, t: 0 },
+        { phase: "up", x: 2, y: 1, t: 40 },
+      ]),
+    ).toEqual([false, true]);
+  });
+
+  test("a drag, a long press, a long hold, or a cancel does not send Tab", () => {
+    expect(
+      replaySecondTap([
+        { phase: "down", x: 0, y: 0, t: 0 },
+        { phase: "move", x: TAP_SLOP + 1, y: 0, t: 20 },
+        { phase: "up", x: TAP_SLOP + 1, y: 0, t: 40 },
+      ]),
+    ).toEqual([false, false, false]);
+    expect(
+      replaySecondTap([
+        { phase: "down", x: 0, y: 0, t: 0 },
+        { phase: "move", x: TAP_SLOP, y: 0, t: 20 },
+        { phase: "up", x: TAP_SLOP, y: 0, t: 40 },
+      ]),
+    ).toEqual([false, false, true]);
+    expect(
+      replaySecondTap([
+        { phase: "down", x: 0, y: 0, t: 0 },
+        { phase: "long-press", x: 0, y: 0, t: LONG_PRESS_MS },
+        { phase: "up", x: 0, y: 0, t: LONG_PRESS_MS + 20 },
+      ]),
+    ).toEqual([false, false, false]);
+    expect(
+      replaySecondTap([
+        { phase: "down", x: 0, y: 0, t: 0 },
+        { phase: "up", x: 0, y: 0, t: LONG_PRESS_MS },
+      ]),
+    ).toEqual([false, false]);
+    expect(
+      replaySecondTap([
+        { phase: "down", x: 0, y: 0, t: 0 },
+        { phase: "cancel", x: 0, y: 0, t: 15 },
+        { phase: "up", x: 0, y: 0, t: 30 },
+      ]),
+    ).toEqual([false, false, false]);
+  });
+
+  test("the setting, a link, the mouse, or a selection does not arm Tab", () => {
+    const press: SecondTapEvent[] = [
+      { phase: "down", x: 0, y: 0, t: 0 },
+      { phase: "up", x: 0, y: 0, t: 30 },
+    ];
+    expect(replaySecondTap(press, false)).toEqual([false, false]);
+    expect(replaySecondTap(press, true, { ...clear, link: true })).toEqual([
+      false,
+      false,
+    ]);
+    expect(replaySecondTap(press, true, { ...clear, mouse: true })).toEqual([
+      false,
+      false,
+    ]);
+    expect(replaySecondTap(press, true, { ...clear, selecting: true })).toEqual(
+      [false, false],
     );
   });
 });

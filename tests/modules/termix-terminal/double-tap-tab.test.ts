@@ -43,13 +43,24 @@ describe("double tap sends Tab on Android", () => {
   const longPress = body(kotlin, /override fun onLongPress\(/);
   const scroll = body(kotlin, /override fun onScroll\(/);
 
-  it("sends Tab only when the shared rule says so, and still selects a word otherwise", () => {
+  it("arms Tab on the second finger-down and selects a word otherwise", () => {
     expect(doubleTap).toMatch(/DoubleTapTab\.sendsTab\(/);
-    expect(doubleTap).toMatch(/sendNamedKey\("Tab", false\)/);
+    expect(doubleTap).not.toMatch(/sendNamedKey/);
+    expect(doubleTap).toMatch(/pendingDoubleTapTab = true/);
     expect(doubleTap).toMatch(/nativeSelectWord/);
     expect(doubleTap).toMatch(/mouseTracking/);
     // The first tap clears a selection before this runs, so that fact is kept.
     expect(doubleTap).toMatch(/selectionDismissedThisTap/);
+  });
+
+  it("sends Tab only when the second press lifts cleanly", () => {
+    const finish = body(kotlin, /override fun onDoubleTapEvent\(/);
+    expect(finish).toMatch(/ACTION_UP/);
+    expect(finish).toMatch(/pendingMoved/);
+    expect(finish).toMatch(/sendNamedKey\("Tab", false\)/);
+    expect(finish).toMatch(/ACTION_CANCEL/);
+    const touch = body(kotlin, /override fun onTouchEvent\(/);
+    expect(touch).toMatch(/ACTION_CANCEL\) pendingDoubleTapTab = false/);
   });
 
   it("remembers a tap that dismissed a selection", () => {
@@ -63,8 +74,10 @@ describe("double tap sends Tab on Android", () => {
   });
 
   it("leaves a long press selecting text and a scroll scrolling", () => {
+    expect(longPress).toMatch(/pendingDoubleTapTab = false/);
     expect(longPress).toMatch(/nativeSelectWord/);
     expect(longPress).not.toMatch(/sendNamedKey/);
+    expect(scroll).toMatch(/pendingDoubleTapTab = false/);
     expect(scroll).toMatch(/scrollRows/);
     expect(scroll).not.toMatch(/sendNamedKey/);
   });

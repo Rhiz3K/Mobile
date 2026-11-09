@@ -27,6 +27,7 @@ import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.accessibility.AccessibilityManager
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.inputmethod.BaseInputConnection
@@ -228,6 +229,18 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
   private var linkOpenedThisTap = false
   /** The first tap dismissed a selection, so the second must not send Tab. */
   private var selectionDismissedThisTap = false
+  /**
+   * onDoubleTap runs on the second finger-down. Tab waits for that press to
+   * lift without a drag, a long press, or a cancel.
+   */
+  private var pendingDoubleTapTab = false
+  private var pendingSawDown = false
+  private var pendingMoved = false
+  private var pendingDownX = 0f
+  private var pendingDownY = 0f
+  private var pendingDownTime = 0L
+  private val touchSlopPx = ViewConfiguration.get(context).scaledTouchSlop
+  private val doubleTapConfirmMs = ViewConfiguration.getLongPressTimeout().toLong()
   private var lastBellAt = 0L
   private var flashUntil = 0L
   private var tone: ToneGenerator? = null
@@ -304,7 +317,7 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
       }
 
       // A double tap selects the word, like a long press without the drag.
-      // With the setting on it sends Tab instead, and leaves that word alone.
+      // With the setting on, Tab waits until the second press lifts cleanly.
       override fun onDoubleTap(e: MotionEvent): Boolean {
         if (handle == 0L || finished) return false
         val link = linkOpenedThisTap || linkAt(e.x, e.y) != null
@@ -312,9 +325,12 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
         linkOpenedThisTap = false
         selectionDismissedThisTap = false
         if (DoubleTapTab.sendsTab(doubleTapTab, mouseTracking, link, selecting)) {
-          sendNamedKey("Tab", false)
+          pendingDoubleTapTab = true
+          pendingSawDown = false
+          pendingMoved = false
           return true
         }
+        pendingDoubleTapTab = false
         if (mouseTracking) return false
         lastPressCol = colAt(e.x)
         lastPressRow = rowAt(e.y)
@@ -327,9 +343,39 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
         return true
       }
 
+      override fun onDoubleTapEvent(e: MotionEvent): Boolean {
+        if (!pendingDoubleTapTab) return false
+        when (e.actionMasked) {
+          MotionEvent.ACTION_DOWN -> {
+            pendingSawDown = true
+            pendingDownX = e.x
+            pendingDownY = e.y
+            pendingDownTime = e.eventTime
+            pendingMoved = false
+          }
+          MotionEvent.ACTION_MOVE -> {
+            val dx = e.x - pendingDownX
+            val dy = e.y - pendingDownY
+            if (dx * dx + dy * dy > touchSlopPx * touchSlopPx) pendingMoved = true
+            if (e.pointerCount > 1) pendingMoved = true
+          }
+          MotionEvent.ACTION_UP -> {
+            val held = e.eventTime - pendingDownTime
+            val send = pendingSawDown && !pendingMoved && held >= 0 && held < doubleTapConfirmMs
+            pendingDoubleTapTab = false
+            if (send && handle != 0L && !finished) sendNamedKey("Tab", false)
+          }
+          MotionEvent.ACTION_CANCEL, MotionEvent.ACTION_POINTER_DOWN -> {
+            pendingDoubleTapTab = false
+          }
+        }
+        return true
+      }
+
       override fun onLongPress(e: MotionEvent) {
         linkOpenedThisTap = false
         selectionDismissedThisTap = false
+        pendingDoubleTapTab = false
         if (handle == 0L || finished || scaleDetector.isInProgress) return
         lastPressCol = colAt(e.x)
         lastPressRow = rowAt(e.y)
@@ -357,6 +403,7 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
       ): Boolean {
         linkOpenedThisTap = false
         selectionDismissedThisTap = false
+        pendingDoubleTapTab = false
         if (handle == 0L || scaleDetector.isInProgress) return false
         scrollAccum += distanceY
         val deltaRows = (scrollAccum / cellHeight).toInt()
@@ -1705,9 +1752,12 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
   // ── Input ──
 
   override fun onTouchEvent(event: MotionEvent): Boolean {
+    // The detector does not report a cancel to onDoubleTapEvent.
+    if (event.actionMasked == MotionEvent.ACTION_CANCEL) pendingDoubleTapTab = false
     if (event.actionMasked == MotionEvent.ACTION_DOWN) scroller.abortAnimation()
     scaleDetector.onTouchEvent(event)
     if (scaleDetector.isInProgress) {
+      pendingDoubleTapTab = false
       if (draggingHandle != HANDLE_NONE) {
         draggingHandle = HANDLE_NONE
         magnifier?.dismiss()

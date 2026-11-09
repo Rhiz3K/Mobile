@@ -73,6 +73,60 @@ export function doubleTapAction(
   return "tab";
 }
 
+export type SecondTapPhase = "down" | "move" | "up" | "cancel" | "long-press";
+
+export interface SecondTapEvent {
+  phase: SecondTapPhase;
+  x: number;
+  y: number;
+  t: number;
+}
+
+export interface SecondTapState {
+  armed: boolean;
+  x: number;
+  y: number;
+  t: number;
+  moved: boolean;
+}
+
+/**
+ * Android's onDoubleTap runs when the second press goes down. Tab is armed
+ * then and sent only if that press lifts as a tap: no drag past the touch
+ * slop, no long press, and no cancel.
+ */
+export function stepSecondTap(
+  state: SecondTapState | null,
+  event: SecondTapEvent,
+  enabled: boolean,
+  context: DoubleTapState,
+  slop = TAP_SLOP,
+  longPressMs = LONG_PRESS_MS,
+): { state: SecondTapState | null; tab: boolean } {
+  if (event.phase === "down") {
+    if (doubleTapAction(enabled, context) !== "tab") {
+      return { state: null, tab: false };
+    }
+    return {
+      state: { armed: true, x: event.x, y: event.y, t: event.t, moved: false },
+      tab: false,
+    };
+  }
+  if (!state?.armed) return { state: null, tab: false };
+  if (event.phase === "move") {
+    const dx = event.x - state.x;
+    const dy = event.y - state.y;
+    const moved = state.moved || dx * dx + dy * dy > slop * slop;
+    return { state: { ...state, moved }, tab: false };
+  }
+  if (event.phase === "cancel" || event.phase === "long-press") {
+    return { state: null, tab: false };
+  }
+  const held = event.t - state.t;
+  const tab = !state.moved && held >= 0 && held < longPressMs;
+  return { state: null, tab };
+}
+
 /** Two taps are one double tap when the second lands soon and close. */
 export function tapsAreDouble(
   first: PointSample | null,
