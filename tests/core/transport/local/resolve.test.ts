@@ -69,7 +69,7 @@ test("a saved host uses its row, ssh port and jump hosts", () => {
   expect(l.jumpHostIds).toEqual([3, 4]);
 });
 
-test("a linked login fills secrets, certificate and username", () => {
+test("a linked login fills secrets and the certificate", () => {
   const p = profile({
     host: {
       ...profile().host,
@@ -89,7 +89,7 @@ test("a linked login fills secrets, certificate and username", () => {
   const l = resolveLogin(p, typed);
   expect(l.authType).toBe("key");
   expect(l.config).toMatchObject({
-    username: "deploy",
+    username: "root",
     privateKey: "KEY",
     passphrase: "kp",
     password: "also",
@@ -101,6 +101,38 @@ test("a linked login fills secrets, certificate and username", () => {
     typed,
   );
   expect(kept.config.username).toBe("root");
+});
+
+test("the host username wins; the linked login is only a fallback", () => {
+  const linked = (username: string, credUsername: string, override = false) =>
+    profile({
+      host: {
+        ...profile().host,
+        username,
+        authType: "credential",
+        credentialId: 9,
+        overrideCredentialUsername: override,
+        password: undefined,
+      } as any,
+      credential: { id: 9, username: credUsername, key: "KEY" } as any,
+    });
+
+  expect(resolveLogin(linked("userB", "userA"), typed).config.username).toBe(
+    "userB",
+  );
+  expect(resolveLogin(linked("", "userA"), typed).config.username).toBe(
+    "userA",
+  );
+  expect(resolveLogin(linked("   ", "userA"), typed).config.username).toBe(
+    "userA",
+  );
+  expect(resolveLogin(linked("userB", "   "), typed).config.username).toBe(
+    "userB",
+  );
+  expect(resolveLogin(linked("", "   "), typed).config.username).toBe("");
+  expect(resolveLogin(linked("", "userA", true), typed).config.username).toBe(
+    "",
+  );
 });
 
 test("a password login never sends a key", () => {

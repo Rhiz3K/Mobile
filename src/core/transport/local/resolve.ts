@@ -1,7 +1,8 @@
 /**
  * Turns a saved host into an engine login, like core's host-resolver and
- * build-connect-config: the linked login fills the secrets, ssh_options sets
- * keepalive, algorithms and env, and proxies and port knocks carry over.
+ * build-connect-config: the linked login fills the secrets, the host's
+ * username wins over the login's, ssh_options sets keepalive, algorithms
+ * and env, and proxies and port knocks carry over.
  */
 import type { HostConnectProfile } from "@/core/data/types";
 import type {
@@ -39,6 +40,26 @@ function keepaliveCount(options: Record<string, unknown>, base: number) {
   const n = Number(options.keepaliveCountMax);
   if (!Number.isFinite(n) || options.keepaliveCountMax == null) return base;
   return n <= 0 ? 0 : Math.max(1, Math.round(n));
+}
+
+function nonEmpty(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() !== "" ? value : undefined;
+}
+
+/**
+ * Like the server's pickResolvedUsername: a set host username always wins.
+ * The credential's username is only a fallback when the host has none, and
+ * overrideCredentialUsername forces the host username.
+ */
+function resolvedUsername(
+  hostUsername: unknown,
+  credentialUsername: unknown,
+  overrideCredentialUsername?: unknown,
+): string {
+  const host = nonEmpty(hostUsername);
+  const cred = nonEmpty(credentialUsername);
+  if (overrideCredentialUsername) return host ?? "";
+  return host ?? cred ?? "";
 }
 
 function envVars(options: Record<string, unknown>): Record<string, string> {
@@ -125,9 +146,11 @@ export function resolveLogin(
     key = cred.key || undefined;
     keyPassword = cred.keyPassword || undefined;
     certificate = cred.certPublicKey || undefined;
-    if (!src.overrideCredentialUsername && cred.username) {
-      username = cred.username;
-    }
+    username = resolvedUsername(
+      src.username,
+      cred.username,
+      src.overrideCredentialUsername,
+    );
   }
   assertDeviceAuth(authType, password, key);
   // Like the server, a linked login decides the type by what it holds.
