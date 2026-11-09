@@ -49,6 +49,22 @@ describe("translateSpecialKeyEvent", () => {
       "\x1bX",
     );
   });
+
+  test("Right follows application cursor mode and Ctrl", () => {
+    expect(translateSpecialKeyEvent(key("ArrowRight"))).toBe("\x1b[C");
+    expect(
+      translateSpecialKeyEvent({
+        ...key("ArrowRight"),
+        cursorApplication: true,
+      }),
+    ).toBe("\x1bOC");
+    expect(translateSpecialKeyEvent(key("ArrowRight", { ctrl: true }))).toBe(
+      "\x1b[1;5C",
+    );
+    expect(translateSpecialKeyEvent(key("ArrowLeft", { alt: true }))).toBe(
+      "\x1b[1;3D",
+    );
+  });
 });
 
 test("the same key from two sources inside the window counts once", () => {

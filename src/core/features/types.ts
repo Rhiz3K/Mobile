@@ -345,6 +345,8 @@ export interface TerminalInputHandle {
   isSelecting: () => boolean;
   /** Set when the tab draws a native terminal that owns the keyboard. */
   keyTarget?: () => TerminalKeyTarget | null;
+  /** True while the program has application cursor keys (DECCKM) on. */
+  cursorApplication?: () => boolean;
   /** Runs a key row command the tab knows, like "search". False when it doesn't. */
   command?: (id: string) => boolean;
   /** The shell's working directory, or null when it can't tell. */

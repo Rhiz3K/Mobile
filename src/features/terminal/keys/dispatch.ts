@@ -1,4 +1,5 @@
 import type { TerminalKeyTarget } from "@/core/features/types";
+import { encodeCursorKey, type CursorModifiers } from "./cursor";
 import type { KeyAction } from "./model";
 
 /** What a key press reaches. */
@@ -19,6 +20,8 @@ export interface KeyState {
   alt: boolean;
   tmuxPrefix: string;
   backspaceMode?: "normal" | "control-h";
+  /** DECCKM. Arrows then go out as SS3, which `less` reads as Right. */
+  cursorApplication?: boolean;
 }
 
 const SEQUENCES: Record<string, string> = {
@@ -51,8 +54,15 @@ const SEQUENCES: Record<string, string> = {
 };
 
 /** The bytes for a named key, for terminals that don't encode keys. */
-export function keySequence(name: string, shift = false): string | null {
-  if (name === "Tab" && shift) return "\x1b[Z";
+export function keySequence(
+  name: string,
+  shift: boolean | CursorModifiers = false,
+): string | null {
+  const options: CursorModifiers =
+    typeof shift === "boolean" ? { shift } : shift;
+  if (name === "Tab" && options.shift) return "\x1b[Z";
+  const cursor = encodeCursorKey(name, options);
+  if (cursor) return cursor;
   return SEQUENCES[name] ?? null;
 }
 
@@ -108,6 +118,12 @@ export function runKeyAction(
       }
       if (target) {
         target.sendKey(action.name, state.shift);
+        return { consumed: true };
+      }
+      // No native encoder (xterm). Arrows have to follow DECCKM themselves.
+      const cursor = encodeCursorKey(action.name, state);
+      if (cursor) {
+        sink.send(cursor);
         return { consumed: true };
       }
       const seq = keySequence(action.name, state.shift);

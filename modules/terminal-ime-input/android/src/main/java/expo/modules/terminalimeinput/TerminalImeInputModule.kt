@@ -50,6 +50,23 @@ private class TerminalImeEditText(
     return TerminalImeInputConnection(this, base)
   }
 
+  override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+    // An unhandled Right moves focus instead of reaching the terminal.
+    if (
+      event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT ||
+      event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT ||
+      event.keyCode == KeyEvent.KEYCODE_DPAD_UP ||
+      event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN
+    ) {
+      when (event.action) {
+        KeyEvent.ACTION_DOWN -> onKeyDown(event.keyCode, event)
+        KeyEvent.ACTION_UP -> onKeyUp(event.keyCode, event)
+      }
+      return true
+    }
+    return super.dispatchKeyEvent(event)
+  }
+
   override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
     val mappedKey = mapSpecialKey(keyCode)
     if (mappedKey == null) {
@@ -158,6 +175,14 @@ private class TerminalImeEditText(
     return true
   }
 
+  internal fun arrowKeyName(text: String): String? = when (text) {
+    "\u001b[A", "\u001bOA" -> "ArrowUp"
+    "\u001b[B", "\u001bOB" -> "ArrowDown"
+    "\u001b[C", "\u001bOC" -> "ArrowRight"
+    "\u001b[D", "\u001bOD" -> "ArrowLeft"
+    else -> null
+  }
+
   private fun mapSpecialKey(keyCode: Int): String? = when (keyCode) {
     KeyEvent.KEYCODE_ENTER,
     KeyEvent.KEYCODE_NUMPAD_ENTER -> "Enter"
@@ -209,6 +234,13 @@ private class TerminalImeEditText(
 
     override fun commitText(text: CharSequence?, newCursorPosition: Int): Boolean {
       val committed = text?.toString().orEmpty()
+      // Keyboards that type Right as ESC [ C never reach less, which wants
+      // ESC O C. Hand it over as the key so the terminal can encode the mode.
+      val arrow = editText.arrowKeyName(committed)
+      if (arrow != null) {
+        editText.owner.emitSpecialKey(arrow)
+        return true
+      }
       if (committed == "\n" && editText.onEnterFromIme()) {
         return true
       }

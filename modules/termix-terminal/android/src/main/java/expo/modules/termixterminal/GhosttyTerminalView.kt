@@ -228,6 +228,9 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
 
   // ── Keyboard ──
   private val ime = ImeShadow()
+  // DECCKM, read from PTY output. The key row's Right has to become ESC O C
+  // while this is on, or less ignores it.
+  private val cursorKeys = CursorKeys()
   private var cjkKeyboard = false
   private val ctrl = StickyModifier(SystemClock::uptimeMillis)
   private val alt = StickyModifier(SystemClock::uptimeMillis)
@@ -540,11 +543,17 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
 
   /** Lines kept above the screen. Only takes effect before the first output. */
   fun setScrollback(lines: Int) {
-    synchronized(vtLock) {
-      if (handle == 0L || stats.bytes > 0) return
-      GhosttyVt.nativeFree(handle)
-      handle = GhosttyVt.nativeCreate(cols, rows, lines.coerceIn(100, 100_000).toLong())
+    val created = synchronized(vtLock) {
+      if (handle == 0L || stats.bytes > 0) {
+        false
+      } else {
+        GhosttyVt.nativeFree(handle)
+        handle = GhosttyVt.nativeCreate(cols, rows, lines.coerceIn(100, 100_000).toLong())
+        true
+      }
     }
+    if (!created) return
+    cursorKeys.reset()
     applyTheme()
     applyCursor()
     updateGridGeometry(force = true)
@@ -561,6 +570,7 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
   /** Takes output from this pipe; null uses the view's own, fed by [write]. */
   fun setPipe(id: String?) {
     if (id == pipeId) return
+    cursorKeys.reset()
     pipe.detachSink(sink)
     pipeId?.let { TermixPipes.release(it) }
     pipeId = id
@@ -578,6 +588,9 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
     val start = SystemClock.uptimeMillis()
     while (!destroyed) {
       val chunk = pipe.read(PARSE_SLICE) ?: break
+      // Before the parser, so a key pressed as the screen appears already
+      // sees the smkx `less` just sent.
+      cursorKeys.feed(chunk)
       synchronized(vtLock) {
         if (handle == 0L) return
         stats.bytes += chunk.size
@@ -785,13 +798,28 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
   /** A named key from the app's key row, with the sticky modifiers and [shift]. */
   fun sendNamedKey(name: String, shift: Boolean) {
     if (handle == 0L || finished) return
-    val keyCode = NAMED_KEYS[name] ?: return
     var meta = stickyMeta()
     if (shift) meta = meta or KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON
+    val ctrl = meta and KeyEvent.META_CTRL_ON != 0
+    val alt = meta and KeyEvent.META_ALT_ON != 0
+    val application = cursorKeys.isApplication()
     consumeSticky()
     ime.reset()
-    val bytes = encodeKey(keyCode, 1, meta, 0, null) ?: return
-    if (bytes.isNotEmpty()) sendBytes(bytes)
+    // While DECCKM is on, arrows are ours: less wants SS3, and a keyboard
+    // that committed ESC [ C has to be rewritten the same way. The key row
+    // has no Meta key; hardware Meta is handled with the key event.
+    val forced = CursorKeys.sequence(name, shift, ctrl, alt, false, application)
+    if (forced != null && (application || shift || ctrl || alt)) {
+      sendBytes(forced.toByteArray(Charsets.UTF_8))
+      return
+    }
+    val keyCode = NAMED_KEYS[name] ?: return
+    val bytes = encodeKey(keyCode, 1, meta, 0, null)
+    if (bytes != null && bytes.isNotEmpty()) {
+      sendBytes(bytes)
+      return
+    }
+    if (forced != null) sendBytes(forced.toByteArray(Charsets.UTF_8))
   }
 
   private fun sendBackspaces(count: Int) {
@@ -1753,6 +1781,16 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
     imm.updateSelection(this, before, before, -1, -1)
   }
 
+  override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+    // Android uses an unhandled DPAD_RIGHT to move focus. In a terminal that
+    // drops Right (less never sees it) and can jump focus to the key row.
+    if (isArrowKey(event.keyCode)) {
+      handleKeyEvent(event)
+      return true
+    }
+    return super.dispatchKeyEvent(event)
+  }
+
   override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
     return handleKeyEvent(event) || super.onKeyDown(keyCode, event)
   }
@@ -1811,6 +1849,24 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
       null
     }
     val unshifted = event.getUnicodeChar(0)
+    if (action != 0) {
+      val metaHeld = (metaState and KeyEvent.META_META_ON) != 0
+      val arrow = CursorKeys.sequence(
+        arrowName(event.keyCode) ?: "",
+        metaState and KeyEvent.META_SHIFT_ON != 0,
+        metaState and KeyEvent.META_CTRL_ON != 0,
+        metaState and KeyEvent.META_ALT_ON != 0,
+        metaHeld,
+        cursorKeys.isApplication(),
+      )
+      val modified = metaHeld || (metaState and
+        (KeyEvent.META_SHIFT_ON or KeyEvent.META_CTRL_ON or KeyEvent.META_ALT_ON)) != 0
+      val force = arrow != null && (cursorKeys.isApplication() || modified)
+      if (force && arrow != null) {
+        sendBytes(arrow.toByteArray(Charsets.UTF_8))
+        return true
+      }
+    }
     val bytes = encodeKey(event.keyCode, action, metaState, unshifted, utf8) ?: return false
     if (bytes.isEmpty()) return false
     sendBytes(bytes)
@@ -1851,6 +1907,14 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
 
     override fun commitText(text: CharSequence, newCursorPosition: Int): Boolean {
       val value = text.toString()
+      // Some Android keyboards commit Right as the text ESC [ C. That edits
+      // readline and is ignored by less, which is waiting for ESC O C.
+      val arrow = CursorKeys.nameOfSequence(value)
+      if (arrow != null && !ime.hasComposing()) {
+        sendNamedKey(arrow, false)
+        syncImeSelection()
+        return true
+      }
       if (value == "\n" && !ime.hasComposing()) {
         ime.commit(value)
         sendEnter()
@@ -1946,6 +2010,16 @@ internal class GhosttyTerminalView(context: Context) : View(context) {
     const val SCROLLBAR_FADE_START_MS = 800L
     const val SCROLLBAR_FADE_END_MS = 1400L
     const val SCROLLBAR_COLOR = 0xB3AAAAAA.toInt()
+
+    fun isArrowKey(keyCode: Int) = arrowName(keyCode) != null
+
+    fun arrowName(keyCode: Int): String? = when (keyCode) {
+      KeyEvent.KEYCODE_DPAD_UP -> "ArrowUp"
+      KeyEvent.KEYCODE_DPAD_DOWN -> "ArrowDown"
+      KeyEvent.KEYCODE_DPAD_LEFT -> "ArrowLeft"
+      KeyEvent.KEYCODE_DPAD_RIGHT -> "ArrowRight"
+      else -> null
+    }
 
     val NAMED_KEYS = mapOf(
       "Escape" to KeyEvent.KEYCODE_ESCAPE,

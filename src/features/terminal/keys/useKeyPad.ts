@@ -96,6 +96,7 @@ export function useKeyPad(
         alt: !t && local.alt !== "inactive",
         tmuxPrefix: optionsRef.current.tmuxPrefix,
         backspaceMode: optionsRef.current.backspaceMode,
+        cursorApplication: !!terminalRef.current?.cursorApplication?.(),
       });
       if (result.toggled) {
         const name = result.toggled;

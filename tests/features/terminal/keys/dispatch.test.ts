@@ -107,3 +107,30 @@ test("control codes and sequences", () => {
   expect(keySequence("F5")).toBe("\x1b[15~");
   expect(keySequence("Nope")).toBeNull();
 });
+
+test("Shift-Right is the modified sequence, not a plain arrow", () => {
+  expect(keySequence("ArrowRight", true)).toBe("\x1b[1;2C");
+  expect(keySequence("ArrowLeft", true)).toBe("\x1b[1;2D");
+});
+
+test("application cursor mode sends SS3, which less binds for Right", () => {
+  const x = sink(false);
+  runKeyAction(
+    { type: "key", name: "ArrowRight" },
+    x.s,
+    state({ cursorApplication: true }),
+  );
+  runKeyAction(
+    { type: "key", name: "ArrowUp" },
+    x.s,
+    state({ cursorApplication: true }),
+  );
+  expect(x.sent).toEqual(["\x1bOC", "\x1bOA"]);
+});
+
+test("a plain Right on the native terminal still goes to the view", () => {
+  const n = sink(true);
+  runKeyAction({ type: "key", name: "ArrowRight" }, n.s, state());
+  expect(n.calls).toEqual([["sendKey", "ArrowRight", false]]);
+  expect(n.sent).toEqual([]);
+});

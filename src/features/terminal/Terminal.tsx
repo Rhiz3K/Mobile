@@ -84,6 +84,7 @@ import {
   TmuxWindowsSheet,
   type PickSession,
 } from "./tmux/TmuxSheets";
+import { CursorKeyMode } from "./keys/cursor";
 import { controlCode } from "./keys/dispatch";
 import { useKeyLayout } from "./keys/useKeyLayout";
 import type { TerminalSearchResult } from "@/modules/termix-terminal";
@@ -172,6 +173,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
     const { config, updateFontSize } = useTerminalCustomization();
     const nativeRef = useRef<TerminalViewApi>(null);
     const xtermRef = useRef<XtermTerminalApi>(null);
+    const cursorMode = useRef(new CursorKeyMode());
     const connRef = useRef<HostConnection | null>(null);
     const sizeRef = useRef<{ cols: number; rows: number } | null>(null);
     const connectedOnce = useRef(false);
@@ -537,7 +539,13 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
           transportRef.current = kind;
           onTransportResolved?.(kind);
         },
-        onConnected: ({ fromBackground, isReattach }) => {
+        onConnected: ({ fromBackground, isReattach, resumed }) => {
+          // A new shell is in normal cursor mode. Reattach keeps the program
+          // that had already turned DECCKM on.
+          if (resumed && !isReattach) {
+            cursorMode.current.reset();
+            if (!XTERM_FALLBACK) nativeRef.current?.write("\x1b[?1l");
+          }
           const firstTime = !connectedBefore.current;
           connectedBefore.current = true;
           // RelayShell clears before the server replays a reattached screen.
@@ -556,6 +564,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
           }
         },
         onData: (data) => {
+          cursorMode.current.feed(data);
           watcherRef.current?.feed(data);
           if (XTERM_FALLBACK) xtermRef.current?.write(data);
           else nativeRef.current?.write(data);
@@ -644,6 +653,8 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
     const [viewKey, setViewKey] = useState(0);
     const firstConn = useRef(true);
     useEffect(() => {
+      // The view is new; the tracker is not. Drop the previous session's mode.
+      cursorMode.current.noteConnection(conn);
       if (firstConn.current) {
         firstConn.current = false;
         return;
@@ -832,6 +843,7 @@ const TerminalComponent = forwardRef<TerminalHandle, TerminalProps>(
         isSelecting: () =>
           XTERM_FALLBACK ? (xtermRef.current?.isSelecting() ?? false) : false,
         keyTarget: () => (XTERM_FALLBACK ? null : keyTarget),
+        cursorApplication: () => cursorMode.current.application,
         command: runCommand,
         getCwd: () => connRef.current?.getCwd() ?? Promise.resolve(null),
       }),
